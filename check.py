@@ -2,19 +2,27 @@
 """Quick health check for the SEC database: run `python3 check.py` after any change.
 
 It reads a handful of companies straight from sec.db (no server, no internet) and checks figures that
-have gone wrong before, plus a few rules every company should obey. If moomoo OpenD is running it
-also checks the chart's price feed. Nothing is written or downloaded.
+have gone wrong before, plus a few rules every company should obey. If moomoo OpenD is running and
+logged in it also checks the chart's price feed. Nothing is written or downloaded.
+
+Anything it could not check (a company not in the database, OpenD not running) is listed as skipped,
+never as passed. It exits with 1 when a check failed or when no database check could run.
 """
 import sys
 
 import sec_db as s
 
-PASSED, FAILED = [], []
+PASSED, FAILED, SKIPPED = [], [], []
 
 
 def check(name, ok, detail=""):
     (PASSED if ok else FAILED).append(name)
     print(("  ok    " if ok else "  FAIL  ") + name + (f"  ({detail})" if detail and not ok else ""))
+
+
+def skip(name, why):
+    SKIPPED.append(name)
+    print(f"  skip  {name}  ({why})")
 
 
 def near(a, b, tol=0.02):
@@ -29,6 +37,9 @@ def main():
     quarters = lambda t: s.desk_quarters(db, s.lookup_cik(db, t))
 
     print("Figures that have been wrong before")
+    for t in ("AAPL", "COST", "LLY", "CAT", "XOM", "NBIS"):
+        if not have(t):
+            skip(f"{t} figures", f"{t} is not in sec.db; run `python3 sec_db.py fetch {t}`")
     if have("AAPL"):
         check("Apple FY2025 revenue is $416.2B", near(year("AAPL", 2025).get("revenue"), 416161))
     if have("COST"):
@@ -49,11 +60,13 @@ def main():
         check("Nebius 2021 revenue is in dollars, not roubles", (year("NBIS", 2021).get("revenue") or 0) < 20000, year("NBIS", 2021).get("revenue"))
 
     print("Rules every company should obey (latest year on file)")
+    looked = 0
     for r in db.execute("SELECT ticker, cik FROM companies WHERE ticker IS NOT NULL ORDER BY ticker"):
         by = s.desk_fundamentals(db, r["cik"])["byYear"]
         years = sorted(y for y in by if by[y].get("assets"))
         if not years:
             continue
+        looked += 1
         v, x = by[years[-1]], s.desk_statements(db, r["cik"])["annual"].get(years[-1], {})
         problems = []
         # some companies report equity with the outside owners' share already inside it (AST SpaceMobile), others beside it
@@ -68,23 +81,36 @@ def main():
             problems.append("cost of revenue is over three times revenue")
         if problems:
             check(f"{r['ticker']} FY{years[-1]} balance sheet adds up", False, "; ".join(problems))
-    if not any("balance sheet adds up" in f for f in FAILED):
-        check("every company's latest balance sheet adds up", True)
+    if not looked:
+        skip("every company's latest balance sheet adds up", "no company in sec.db has a balance sheet yet")
+    elif not any("balance sheet adds up" in f for f in FAILED):
+        check(f"every company's latest balance sheet adds up ({looked} companies)", True)
+
+    db_checked = len(PASSED) + len(FAILED)
 
     print("moomoo price feed")
     try:
         status = s.moomoo_status()
-    except s.OpenDError as e:
-        print("  skipped: " + str(e))
-    else:
-        check("OpenD is logged in for quotes", status.get("quotes"))
-        d = s.moomoo_candles("AAPL", "D", tail=True)        # the last few candles; AAPL is almost always already counted this week
-        bars = d["bars"]
-        check("daily candles arrive, oldest first", len(bars) > 3 and all(a[0] < b[0] for a, b in zip(bars, bars[1:])))
-        check("each candle's high and low bracket its open and close", all(b[2] >= max(b[1], b[4]) - 1e-6 and b[3] <= min(b[1], b[4]) + 1e-6 for b in bars))
-        check("P/E history arrives", len(s.moomoo_valuation("AAPL")["points"]) > 1000)
+    except (s.OpenDError, OSError) as e:
+        status = None
+        skip("moomoo price feed", str(e) or "OpenD is not running")
+    if status and not status.get("quotes"):
+        skip("moomoo price feed", "OpenD is running but not logged in; log in to the moomoo OpenD app")
+    elif status:
+        try:
+            bars = s.moomoo_candles("AAPL", "D", tail=True)["bars"]   # the last few candles; AAPL is almost always already counted this week
+            check("daily candles arrive, oldest first", len(bars) > 3 and all(a[0] < b[0] for a, b in zip(bars, bars[1:])), f"{len(bars)} candles")
+            check("each candle's high and low bracket its open and close", all(b[2] >= max(b[1], b[4]) - 1e-6 and b[3] <= min(b[1], b[4]) + 1e-6 for b in bars))
+            pts = s.moomoo_valuation("AAPL")["points"]
+            check("P/E history arrives", len(pts) > 1000, f"{len(pts)} days")
+        except (s.OpenDError, OSError) as e:
+            check("moomoo price feed answers", False, str(e))
 
-    print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
+    print(f"\n{len(PASSED)} passed, {len(FAILED)} failed, {len(SKIPPED)} skipped")
+    if not db_checked:
+        print("The database was not checked: sec.db has none of the companies above. Fetch some first,")
+        print("for example `python3 sec_db.py fetch AAPL COST LLY`.")
+        return 1
     return 1 if FAILED else 0
 
 

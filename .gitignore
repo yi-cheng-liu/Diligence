@@ -12,3 +12,6 @@ _backup_before_reports_tab/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Your research reports (the default reports folder)
+reports/

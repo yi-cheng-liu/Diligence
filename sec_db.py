@@ -2909,6 +2909,18 @@ def moomoo_status():
 # Local web server: the Stock Research Desk page plus a JSON API
 # --------------------------------------------------------------------------
 
+LOCAL_NAMES = {"localhost", "127.0.0.1", "::1"}
+
+
+def _is_local(value, schemes=None):
+    """True when a Host header ("localhost:8765") or an address ("http://127.0.0.1:3000") names this computer."""
+    try:
+        u = urlparse(value if "//" in value else "//" + value)
+        return (u.hostname or "") in LOCAL_NAMES and (schemes is None or u.scheme in schemes)
+    except ValueError:
+        return False
+
+
 def make_handler(client, max_age_hours=12):
     locks, locks_guard = {}, threading.Lock()
 
@@ -2944,11 +2956,36 @@ def make_handler(client, max_age_hours=12):
             except ConnectionError:  # browser closed the connection mid-response
                 pass
 
+        cors = None   # the localhost page allowed to read this reply, set by _refused()
+
+        def _refused(self, path):
+            """Only this computer may use the server. Another website open in the browser must not read your
+            holdings, reports or keys, or start downloads, and a site that points its own name at 127.0.0.1
+            (DNS rebinding) is turned away by the Host check. Returns why a request is refused, or None."""
+            self.cors = None
+            if not _is_local(self.headers.get("Host") or ""):
+                return "This server only answers requests addressed to localhost."
+            origin = self.headers.get("Origin")
+            if origin:   # sent by pages making fetch() calls to another address, and with every POST
+                if not _is_local(origin, ("http", "https")):
+                    return "Only pages on this computer (localhost) may use this server."
+                self.cors = origin
+                return None
+            # No Origin: a script, image or link. Browsers say where it came from in Sec-Fetch-Site; older ones
+            # only in Referer.
+            site, referer = self.headers.get("Sec-Fetch-Site"), self.headers.get("Referer")
+            cross = site == "cross-site" if site else bool(referer) and not _is_local(referer)
+            if cross and not (self.headers.get("Sec-Fetch-Mode") == "navigate" and not path.startswith("/api/")):
+                return "Only pages on this computer (localhost) may use this server."
+            return None
+
         def _send(self, status, payload):
             body = json.dumps(payload).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            if self.cors:
+                self.send_header("Access-Control-Allow-Origin", self.cors)
+            self.send_header("Vary", "Origin")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -2968,7 +3005,9 @@ def make_handler(client, max_age_hours=12):
             try:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
+                if self.cors:
+                    self.send_header("Access-Control-Allow-Origin", self.cors)
+                self.send_header("Vary", "Origin")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -3028,6 +3067,9 @@ def make_handler(client, max_age_hours=12):
 
         def do_GET(self):
             url = urlparse(self.path)
+            why = self._refused(url.path)
+            if why:
+                return self._send(403, {"error": why})
             qs = parse_qs(url.query)
             parts = [p for p in url.path.split("/") if p]
             if not parts:
@@ -3161,6 +3203,9 @@ def make_handler(client, max_age_hours=12):
             otherwise start research runs."""
             url = urlparse(self.path)
             parts = [p for p in url.path.split("/") if p]
+            why = self._refused(url.path)
+            if why:
+                return self._send(403, {"error": why})
             origin = self.headers.get("Origin")
             host = self.headers.get("Host") or ""
             if origin and origin not in ("http://" + host, "http://localhost:" + host.rsplit(":", 1)[-1], "http://127.0.0.1:" + host.rsplit(":", 1)[-1]):
@@ -3195,7 +3240,7 @@ def make_handler(client, max_age_hours=12):
 
 # ---- Research reports: the markdown files written by the report skills ----
 # The Reports tab reads them straight from their folder, so a report shows up as soon as it is saved.
-REPORTS_DIR_DEFAULT = os.path.join(os.path.expanduser("~"), "Desktop", "ai-berkshire", "reports")
+REPORTS_DIR_DEFAULT = os.path.join(HERE, "reports")
 REPORT_KINDS = [("《看懂", "Series"), ("bottleneck-map", "Bottleneck scan"), ("-how-it-works-", "How it works"),
                 ("-tech-stack-", "Tech stack"), ("-supply-chain-", "Supply chain"), ("-overview-", "Theme overview"), ("-industry-", "Industry"), ("-funnel-", "Funnel"),
                 ("-earnings-", "Earnings"), ("財報", "Earnings"), ("-checklist", "Checklist"), ("-management-", "Management"),
@@ -3220,13 +3265,14 @@ _reports_lock = threading.Lock()
 
 
 def reports_dir():
-    """Where the reports live: "reports_dir" in settings.json, else the ai-berkshire folder on the Desktop."""
+    """Where the reports live: "reports_dir" in settings.json, else the reports folder next to this file.
+    A relative "reports_dir" is taken from this folder too, not from wherever the server was started."""
     try:
         with open(SETTINGS_PATH, encoding="utf-8") as f:
             d = (json.load(f).get("reports_dir") or "").strip()
     except (OSError, ValueError):
         d = ""
-    return os.path.realpath(os.path.expanduser(d or REPORTS_DIR_DEFAULT))
+    return os.path.realpath(os.path.join(HERE, os.path.expanduser(d)) if d else REPORTS_DIR_DEFAULT)
 
 
 REPORT_CATEGORY_DIRS = {"Company": "Company", "Industry-theme": "Industry & theme", "Screens-pools": "Screens & pools",

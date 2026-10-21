@@ -169,7 +169,7 @@ are read from OpenD: nothing here unlocks trading or can place an order.
 
 ### The Reports tab
 The last tab, **Reports**, is a reading room for the research reports you generate (the markdown
-files in `~/Desktop/ai-berkshire/reports`). Nothing is copied: the server reads that folder each
+files in the `reports` folder inside this project, or the folder set in `settings.json`). Nothing is copied: the server reads that folder each
 time, so a new report shows up as soon as it is saved. Press the ↻ button, or just click back
 into the window, to pick up new ones.
 
@@ -197,13 +197,20 @@ into the window, to pick up new ones.
   community. That second label is the top-level folder a report sits in (`Company/`,
   `Industry-theme/`, `Screens-pools/` and so on); the names are listed under
   `"category_folders"` in the reports folder's `_index/config.json`.
-- To read reports from a different folder, add `"reports_dir": "/path/to/reports"` to
-  `settings.json`.
+- To keep reports somewhere else, add `"reports_dir": "/path/to/reports"` to `settings.json`
+  (`~` and paths relative to this project folder work too). The `reports` folder is kept out of git.
 - The page is `desk/reports.html`; it also opens on its own at
   `http://localhost:8765/desk/reports.html`.
 
-## Using it from another website
+## Using it from another page or program
 The same server is a JSON API. If you ask for a company that isn't saved yet, it downloads it first.
+
+Only this computer may use it. Programs on this computer (curl, Python scripts) can call it freely. In a
+browser, only pages served from `localhost`, `127.0.0.1` or `[::1]` (any port) can read its answers, so a
+page you build on `http://localhost:3000` works but other websites are refused. That keeps them from
+reading your holdings, reports or API keys, or starting downloads. Requests addressed to any other host
+name are refused too, which stops a site from pointing its own name at your computer. Pages opened from
+a file (`file://`) are refused as well, so open the desk at `http://localhost:8765`.
 
 | URL | Returns |
 |---|---|
@@ -231,7 +238,9 @@ The same server is a JSON API. If you ask for a company that isn't saved yet, it
 Run `python check.py` after any change to `sec_db.py`. It reads a few companies from `sec.db`
 (no server or internet needed) and checks figures that have gone wrong before, that every
 company's latest balance sheet adds up, and, if moomoo OpenD is running, the chart's price feed.
-It ends with a count of what passed and failed.
+It ends with a count of what passed, failed and was skipped. A company missing from `sec.db`, or OpenD not
+running or not logged in, shows as skipped, never as passed. It exits with an error when a check fails or
+when no database check could run, for example with an empty `sec.db`.
 
 ## Looking inside the database
 `sec.db` is a normal SQLite file. Open it with the free app "DB Browser for SQLite".
