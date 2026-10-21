@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Themes</title>
+<link rel="icon" type="image/png" sizes="64x64" href="./favicon.png?v=4">
+<link rel="stylesheet" href="_ds/nocturne-e1ee5842-13e2-4a15-8f5e-73e39018410f/styles.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<script src="vendor/marked-12.0.2.min.js"></script>
+<script src="md-extras.js"></script>
+<style>
+/* Two panes: the themes on the left; on the right one theme's topics, or one report to read. */
+:root{
+  color-scheme:dark;
+  --ink:var(--color-text); --ink2:var(--color-neutral-300); --ink3:var(--color-neutral-500);
+  --bg:var(--color-bg); --panel:var(--color-surface); --line:var(--color-neutral-800);
+  --hair:color-mix(in srgb,var(--ink) 9%,transparent);
+  --accent:var(--color-accent-400); --accent-soft:color-mix(in srgb,var(--accent) 13%,transparent);
+  --up:oklch(0.78 0.14 155); --down:oklch(0.72 0.16 25); --warn:oklch(0.83 0.15 85);
+  --serif:"Noto Serif TC","Noto Serif SC","Songti TC","Songti SC",Georgia,serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;display:grid;grid-template-columns:272px minmax(0,1fr);overflow:hidden}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;border:2px solid var(--bg)}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;padding:3px 11px;border-radius:8px;border:1px solid var(--line);background:transparent;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.b:hover{background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink)}
+.b.pri{border-color:var(--color-accent);color:var(--color-accent-300)}
+.b.pri:hover{background:var(--accent-soft)}
+.b.quiet{border-color:transparent;color:var(--ink3);padding:3px 8px}
+.b.quiet:hover{color:var(--ink)}
+.b:disabled{opacity:.45;cursor:not-allowed}
+.f{min-height:32px;padding:5px 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%}
+.f:hover{border-color:var(--color-neutral-600)}
+.f:focus{border-color:var(--color-accent);outline:none}
+textarea.f{resize:vertical;min-height:70px;line-height:1.5}
+
+/* left */
+#side{display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:16px 10px 28px;border-right:1px solid var(--hair);background:linear-gradient(180deg,var(--panel),var(--bg) 70%)}
+#side h1{margin:0 8px 12px;font-size:18px;font-weight:500;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+#side h1 i{color:var(--color-accent)}
+#newBtn{margin:0 8px 6px;justify-content:flex-start}
+#newForm{display:none;gap:8px;margin:4px 8px 8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+#newForm.open{display:grid}
+#newForm label{display:grid;gap:4px;font-size:12px;color:var(--ink3)}
+.cap{margin:18px 8px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.th{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 8px;width:100%;border:0;background:transparent;border-radius:8px;padding:7px 8px;text-align:left;color:var(--ink2)}
+.th:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
+.th[aria-current="true"]{background:var(--accent-soft);color:var(--ink)}
+.th b{font-weight:500;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th small{font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.th .sub{grid-column:span 2;font-size:11.5px;color:var(--ink3)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--color-accent);margin-right:5px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+.note{margin:4px 8px;font-size:12px;color:var(--ink3);line-height:1.5}
+
+/* right */
+#main{overflow-y:auto;min-width:0;position:relative;container-type:inline-size}
+.wrap{max-width:1400px;padding:26px 40px 80px}
+.eyebrow{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);display:flex;gap:10px;flex-wrap:wrap}
+h2.title{margin:8px 0 6px;font:700 28px/1.25 var(--serif);letter-spacing:.01em}
+.brief{color:var(--ink2);font-size:14.5px;line-height:1.7;max-width:46em;white-space:pre-wrap}
+.brief.empty{color:var(--ink3);font-style:italic}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.acts{margin:16px 0 22px}
+.panel{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 18px;background:color-mix(in srgb,var(--panel) 45%,transparent)}
+.panel h4{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500}
+.add{display:grid;grid-template-columns:190px minmax(0,1fr);gap:8px}
+.add .wide{grid-column:span 2}
+.kinds{font-size:12px;color:var(--ink3);margin-top:8px;line-height:1.6}
+.kinds b{color:var(--ink2);font-weight:500}
+.sug{display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 10px;padding:8px 0;border-top:1px solid var(--hair);align-items:start}
+.sug:first-of-type{border-top:0}
+.sug .why{grid-column:2;font-size:12.5px;color:var(--ink3)}
+input[type=checkbox]{accent-color:var(--color-accent);cursor:pointer;margin-top:4px}
+.topic{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;padding:14px 0;border-top:1px solid var(--hair)}
+.topic:first-child{border-top:0}
+.topic .t{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;min-width:0}
+.topic .t a,.topic .t span.name{font:600 16px/1.4 var(--serif);color:var(--ink);text-decoration:none;overflow-wrap:anywhere}
+.topic .t a:hover{color:var(--color-accent-300)}
+.topic .meta{grid-column:1;font-size:12.5px;color:var(--ink3);display:flex;gap:6px 12px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.topic .meta .live{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px}
+.topic .notes{grid-column:1;font-size:12.5px;color:var(--ink3);font-style:italic}
+.topic .err{grid-column:1 / span 2;font-size:12.5px;color:var(--down);background:color-mix(in srgb,var(--down) 8%,transparent);border-radius:8px;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.topic .tools{grid-row:1 / span 2;grid-column:2;display:flex;gap:4px;align-items:flex-start}
+.kind{font-size:11px;letter-spacing:.04em;padding:1px 8px;border-radius:999px;white-space:nowrap;border:1px solid;font-weight:500}
+.k-how{color:var(--color-accent-300);border-color:color-mix(in srgb,var(--color-accent-300) 45%,transparent)}
+.k-stack{color:var(--color-accent-2-300);border-color:color-mix(in srgb,var(--color-accent-2-300) 45%,transparent)}
+.k-supply{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.k-industry{color:var(--up);border-color:color-mix(in srgb,var(--up) 45%,transparent)}
+.k-open,.k-other{color:var(--ink2);border-color:var(--line)}
+.k-overview{color:var(--ink);border-color:var(--ink2)}
+.st{font-size:12px;font-weight:500}
+.st-running{color:var(--color-accent-300)} .st-queued{color:var(--warn)} .st-done{color:var(--up)} .st-failed{color:var(--down)} .st-new,.st-stopped{color:var(--ink3)}
+.tickers{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tk{border:1px solid var(--line);background:transparent;border-radius:6px;padding:1px 7px;font:12px var(--mono);color:var(--ink2)}
+.tk:hover{border-color:var(--color-accent);color:var(--ink)}
+.empty{max-width:40em;margin:12vh auto 0;padding:0 32px;color:var(--ink3);line-height:1.8}
+.empty h2{font:700 24px/1.3 var(--serif);color:var(--ink);margin:0 0 10px}
+.empty ul{padding-left:1.2em}
+.empty li b{color:var(--ink2);font-weight:500}
+.msg{font-size:12.5px;color:var(--ink3)}
+.msg.bad{color:var(--down)}
+
+/* a report, set for reading (as on the Reports page): the text, and its sections down the right */
+.rd{max-width:1640px;margin:0 auto;padding:0 40px 120px}
+.rdg{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:56px}
+.rdg article{min-width:0}
+#toc{position:sticky;top:56px;align-self:start;padding-top:28px;max-height:calc(100vh - 56px);overflow:auto;display:flex;flex-direction:column;gap:2px}
+#toc span{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px}
+#toc a{font-size:12.5px;line-height:1.45;color:var(--ink3);text-decoration:none;padding:5px 0 5px 12px;border-left:1px solid var(--line)}
+#toc a:hover,#toc a.on{color:var(--ink);border-left-color:var(--accent)}
+@container (max-width:900px){.rdg{grid-template-columns:minmax(0,1fr)}#toc{display:none}}
+.rd .back{position:sticky;top:0;z-index:3;background:var(--bg);padding:14px 0 10px;border-bottom:1px solid var(--hair);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rd .head{padding:28px 0 18px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.rd .head h1{font:900 clamp(26px,3.2vw,38px)/1.25 var(--serif);margin:10px 0 8px;text-wrap:balance;letter-spacing:.015em}
+.md{font-size:16.5px;line-height:1.9;color:var(--ink2)}
+.md>*{max-width:62em}
+.md>.tw,.md>pre{max-width:none}
+.md h1{display:none}
+.md h2{font:700 25px/1.35 var(--serif);color:var(--ink);margin:54px 0 16px;padding-top:22px;border-top:1px solid var(--line);text-wrap:balance;scroll-margin-top:60px}
+.md h3{font:700 19px/1.45 var(--serif);color:var(--ink);margin:36px 0 10px}
+.md h4{font-weight:600;font-size:16px;color:var(--ink);margin:26px 0 8px}
+.md p{margin:0 0 16px}
+.md strong{color:var(--ink);font-weight:600}
+.md a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}
+.md ul,.md ol{margin:0 0 18px;padding-left:1.35em}
+.md li{margin-bottom:7px}
+.md li::marker{color:var(--ink3)}
+.md blockquote{margin:22px 0;padding:14px 20px;border-radius:8px;background:var(--panel);color:var(--ink)}
+.md blockquote p:last-child{margin:0}
+.md code{font:.86em var(--mono);background:var(--panel);padding:1px 6px;border-radius:4px;color:var(--ink);overflow-wrap:anywhere}
+.md pre{margin:20px 0;padding:18px 20px;border-radius:8px;background:var(--panel);overflow-x:auto;font:13px/1.6 var(--mono);color:var(--ink)}
+.md pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+.tw{margin:20px 0 26px;overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+.md table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6;font-variant-numeric:tabular-nums}
+.md th{text-align:left;font-weight:600;font-size:12.5px;color:var(--ink);background:var(--panel);white-space:nowrap;padding:10px 14px}
+.md td{padding:10px 14px;border-top:1px solid var(--hair);vertical-align:top;min-width:6em}
+.md td:first-child{color:var(--ink);font-weight:500}
+</style>
+</head>
+<body>
+<nav id="side" aria-label="Themes">
+  <h1><i class="ph ph-books"></i>Themes</h1>
+  <button class="b" id="newBtn"><i class="ph ph-plus"></i>New theme</button>
+  <form id="newForm" autocomplete="off">
+    <label>Name<input class="f" id="newName" placeholder="Payments, Robotics, Vision Pro…" required></label>
+    <label>What you want to understand<textarea class="f" id="newBrief" placeholder="How money moves between banks and card networks, who earns what, and which listed companies matter."></textarea></label>
+    <label>Write reports in<select class="f" id="newLang"></select></label>
+    <div class="row"><button class="b pri" type="submit">Create</button><button class="b quiet" type="button" id="newCancel">Cancel</button></div>
+    <span class="msg" id="newMsg"></span>
+  </form>
+  <div class="cap">Your themes</div>
+  <div id="mine"></div>
+  <div class="cap">From your reports</div>
+  <div id="read"></div>
+  <p class="note" id="sideNote"></p>
+</nav>
+<main id="main"></main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const KEY = 'diligence.themes.v1', SCREENER_KEY = 'diligence.screener.v1';
+const V = Object.assign({ cur: null, report: null }, (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })());
+const keep = () => { try { localStorage.setItem(KEY, JSON.stringify(V)); } catch (e) {} };
+let LIST = { themes: [], kinds: {}, langs: {}, parallel: 3, claude: true }, TH = null, SUG = null, busyMsg = '', pollT = null, listT = null;
+
+const getJSON = url => fetch(url).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
+const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  .then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
+// messages to the desk this page sits in
+const tell = msg => { if (window.parent !== window) window.parent.postMessage(Object.assign({ from: 'themes' }, msg), location.origin); };
+const same = (a, b) => a && b && a.where === b.where && a.name === b.name;
+const KIND_TIPS = { how: 'how a technology, product or system works', stack: 'its layers, the state of the art and what improves next', supply: 'parts, suppliers, bottlenecks', industry: 'the industry and the companies in it', open: 'any other question', overview: 'ties the theme\'s finished reports together' };
+const kindClass = k => 'kind k-' + (KIND_TIPS[k] ? k : 'other');
+const mins = s => s < 60 ? Math.max(1, Math.round(s)) + 's' : Math.round(s / 60) + ' min';
+const day = ts => new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+// ---- Left pane
+function drawSide() {
+  const item = t => `<button class="th" data-where="${esc(t.where)}" data-name="${esc(t.name)}" aria-current="${!!same(t, V.cur)}"><b>${t.busy ? '<span class="dot"></span>' : ''}${esc(t.name)}</b><small>${t.managed ? t.done + '/' + t.topics : t.topics}</small>${t.managed ? '' : `<span class="sub">${t.where === 'Technical-research' ? 'Technical research' : 'Industry & theme'}</span>`}</button>`;
+  const mine = LIST.themes.filter(t => t.managed), read = LIST.themes.filter(t => !t.managed);
+  $('mine').innerHTML = mine.length ? mine.map(item).join('') : '<p class="note">None yet. Make one with New theme.</p>';
+  $('read').innerHTML = read.length ? read.map(item).join('') : '<p class="note">No report folders found.</p>';
+  $('sideNote').innerHTML = LIST.claude ? `Reports are researched by Claude Code on this computer, ${LIST.parallel} at a time; the rest wait their turn. They are saved in <code>${esc((LIST.dir || '') + '/Industry-theme')}</code>.` : '<span style="color:var(--down)">Claude Code (the claude command) was not found, so nothing can be researched.</span>';
+  if (!$('newLang').options.length) $('newLang').innerHTML = Object.entries(LIST.langs).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+}
+$('side').addEventListener('click', e => { const b = e.target.closest('.th'); if (b) openTheme({ where: b.dataset.where, name: b.dataset.name }); });
+$('newBtn').addEventListener('click', () => { $('newForm').classList.add('open'); $('newBtn').style.display = 'none'; $('newName').focus(); });
+$('newCancel').addEventListener('click', () => { $('newForm').classList.remove('open'); $('newBtn').style.display = ''; });
+$('newForm').addEventListener('submit', async e => {
+  e.preventDefault(); $('newMsg').textContent = 'Creating…'; $('newMsg').className = 'msg';
+  try {
+    const t = await post('/api/themes/create', { name: $('newName').value, brief: $('newBrief').value, language: $('newLang').value });
+    $('newForm').reset(); $('newForm').classList.remove('open'); $('newBtn').style.display = ''; $('newMsg').textContent = '';
+    await loadList(); openTheme(t);
+  } catch (err) { $('newMsg').textContent = err.message; $('newMsg').className = 'msg bad'; }
+});
+async function loadList() {
+  try { LIST = await getJSON('/api/themes'); } catch (e) { $('sideNote').textContent = 'Could not load themes: ' + e.message; return; }
+  drawSide();
+  clearTimeout(listT); if (LIST.themes.some(t => t.busy)) listT = setTimeout(loadList, 8000);
+}
+
+// ---- One theme
+async function openTheme(t, report) {
+  V.cur = { where: t.where, name: t.name }; V.report = report || null; SUG = null; busyMsg = ''; keep(); drawSide();
+  if (!report) $('main').scrollTop = 0;
+  await loadTheme();
+}
+async function loadTheme(soft) {
+  clearTimeout(pollT);
+  if (!V.cur) { TH = null; draw(); return; }
+  try { TH = await getJSON(`/api/themes/one?where=${encodeURIComponent(V.cur.where)}&name=${encodeURIComponent(V.cur.name)}`); }
+  catch (e) { TH = null; V.cur = null; keep(); draw(); return; }
+  if (soft && !V.report && $('topicsPanel')) refresh(); else draw();
+  // while anything is queued or running, follow it
+  if (TH.managed && TH.topics.some(x => x.status === 'queued' || x.status === 'running')) pollT = setTimeout(() => { loadTheme(true); }, 3000);
+}
+// redraw only the progress: the brief editor, the suggestions and the add form keep what is being typed
+function refresh() {
+  const tmp = document.createElement('div'); tmp.innerHTML = pageHTML();
+  ['eyebrow', 'acts', 'topicsPanel', 'othersPanel'].forEach(id => {
+    const a = $(id), b = tmp.querySelector('#' + id);
+    if (id === 'acts' && $('briefEdit')) return;
+    if (a && b) a.replaceWith(b); else if (a) a.remove(); else if (b && id === 'othersPanel') $('topicsPanel').after(b);
+  });
+  wire();
+}
+async function change(body) {
+  try { TH = await post('/api/themes/change', Object.assign({ where: TH.where, name: TH.name }, body)); busyMsg = ''; }
+  catch (e) { busyMsg = e.message; }
+  draw(); loadList(); loadTheme();
+}
+const tickersOf = th => [...new Set(th.topics.concat(th.others || []).filter(x => x.status === 'done' || !x.status).flatMap(x => x.tickers || []))];
+
+function draw() {
+  if (V.report && TH) return drawReport();
+  $('main').innerHTML = pageHTML(); wire();
+}
+function pageHTML() {
+  if (!TH) {
+    return `<div class="empty"><h2>Deep research on a subject</h2>
+      <p>A theme is a subject you want to understand properly. Give it topics, and each topic is researched and written up as its own long report, several at once. Topics can be of different kinds:</p>
+      <ul><li><b>How it works</b>: how Zelle moves money, how Visa settles a card payment, how Waymo's lidar sees</li>
+      <li><b>Tech stack &amp; progress</b>: the layers of a technology, the state of the art and what improves next</li>
+      <li><b>Supply chain</b>: what goes into the Vision Pro, who makes each part, where the bottlenecks are</li>
+      <li><b>Industry &amp; companies</b>: an industry, its economics and the companies in it</li>
+      <li><b>Open question</b>: anything else</li></ul>
+      <p>Start with <b>New theme</b> on the left, or open one of your report folders.</p></div>`;
+  }
+  const kinds = Object.entries(LIST.kinds || {});
+  const kindOpts = sel => kinds.map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
+  const tk = tickersOf(TH);
+  let h = `<div class="wrap"><div class="eyebrow" id="eyebrow"><span>Theme</span><span>${esc(TH.where === 'Technical-research' ? 'Technical research' : 'Industry & theme')}</span>${TH.managed ? `<span>${TH.topics.filter(x => x.status === 'done').length} of ${TH.topics.length} done</span>` : `<span>${TH.topics.length} reports</span>`}</div>
+    <h2 class="title">${esc(TH.name)}</h2>`;
+  if (!TH.managed) {
+    h += `<p class="brief empty">A folder of reports. ${TH.where === 'Industry-theme' ? 'Make it a theme to add topics and research them here; its reports stay as they are.' : ''}</p>
+      <div class="row acts">${TH.where === 'Industry-theme' ? '<button class="b pri" id="adopt"><i class="ph ph-plus"></i>Make it a theme</button>' : ''}${tk.length ? `<button class="b" id="screen"><i class="ph ph-funnel"></i>Screen ${tk.length} companies</button>` : ''}</div>
+      <div class="panel"><h4>Reports</h4>${TH.topics.map(x => `<div class="topic"><div class="t"><span class="${kindClass('other')}">${esc(x.kind || 'Report')}</span><a href="#" data-read="${esc(x.path)}">${esc(x.title)}</a></div><div class="meta">${esc(x.date || '')}${x.tickers && x.tickers.length ? ' · ' + x.tickers.length + ' companies' : ''}</div></div>`).join('')}</div></div>`;
+    return h;
+  }
+  const queued = TH.topics.filter(x => x.status === 'queued').sort((a, b) => a.queued_at - b.queued_at);
+  const fresh = TH.topics.filter(x => ['new', 'failed', 'stopped'].includes(x.status));
+  const done = TH.topics.filter(x => x.status === 'done' && x.type !== 'overview');
+  h += `<div class="brief${TH.brief ? '' : ' empty'}" id="brief">${esc(TH.brief || 'No brief yet: say what you want to understand, and every report will be written with it in mind.')}</div>
+    <div class="row acts" id="acts">
+      <button class="b" id="editBrief"><i class="ph ph-pencil-simple"></i>Edit brief</button>
+      <select class="f" id="lang" style="width:auto" title="Language the reports are written in">${Object.entries(LIST.langs).map(([k, v]) => `<option value="${k}"${k === TH.language ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>
+      <button class="b" id="suggest"${LIST.claude ? '' : ' disabled'}><i class="ph ph-sparkle"></i>Suggest topics</button>
+      ${fresh.length ? `<button class="b pri" id="runAll"${LIST.claude ? '' : ' disabled'}><i class="ph ph-play"></i>Research all ${fresh.length} not started</button>` : ''}
+      ${done.length >= 2 && !TH.topics.some(x => x.type === 'overview') ? '<button class="b" id="overview"><i class="ph ph-tree-structure"></i>Add an overview</button>' : ''}
+      ${tk.length ? `<button class="b" id="screen"><i class="ph ph-funnel"></i>Screen ${tk.length} companies</button>` : ''}
+      <span class="msg${busyMsg && !/^Asking/.test(busyMsg) ? ' bad' : ''}">${esc(busyMsg)}</span>
+    </div>`;
+  if (SUG) h += `<div class="panel"><h4>Suggested topics</h4>${SUG.map((s, i) => `<label class="sug"><input type="checkbox" data-sug="${i}" checked><span><span class="${kindClass(s.type)}">${esc(LIST.kinds[s.type] || s.type)}</span> <b style="font-weight:500">${esc(s.title)}</b></span><span class="why">${esc(s.why)}</span></label>`).join('')}
+      <div class="row" style="margin-top:10px"><button class="b pri" id="sugRun">Add and research</button><button class="b" id="sugAdd">Add</button><button class="b quiet" id="sugNo">Dismiss</button></div></div>`;
+  h += `<div class="panel"><h4>Add a topic</h4><form class="add" id="addForm" autocomplete="off">
+      <select class="f" id="addKind">${kindOpts('how')}</select>
+      <input class="f" id="addTitle" placeholder="How does Zelle move money between banks?" required>
+      <input class="f wide" id="addNotes" placeholder="Anything to focus on (optional)">
+      <div class="row wide"><button class="b pri" type="submit" data-run="1">Add and research</button><button class="b" type="submit">Add</button></div></form>
+      <div class="kinds">${kinds.filter(([k]) => k !== 'overview').map(([k, v]) => `<b>${esc(v)}</b>: ${esc(KIND_TIPS[k])}`).join(' · ')}</div></div>`;
+  h += `<div class="panel" id="topicsPanel"><h4>Topics</h4>${TH.topics.length ? TH.topics.map(x => topicRow(x, queued)).join('') : '<p class="msg">No topics yet. Add one above, or ask for suggestions.</p>'}</div>`;
+  if ((TH.others || []).length) h += `<div class="panel" id="othersPanel"><h4>Other reports in this folder</h4>${TH.others.map(x => `<div class="topic"><div class="t"><a href="#" data-read="${esc(x.path)}">${esc(x.title)}</a></div></div>`).join('')}</div>`;
+  return h + '</div>';
+}
+function topicRow(x, queued) {
+  const now = Date.now() / 1000, st = x.status || 'new';
+  const status = { new: 'Not started', queued: 'Waiting', running: 'Researching', done: 'Done', failed: 'Failed', stopped: 'Stopped' }[st];
+  let meta = `<span class="st st-${st}">${status}</span>`;
+  if (st === 'running') meta += `<span>${mins(now - (x.started || now))}</span><span>${x.searches || 0} searches · ${x.pages || 0} pages read</span>${x.activity ? `<span class="live">${esc(x.activity)}</span>` : ''}`;
+  else if (st === 'queued') meta += `<span>${queued.indexOf(x) + 1} in line here · ${LIST.parallel} run at a time</span>`;
+  else if (st === 'done') meta += `<span>${x.finished ? day(x.finished) : ''}</span>${x.started && x.finished ? `<span>${mins(x.finished - x.started)}</span>` : ''}<span>${x.searches || 0} searches · ${x.pages || 0} pages</span>${x.tickers && x.tickers.length ? `<span>${x.tickers.length} companies</span>` : ''}`;
+  const tools = st === 'running' || st === 'queued' ? `<button class="b" data-stop="${x.id}">Stop</button>`
+    : `<button class="b${st === 'done' ? '' : ' pri'}" data-run="${x.id}"${LIST.claude ? '' : ' disabled'}>${st === 'done' ? 'Research again' : st === 'new' ? 'Research' : 'Try again'}</button><button class="b quiet" data-remove="${x.id}" title="Remove this topic (its report stays in the folder)"><i class="ph ph-trash"></i></button>`;
+  const title = x.path ? `<a href="#" data-read="${esc(x.path)}">${esc(x.title)}</a>` : `<span class="name">${esc(x.title)}</span>`;
+  return `<div class="topic"><div class="t"><span class="${kindClass(x.type)}">${esc(x.label || x.type)}</span>${title}</div><div class="tools">${tools}</div>
+    <div class="meta">${meta}</div>${x.notes ? `<div class="notes">${esc(x.notes)}</div>` : ''}${st === 'failed' && x.error ? `<div class="err">${esc(x.error)}</div>` : ''}</div>`;
+}
+function wire() {
+  const m = $('main'), on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+  m.querySelectorAll('[data-read]').forEach(a => a.onclick = e => { e.preventDefault(); V.report = a.dataset.read; keep(); drawReport(); });
+  m.querySelectorAll('[data-run]').forEach(b => { if (b.dataset.run !== '1') b.onclick = () => change({ run: [b.dataset.run] }); });
+  m.querySelectorAll('[data-stop]').forEach(b => b.onclick = () => change({ stop: [b.dataset.stop] }));
+  m.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { const t = TH.topics.find(x => x.id === b.dataset.remove); if (confirm(`Remove "${t.title}"?${t.file ? ' Its report stays in the folder.' : ''}`)) change({ remove: [t.id] }); });
+  on('screen', () => screen(tickersOf(TH), TH.name));
+  on('adopt', async () => { if (!confirm(`Make "${TH.name}" a theme? Its reports stay as they are; you can then add topics to it.`)) return; try { await post('/api/themes/create', { name: TH.name, brief: '', language: 'en' }); await loadList(); openTheme({ where: 'Industry-theme', name: TH.name }); } catch (e) { alert(e.message); } });
+  on('editBrief', () => {
+    const el = $('brief'); el.outerHTML = `<div id="briefEdit"><textarea class="f" id="briefText" style="min-height:90px;max-width:46em">${esc(TH.brief || '')}</textarea><div class="row" style="margin-top:8px"><button class="b pri" id="briefSave">Save</button><button class="b quiet" id="briefCancel">Cancel</button></div></div>`;
+    $('briefText').focus(); $('briefSave').onclick = () => change({ brief: $('briefText').value }); $('briefCancel').onclick = draw; $('editBrief').style.display = 'none';
+  });
+  const lang = $('lang'); if (lang) lang.onchange = () => change({ language: lang.value });
+  on('runAll', () => change({ run: TH.topics.filter(x => ['new', 'failed', 'stopped'].includes(x.status)).map(x => x.id) }));
+  on('overview', () => change({ add: [{ title: 'Overview: ' + TH.name, type: 'overview' }] }));
+  on('suggest', async () => {
+    busyMsg = 'Asking Claude for topics, about half a minute…'; draw();
+    try { SUG = (await post('/api/themes/suggest', { where: TH.where, name: TH.name })).topics; busyMsg = SUG.length ? '' : 'No suggestions came back.'; }
+    catch (e) { busyMsg = e.message; }
+    draw();
+  });
+  const picked = () => SUG.filter((s, i) => { const c = m.querySelector(`[data-sug="${i}"]`); return c && c.checked; });
+  const addSug = async run => { const items = picked(); if (!items.length) return; SUG = null;
+    const before = new Set(TH.topics.map(x => x.id)); await change({ add: items });
+    if (run) change({ run: TH.topics.filter(x => !before.has(x.id)).map(x => x.id) }); };
+  on('sugAdd', () => addSug(false)); on('sugRun', () => addSug(true)); on('sugNo', () => { SUG = null; draw(); });
+  const f = $('addForm');
+  if (f) f.onsubmit = async e => {
+    e.preventDefault(); const run = e.submitter && e.submitter.dataset.run === '1', before = new Set(TH.topics.map(x => x.id));
+    await change({ add: [{ title: $('addTitle').value, type: $('addKind').value, notes: $('addNotes').value }] });
+    if (run) change({ run: TH.topics.filter(x => !before.has(x.id)).map(x => x.id) });
+  };
+}
+
+// ---- Send companies to the screener: it reads its list from this browser's storage
+function screen(symbols, name) {
+  if (!symbols.length) return;
+  let S = {}; try { S = JSON.parse(localStorage.getItem(SCREENER_KEY)) || {}; } catch (e) {}
+  S.list = { kind: 'paste', symbols, label: name };
+  try { localStorage.setItem(SCREENER_KEY, JSON.stringify(S)); } catch (e) {}
+  if (window.parent !== window) tell({ type: 'workspace', to: 'screener' }); else location.href = 'screener.html';
+}
+
+// ---- Reading a report. Reports are written from web pages, so raw HTML in them is shown as text and only
+// ordinary web links are kept.
+marked.use({ renderer: { html: t => esc(typeof t === 'string' ? t : t.text) } });
+async function drawReport() {
+  clearTimeout(pollT);
+  const path = V.report, m = $('main');
+  const topic = TH.topics.concat(TH.others || []).find(x => x.path === path) || {};
+  m.innerHTML = `<div class="rd"><div class="back"><button class="b quiet" id="back"><i class="ph ph-arrow-left"></i>${esc(TH.name)}</button></div><p class="msg" style="padding:30px 0">Loading…</p></div>`;
+  $('back').onclick = () => { V.report = null; keep(); loadTheme(); };
+  let doc; try { doc = await getJSON('/api/reports/file?path=' + encodeURIComponent(path)); } catch (e) { m.querySelector('.msg').textContent = 'Could not open the report: ' + e.message; return; }
+  if (V.report !== path) return;
+  const title = (doc.text.match(/^#\s+(.+)$/m) || [])[1] || topic.title || path;
+  const date = (doc.text.match(/Report date[:：]\s*([0-9-]+)/i) || [])[1] || '';
+  const tk = topic.tickers || [];
+  m.innerHTML = `<div class="rd"><div class="back"><button class="b quiet" id="back"><i class="ph ph-arrow-left"></i>${esc(TH.name)}</button>
+      ${tk.length ? `<button class="b" id="screenOne"><i class="ph ph-funnel"></i>Screen ${tk.length} companies</button>` : ''}</div>
+    <div class="head"><div class="eyebrow">${topic.label || topic.kind ? `<span>${esc(topic.label || topic.kind)}</span>` : ''}${date ? `<span>${esc(date)}</span>` : ''}</div><h1>${esc(title.replace(/\*\*/g, ''))}</h1>
+      ${tk.length ? `<div class="tickers">${tk.slice(0, 40).map(t => `<button class="tk" data-open="${esc(t)}" title="Open ${esc(t)} in Companies">${esc(t)}</button>`).join('')}</div>` : ''}</div>
+    <div class="rdg"><article class="md" id="md"></article><nav id="toc" aria-label="Sections"></nav></div></div>`;
+  const md = $('md'); md.innerHTML = marked.parse(doc.text.replace(/^Report date[:：].*$/im, ''), { gfm: true, breaks: false });   // the date is shown above
+  const toc = [...md.querySelectorAll('h2')].map((h, i) => { h.id = 's' + i; return `<a href="#s${i}">${esc(h.textContent)}</a>`; });
+  if (toc.length > 2) $('toc').innerHTML = '<span>In this report</span>' + toc.join(''); else $('toc').remove();
+  md.querySelectorAll('table').forEach(t => { const w = document.createElement('div'); w.className = 'tw'; t.parentNode.insertBefore(w, t); w.appendChild(t); });
+  md.querySelectorAll('a').forEach(a => { const href = a.getAttribute('href') || ''; if (/^https?:\/\//i.test(href)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; } else if (!href.startsWith('#')) a.removeAttribute('href'); });
+  md.querySelectorAll('img').forEach(i => i.remove());
+  if (window.enhanceMarkdown) window.enhanceMarkdown(md);   // Mermaid diagrams and charts
+  $('back').onclick = () => { V.report = null; keep(); loadTheme(); };
+  m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => tell({ type: 'open', symbol: b.dataset.open }));
+  const so = $('screenOne'); if (so) so.onclick = () => screen(tk, title.replace(/\*\*/g, ''));
+  m.querySelectorAll('#toc a').forEach(a => a.onclick = e => { e.preventDefault(); const h = document.getElementById(a.getAttribute('href').slice(1)); if (h) h.scrollIntoView({ behavior: 'smooth' }); });
+  m.scrollTop = 0; tocMark();
+}
+// light up the section being read
+function tocMark() {
+  const links = document.querySelectorAll('#toc a'); let on = null;
+  links.forEach(a => { const h = document.getElementById(a.getAttribute('href').slice(1)); if (h && h.getBoundingClientRect().top < 140) on = a; });
+  links.forEach(a => a.classList.toggle('on', a === on));
+}
+$('main').addEventListener('scroll', () => { if (V.report) tocMark(); }, { passive: true });
+
+// ---- Start
+loadList().then(() => { if (V.cur && LIST.themes.some(t => same(t, V.cur))) openTheme(V.cur, V.report); else { V.cur = null; draw(); } });
+</script>
+</body>
+</html>

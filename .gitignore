@@ -1,0 +1,14 @@
+# Data the server builds or downloads (sec.db is far over GitHub's 100 MB limit)
+sec.db
+sec.db-*
+13f_data/
+
+# Personal settings and keys
+settings.json
+desk/keys.local.js
+
+# Old copies (they hold the keys) and Python/macOS clutter
+_backup_before_reports_tab/
+__pycache__/
+*.pyc
+.DS_Store

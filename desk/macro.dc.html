@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macro</title>
+<link rel="icon" type="image/png" sizes="64x64" href="./favicon.png?v=4">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/nocturne-e1ee5842-13e2-4a15-8f5e-73e39018410f/styles.css">
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+  <style>
+    :root{color-scheme:dark;--ink:var(--color-text);--ink2:var(--color-neutral-300);--ink3:var(--color-neutral-500);--line:var(--color-neutral-800);
+      --hair:color-mix(in srgb,var(--ink) 9%,transparent);--acc:var(--color-accent-300);--acc-soft:color-mix(in srgb,var(--color-accent) 14%,transparent);
+      --up:oklch(0.78 0.14 155);--down:oklch(0.72 0.16 25);--warn:oklch(0.83 0.15 85);--panel:var(--color-surface)}
+    html,body{margin:0;background:var(--color-bg);color:var(--ink)}
+    *{box-sizing:border-box}
+    ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;border:2px solid var(--color-bg)}
+    button,input,select,textarea{font:inherit;color:inherit}
+    .app{min-height:100vh;display:flex;flex-direction:column;font-size:14px;font-variant-numeric:tabular-nums}
+    .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 24px;background:var(--color-bg);border-bottom:1px solid var(--hair)}
+    .brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:500}.brand i{color:var(--color-accent)}
+    .tabs{display:flex;gap:2px;margin-left:10px}
+    .tab{border:0;background:transparent;padding:7px 12px;border-radius:8px;color:var(--ink3);cursor:pointer;font-size:13.5px}
+    .tab:hover{color:var(--ink)}.tab[aria-pressed="true"]{color:var(--ink);background:var(--acc-soft)}
+    .grow{flex:1}
+    .src{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink3)}.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .b{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:4px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;font-size:13px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+    .b:hover{background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink)}.b.pri{border-color:var(--color-accent);color:var(--acc)}.b.pri:hover{background:var(--acc-soft)}
+    .b.sm{min-height:26px;padding:2px 9px;font-size:12px}.b:disabled{opacity:.4;cursor:not-allowed}
+    .f{min-height:34px;padding:6px 10px;background:var(--color-bg);border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%}
+    .f:focus{outline:none;border-color:var(--color-accent)}
+    .card{background:color-mix(in srgb,var(--panel) 55%,transparent);border:1px solid var(--line);border-radius:12px}
+    .cap{margin:0 0 12px;font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);display:flex;gap:10px;align-items:baseline}
+    .cap small{font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink3)}
+    .note{font-size:12.5px;color:var(--ink3);line-height:1.55;margin:0}
+    .up{color:var(--up)}.down{color:var(--down)}.dim{color:var(--ink3)}
+    /* dashboard */
+    .dash{max-width:1500px;width:100%;margin:0 auto;padding:26px 28px 80px}
+    .hero h1{margin:0;font-size:28px;font-weight:500;letter-spacing:-.02em}.sub{margin:6px 0 0;color:var(--ink3);max-width:760px;line-height:1.55}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.hero .row{margin-top:16px}
+    .search{flex:1;min-width:320px;position:relative;display:flex;align-items:center}.search i{position:absolute;left:12px;color:var(--ink3)}
+    .search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line);border-radius:10px;background:var(--color-bg);font-size:14px}
+    .search input:focus{outline:none;border-color:var(--color-accent)}
+    section.blk{margin-top:34px}
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+    .scard{padding:12px 14px 10px;cursor:pointer;transition:border-color .15s}.scard:hover{border-color:var(--color-neutral-600)}
+    .scard .top2{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink3);font-family:ui-monospace,monospace}
+    .badge{font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;font-family:inherit}
+    .scard .nm{font-size:14px;font-weight:500;margin-top:4px;line-height:1.3;min-height:36px}
+    .scard .sp{height:44px;margin:6px 0}.scard .val{font-size:18px;font-weight:500}.scard .unit{font-size:11px;color:var(--ink3);margin-left:6px}
+    .pcard{overflow:hidden;cursor:pointer}.pcard:hover{border-color:var(--color-neutral-600)}.pcard .mini{height:86px;border-bottom:1px solid var(--hair);padding:6px}
+    .pcard .tx{padding:10px 12px 12px}.pcard .tx b{font-weight:500;font-size:14px}.pcard .tx p{margin:4px 0 0;font-size:12px;color:var(--ink3);line-height:1.45}
+    .browse{display:grid;grid-template-columns:240px minmax(0,1fr);gap:16px;align-items:start}
+    .tree{padding:6px;position:sticky;top:64px}
+    .tnode{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:transparent;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--ink2);text-align:left;font-size:13px}
+    .tnode:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}.tnode[aria-pressed="true"]{background:var(--acc-soft);color:var(--ink)}
+    .tnode small{color:var(--ink3);font-size:11px}.tnode.sub2{padding-left:24px;font-size:12.5px}
+    .frow{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:9px 12px;border-bottom:1px solid var(--hair);cursor:pointer}
+    .frow:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}.frow code{font-size:12px;color:var(--ink3)}.frow span.m{font-size:12px;color:var(--ink3)}
+    /* editor */
+    .ed{padding:14px 20px 60px;width:100%}
+    .edbar{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+    .title{flex:1;font-size:19px;font-weight:500;border:0;background:transparent;padding:5px 4px;border-bottom:1px solid transparent}.title:focus{outline:none;border-bottom-color:var(--line)}
+    .edgrid{display:grid;grid-template-columns:250px minmax(0,1fr) 330px;gap:14px;align-items:start}
+    .side{position:sticky;top:62px;max-height:calc(100vh - 80px);overflow-y:auto;padding:10px 8px}
+    .shead{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 6px 5px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+    .sitem{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:7px;cursor:pointer}
+    .sitem:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}.sitem .t{flex:1;min-width:0}.sitem .t>b{display:block;font-weight:500;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sitem .t>code{font-size:10.5px;color:var(--ink3)}.sitem .t>span{display:block;font-size:11px;color:var(--ink3);line-height:1.35}
+    .pm{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:transparent;display:grid;place-items:center;cursor:pointer;font-size:14px;color:var(--acc);flex:none}
+    .pm.on{background:var(--color-accent);border-color:var(--color-accent);color:#fff}
+    .controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--hair)}
+    .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+    .seg{display:flex;background:color-mix(in srgb,var(--ink) 6%,transparent);border-radius:8px;padding:3px;gap:2px}
+    .seg button{border:0;background:transparent;border-radius:6px;padding:5px 10px;font-size:12.5px;color:var(--ink3);cursor:pointer;position:relative}
+    .seg button:hover{color:var(--ink)}.seg button[aria-pressed="true"]{background:var(--color-bg);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.3)}
+    .seg button:disabled{opacity:.32;cursor:not-allowed}.seg button.best::after{content:'';position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--up)}
+    .typenote{padding:8px 14px;font-size:12.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent);border-bottom:1px solid var(--hair)}
+    .warnbar{display:flex;gap:10px;align-items:center;padding:9px 14px;font-size:12.5px;color:var(--warn);border-bottom:1px solid var(--hair);background:color-mix(in srgb,var(--warn) 6%,transparent)}
+    .chart{padding:10px 8px 6px;min-height:440px;position:relative}
+    .picker{position:absolute;top:44px;z-index:30;padding:12px;width:240px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+    .lrow{display:grid;grid-template-columns:22px minmax(150px,1.4fr) 190px 70px 150px 26px;gap:10px;align-items:center;padding:9px 14px;border-top:1px solid var(--hair)}
+    .sw{width:16px;height:16px;border-radius:4px;border:0;cursor:pointer}
+    .lname{min-width:0;cursor:pointer}.lname>b{font-family:ui-monospace,monospace;font-size:12px;font-weight:500}.lname>span{display:block;font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ldet{padding:4px 14px 14px 46px;font-size:12.5px;line-height:1.6;color:var(--ink2);border-top:1px dashed var(--hair)}
+    .ldet dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0}.ldet dt{color:var(--ink3)}.ldet dd{margin:0}
+    .about{position:sticky;top:62px;display:grid;gap:12px;max-height:calc(100vh - 80px);overflow-y:auto}
+    .about .card{padding:12px 14px}.about h4{margin:0 0 8px;font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+    .about p{margin:0 0 8px;font-size:12.5px;line-height:1.6;color:var(--ink2)}
+    .lineinfo{padding:8px 0;border-top:1px solid var(--hair);font-size:12.5px;line-height:1.55;color:var(--ink2)}.lineinfo:first-of-type{border-top:0}
+    .lineinfo b{font-weight:500;color:var(--ink)}.lineinfo i{font-style:normal;color:var(--ink3)}
+    .caution{display:flex;gap:7px;font-size:12px;color:var(--ink2);line-height:1.5;margin-top:5px}.caution span:first-child{color:var(--warn)}
+    .rel1{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--hair);font-size:12.5px;line-height:1.45}.rel1:first-of-type{border-top:0}
+    .rel1 .t{flex:1}.rel1 .t>span{display:block;font-size:11.5px;color:var(--ink3)}
+    .md{font-size:12.5px;line-height:1.6;color:var(--ink2)}.md h3{font-size:12.5px;margin:12px 0 4px;color:var(--ink)}.md p{margin:0 0 8px}.md ul{padding-left:1.2em;margin:0 0 8px}
+    textarea.f{min-height:110px;resize:vertical;line-height:1.5}
+    /* relations */
+    .rel{padding:20px 24px 60px}.rel h1{margin:0;font-size:24px;font-weight:500}
+    .relbody{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"map side" "tree side";gap:14px;margin-top:16px;align-items:start}
+    .relmap{grid-area:map;overflow-x:auto;padding:8px}.reltree{grid-area:tree;min-width:0}.reltree>section{padding:14px 16px}
+    .relside{grid-area:side;padding:14px 16px;position:sticky;top:62px;max-height:calc(100vh - 80px);overflow-y:auto}
+    .relside .cols{display:grid;gap:4px}
+    @media (max-width:1749px){.relbody{grid-template-columns:minmax(0,1fr);grid-template-areas:"map" "side" "tree"}.relside{position:static;max-height:none}.relside .cols{grid-template-columns:1.2fr 1fr 1fr;gap:24px}}
+    .relside h3{margin:0 0 4px;font-size:16px;font-weight:500}
+    .chain{margin:14px 0 0;padding:0;list-style:none;counter-reset:c;columns:3 300px;column-gap:28px}
+    .chain li{position:relative;padding:7px 0 7px 26px;border-top:1px solid var(--hair);font-size:12.5px;line-height:1.45;break-inside:avoid}
+    .chain li::before{counter-increment:c;content:counter(c);position:absolute;left:0;top:8px;width:18px;height:18px;border-radius:50%;background:var(--acc-soft);font-size:10.5px;display:grid;place-items:center;color:var(--ink2)}
+    .chain li>span{display:block;color:var(--ink3);font-size:11.5px}
+    .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink3);margin-top:8px}
+    /* modals */
+    .scrim{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:60px 20px}
+    .modal{width:600px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden}
+    .modal .mh{padding:14px 16px;border-bottom:1px solid var(--hair);display:grid;gap:10px}.modal .mh h3{margin:0;font-size:16px;font-weight:500;display:flex;justify-content:space-between}
+    .modal .mb{overflow-y:auto;padding:8px 10px 14px}
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:60;background:var(--panel);border:1px solid var(--line);padding:10px 18px;border-radius:9px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,.4)}
+    .empty{border:1px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--ink3);font-size:13px}
+  </style>
+</helmet>
+
+<div class="app">
+  <header class="top">
+    <span class="brand"><i class="ph ph-chart-line-up"></i>Macro</span>
+    <nav class="tabs">
+      <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+        <button class="tab" aria-pressed="{{ tb.on }}" onClick="{{ tb.go }}">{{ tb.label }}</button>
+      </sc-for>
+    </nav>
+    <span class="grow"></span>
+    <span class="src" title="{{ srcTip }}"><span class="dot" style="background:{{ srcDot }}"></span>{{ srcLabel }}</span>
+    <button class="b sm" onClick="{{ openKey }}"><i class="ph ph-key"></i>{{ keyBtnLabel }}</button>
+  </header>
+
+  <!-- ===== DASHBOARD ===== -->
+  <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+  <main class="dash">
+    <div class="hero">
+      <h1>The U.S. economy</h1>
+      <p class="sub">Search the catalog, or all of FRED once a key is set. Open a featured relationship, or start from the map of how the economy connects. Click any indicator to chart it, then overlay and transform lines and save the result.</p>
+      <div class="row">
+        <div class="search"><i class="ph ph-magnifying-glass"></i><input value="{{ heroQ }}" onInput="{{ onHeroQ }}" placeholder="{{ searchPlaceholder }}"></div>
+        <button class="b pri" onClick="{{ openBlank }}"><i class="ph ph-plus"></i>New chart</button>
+        <button class="b" onClick="{{ goRelations }}"><i class="ph ph-graph"></i>How it connects</button>
+      </div>
+    </div>
+
+    <sc-if value="{{ isSearching }}" hint-placeholder-val="{{ false }}">
+      <section class="blk">
+        <h2 class="cap">In the catalog <small>{{ searchCountLabel }}</small></h2>
+        <sc-if value="{{ searchEmpty }}" hint-placeholder-val="{{ false }}"><p class="note">Nothing in the catalog matches.</p></sc-if>
+        <div class="cards">
+          <sc-for list="{{ searchItems }}" as="it" hint-placeholder-count="3">
+            <div class="card scard" onClick="{{ it.onOpen }}">
+              <div class="top2"><span>{{ it.code }}</span><span class="badge" style="background:{{ it.badgeBg }};color:{{ it.badgeFg }}">{{ it.change }}</span></div>
+              <div class="nm">{{ it.short }}</div>
+              <div class="sp">{{ it.spark }}</div>
+              <div><span class="val">{{ it.latest }}</span><span class="unit">{{ it.units }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+      <section class="blk">
+        <h2 class="cap">All of FRED <small>{{ fredCountLabel }}</small></h2>
+        <p class="note">{{ fredNote }}</p>
+        <div class="card" style="margin-top:10px;overflow:hidden">
+          <sc-for list="{{ fredItems }}" as="f" hint-placeholder-count="0">
+            <div class="frow" onClick="{{ f.onOpen }}" title="{{ f.notes }}"><code>{{ f.id }}</code><span>{{ f.title }}</span><span class="m">{{ f.meta }}</span></div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ notSearching }}" hint-placeholder-val="{{ true }}">
+      <section class="blk">
+        <h2 class="cap">Your saved charts <small>{{ savedCountLabel }}</small></h2>
+        <sc-if value="{{ noSaved }}" hint-placeholder-val="{{ true }}"><div class="empty">No saved charts yet. Build one and press Save to keep it here.</div></sc-if>
+        <div class="cards">
+          <sc-for list="{{ savedList }}" as="g" hint-placeholder-count="0">
+            <div class="card pcard" onClick="{{ g.onOpen }}">
+              <div class="mini">{{ g.mini }}</div>
+              <div class="tx"><div class="row" style="justify-content:space-between"><b>{{ g.title }}</b><button class="b sm" onClick="{{ g.onDelete }}" title="Delete">✕</button></div><p>{{ g.sub }}</p></div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="blk">
+        <h2 class="cap">Featured relationships <small>classic charts, each with a note on how to read it</small></h2>
+        <div class="cards">
+          <sc-for list="{{ presetCards }}" as="p" hint-placeholder-count="6">
+            <div class="card pcard" onClick="{{ p.onOpen }}">
+              <div class="mini">{{ p.mini }}</div>
+              <div class="tx"><b>{{ p.name }}</b><p>{{ p.desc }}</p></div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="blk">
+        <h2 class="cap">Browse the catalog <small>{{ catalogStatLabel }}</small></h2>
+        <div class="browse">
+          <div class="card tree">
+            <sc-for list="{{ catTree }}" as="c" hint-placeholder-count="7">
+              <button class="tnode" aria-pressed="{{ c.on }}" onClick="{{ c.onSelect }}"><span>{{ c.title }}</span><small>{{ c.count }}</small></button>
+              <sc-for list="{{ c.groups }}" as="gg" hint-placeholder-count="0">
+                <button class="tnode sub2" aria-pressed="{{ gg.on }}" onClick="{{ gg.onSelect }}"><span>{{ gg.title }}</span><small>{{ gg.count }}</small></button>
+              </sc-for>
+            </sc-for>
+          </div>
+          <div>
+            <div class="row" style="justify-content:space-between;margin-bottom:12px"><div><b style="font-weight:500;font-size:16px">{{ resTitle }}</b><p class="note">{{ resBlurb }}</p></div><span class="note">{{ resCountLabel }}</span></div>
+            <div class="cards">
+              <sc-for list="{{ browseItems }}" as="it" hint-placeholder-count="6">
+                <div class="card scard" onClick="{{ it.onOpen }}">
+                  <div class="top2"><span>{{ it.code }}</span><span class="badge" style="background:{{ it.badgeBg }};color:{{ it.badgeFg }}">{{ it.change }}</span></div>
+                  <div class="nm">{{ it.short }}</div>
+                  <div class="sp">{{ it.spark }}</div>
+                  <div><span class="val">{{ it.latest }}</span><span class="unit">{{ it.units }}</span></div>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ moreVisible }}" hint-placeholder-val="{{ false }}"><button class="b" style="width:100%;margin-top:12px" onClick="{{ onShowMore }}">{{ moreLabel }}</button></sc-if>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+  </main>
+  </sc-if>
+
+  <!-- ===== RELATIONS ===== -->
+  <sc-if value="{{ isRelations }}" hint-placeholder-val="{{ false }}">
+  <main class="rel">
+    <h1>How the economy connects</h1>
+    <p class="sub">Each arrow is a cause and effect economists rely on. <b class="up">+</b> means the next indicator moves the same way; <b class="down">−</b> means it moves the opposite way. Hover an indicator to light up only its arrows; click it to select it, then push it up or down to follow what happens next. The figures are the latest readings.</p>
+    <div class="relbody">
+      <div class="card relmap">{{ relMap }}
+        <div class="legend" style="padding:4px 10px 6px"><span><b class="up">━</b> same direction (+)</span><span><b class="down">━</b> opposite direction (−)</span><span>╌ feedback (when shown)</span><span style="color:var(--warn)">┈ warning sign, not a cause</span><span>Hover an indicator to light up its arrows · hover an arrow for the mechanism</span></div></div>
+      <div class="reltree">
+        <sc-if value="{{ relHasChain }}" hint-placeholder-val="{{ false }}">
+          <section class="card">
+            <div class="row" style="justify-content:space-between"><div><div class="cap" style="margin:0">What follows</div><b style="font-weight:500;font-size:16px">{{ relChainTitle }}</b></div>
+              <div class="row"><button class="b" onClick="{{ relChartChain }}"><i class="ph ph-chart-line-up"></i>Chart this chain</button><button class="b" onClick="{{ relClear }}">Clear</button></div></div>
+            <p class="note" style="margin-top:6px">Read left to right. Each step follows the first arrow that reaches it; ± means another chain pushes it the other way, so the net effect is unclear. The small text is how long the step usually takes. Hover a box for the mechanism.</p>
+            <div style="overflow-x:auto;margin-top:12px">{{ relTree }}</div>
+            <ol class="chain">
+              <sc-for list="{{ relChain }}" as="c" hint-placeholder-count="0">
+                <li><b class="{{ c.cls }}">{{ c.text }}</b><span>{{ c.why }}</span></li>
+              </sc-for>
+            </ol>
+          </section>
+        </sc-if>
+      </div>
+      <aside class="card relside">
+        <div class="cols">
+          <div>
+            <sc-if value="{{ relHasSel }}" hint-placeholder-val="{{ false }}">
+              <h3>{{ relSelName }}</h3>
+              <p class="note">{{ relSelWhy }}</p>
+              <div class="row" style="margin-top:10px">
+                <button class="b pri" onClick="{{ relUp }}"><i class="ph ph-arrow-up"></i>Push up</button>
+                <button class="b pri" onClick="{{ relDown }}"><i class="ph ph-arrow-down"></i>Push down</button>
+                <button class="b" onClick="{{ relChartOne }}" disabled="{{ relNoSeries }}"><i class="ph ph-chart-line"></i>Chart it</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ relNoSel }}" hint-placeholder-val="{{ true }}">
+              <h3>Pick an indicator</h3>
+              <p class="note">Hover an indicator to light up the arrows into and out of it. Click it to keep it selected and see what moves it and what it moves, then push it up or down to follow the chain of effects. Try one of these:</p>
+              <div class="row" style="margin-top:10px"><sc-for list="{{ relQuick }}" as="q" hint-placeholder-count="4"><button class="b sm" onClick="{{ q.go }}">{{ q.label }}</button></sc-for></div>
+            </sc-if>
+            <label class="note" style="margin-top:12px;cursor:pointer;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" style="margin-top:3px" checked="{{ relFb }}" onChange="{{ relToggleFb }}"> Show and follow feedback loops (the Fed reacting, taxes rising with income)</label>
+          </div>
+          <div>
+            <div class="cap" style="margin-top:14px">What moves it</div>
+            <sc-if value="{{ relNoIn }}" hint-placeholder-val="{{ false }}"><p class="note">{{ relNoInText }}</p></sc-if>
+            <sc-for list="{{ relIn }}" as="r" hint-placeholder-count="0">
+              <div class="rel1"><b class="{{ r.cls }}">{{ r.sign }}</b><div class="t"><b style="font-weight:500">{{ r.name }}</b><span>{{ r.detail }}</span></div></div>
+            </sc-for>
+          </div>
+          <div>
+            <div class="cap" style="margin-top:14px">What it moves</div>
+            <sc-if value="{{ relNoOut }}" hint-placeholder-val="{{ false }}"><p class="note">{{ relNoOutText }}</p></sc-if>
+            <sc-for list="{{ relOut }}" as="r" hint-placeholder-count="0">
+              <div class="rel1"><b class="{{ r.cls }}">{{ r.sign }}</b><div class="t"><b style="font-weight:500">{{ r.name }}</b><span>{{ r.detail }}</span></div></div>
+            </sc-for>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ===== EDITOR ===== -->
+  <sc-if value="{{ isEditor }}" hint-placeholder-val="{{ false }}">
+  <main class="ed">
+    <div class="edbar">
+      <button class="b" onClick="{{ goHome }}"><i class="ph ph-arrow-left"></i>Dashboard</button>
+      <input class="title" value="{{ edTitle }}" onInput="{{ onTitle }}" placeholder="Untitled chart">
+      <button class="b" onClick="{{ onExport }}"><i class="ph ph-download-simple"></i>CSV</button>
+      <button class="b pri" onClick="{{ onSave }}">{{ saveLabel }}</button>
+    </div>
+    <div class="edgrid">
+      <aside class="card side">
+        <input class="f" value="{{ sideQ }}" onInput="{{ onSideQ }}" placeholder="Search to add a series…">
+        <sc-if value="{{ sideSearching }}" hint-placeholder-val="{{ false }}">
+          <div class="shead">In the catalog <span>{{ sideLocalCount }}</span></div>
+          <sc-for list="{{ sideLocal }}" as="it" hint-placeholder-count="0">
+            <div class="sitem" onClick="{{ it.onToggle }}" title="{{ it.tip }}"><div class="t"><b>{{ it.short }}</b><code>{{ it.code }}</code></div><span class="{{ it.pmCls }}">{{ it.pm }}</span></div>
+          </sc-for>
+          <div class="shead">All of FRED</div>
+          <p class="note" style="padding:0 6px">{{ sideFredNote }}</p>
+          <sc-for list="{{ sideFred }}" as="it" hint-placeholder-count="0">
+            <div class="sitem" onClick="{{ it.onToggle }}" title="{{ it.tip }}"><div class="t"><b>{{ it.short }}</b><code>{{ it.code }}</code><span>{{ it.meta }}</span></div><span class="{{ it.pmCls }}">{{ it.pm }}</span></div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ sideNotSearching }}" hint-placeholder-val="{{ true }}">
+          <div class="shead">On this chart</div>
+          <sc-for list="{{ sideOn }}" as="it" hint-placeholder-count="0">
+            <div class="sitem" onClick="{{ it.onToggle }}"><span class="dot" style="background:{{ it.color }}"></span><div class="t"><b>{{ it.short }}</b><code>{{ it.code }}</code></div><span class="pm on">✓</span></div>
+          </sc-for>
+          <div class="shead">Related <span title="From the map of how the economy connects">?</span></div>
+          <sc-if value="{{ sideNoRelated }}" hint-placeholder-val="{{ false }}"><p class="note" style="padding:0 6px">Add a headline indicator to see what moves it and what it moves.</p></sc-if>
+          <sc-for list="{{ sideRelated }}" as="it" hint-placeholder-count="0">
+            <div class="sitem" onClick="{{ it.onToggle }}" title="{{ it.tip }}"><div class="t"><b>{{ it.short }}</b><span>{{ it.why }}</span></div><span class="{{ it.pmCls }}">{{ it.pm }}</span></div>
+          </sc-for>
+          <sc-if value="{{ sideHasRecent }}" hint-placeholder-val="{{ false }}"><div class="shead">Recently used</div></sc-if>
+          <sc-for list="{{ sideRecent }}" as="it" hint-placeholder-count="0">
+            <div class="sitem" onClick="{{ it.onToggle }}"><div class="t"><b>{{ it.short }}</b><code>{{ it.code }}</code></div><span class="{{ it.pmCls }}">{{ it.pm }}</span></div>
+          </sc-for>
+          <div class="shead">Browse</div>
+          <sc-for list="{{ sideSections }}" as="sec" hint-placeholder-count="7">
+            <div class="shead" style="padding-top:6px;text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink2)" onClick="{{ sec.onToggle }}"><span>{{ sec.chev }} {{ sec.title }}</span><span>{{ sec.count }}</span></div>
+            <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="0">
+              <div class="sitem" onClick="{{ it.onToggle }}" title="{{ it.tip }}" style="padding-left:16px"><div class="t"><b>{{ it.short }}</b><code>{{ it.code }}</code></div><span class="{{ it.pmCls }}">{{ it.pm }}</span></div>
+            </sc-for>
+          </sc-for>
+        </sc-if>
+      </aside>
+
+      <section class="card" style="overflow:visible">
+        <div class="controls">
+          <span class="lbl">Chart</span>
+          <div class="seg"><sc-for list="{{ typeBtns }}" as="b" hint-placeholder-count="6"><button class="{{ b.cls }}" aria-pressed="{{ b.on }}" disabled="{{ b.disabled }}" title="{{ b.tip }}" onClick="{{ b.onClick }}">{{ b.label }}</button></sc-for></div>
+          <span class="lbl">Range</span>
+          <div class="seg" style="position:relative"><sc-for list="{{ rangeBtns }}" as="b" hint-placeholder-count="5"><button aria-pressed="{{ b.on }}" onClick="{{ b.onClick }}">{{ b.label }}</button></sc-for><button aria-pressed="{{ rangeCustomOn }}" onClick="{{ onOpenRangePicker }}">Custom…</button></div>
+          <sc-if value="{{ rangePickerOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="picker">
+              <div class="lbl" style="margin-bottom:8px">Custom period</div>
+              <div class="row"><span class="note" style="width:36px">From</span><input class="f" type="month" ref="{{ rangeStartRef }}" defaultValue="{{ draftStart }}" style="flex:1"></div>
+              <div class="row" style="margin-top:6px"><span class="note" style="width:36px">To</span><input class="f" type="month" ref="{{ rangeEndRef }}" defaultValue="{{ draftEnd }}" style="flex:1"></div>
+              <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="b sm" onClick="{{ onCancelRange }}">Cancel</button><button class="b sm pri" onClick="{{ onApplyRange }}">Apply</button></div>
+            </div>
+          </sc-if>
+          <button class="b sm" aria-pressed="{{ recOn }}" onClick="{{ onToggleRec }}" style="{{ recStyle }}" disabled="{{ recOff }}" title="Shade the recessions dated by the NBER">▦ Recessions</button>
+          <span class="grow"></span><span class="note">{{ rangeText }}</span>
+        </div>
+        <sc-if value="{{ typeNote }}" hint-placeholder-val="{{ false }}"><div class="typenote">{{ typeNote }}</div></sc-if>
+        <sc-if value="{{ scaleWarn }}" hint-placeholder-val="{{ false }}">
+          <div class="warnbar"><span style="flex:1">{{ scaleWarnText }}</span><button class="b sm" onClick="{{ onIndexAll }}">Index all to 100</button><button class="b sm" onClick="{{ onSplitAxes }}">Split onto two axes</button></div>
+        </sc-if>
+        <sc-if value="{{ pieMode }}" hint-placeholder-val="{{ false }}">
+          <div class="warnbar" style="color:var(--ink2);background:transparent"><span>Shares on</span><input class="f" type="month" value="{{ pieDate }}" onChange="{{ onPieDate }}" style="width:170px"><span class="note">{{ pieNote }}</span></div>
+        </sc-if>
+        <div class="chart">{{ chart }}</div>
+        <div class="row" style="padding:8px 14px;border-top:1px solid var(--hair)">
+          <span class="lbl">Lines</span><span class="note">{{ scatterNote }}</span><span class="grow"></span>
+          <button class="b sm" onClick="{{ openCatalog }}"><i class="ph ph-plus"></i>Add series</button>
+          <button class="b sm" onClick="{{ openFormula }}">ƒ Custom line</button>
+        </div>
+        <sc-for list="{{ lineRows }}" as="r" hint-placeholder-count="0">
+          <div class="lrow">
+            <button class="sw" title="Change colour" style="background:{{ r.color }}" onClick="{{ r.onColor }}"></button>
+            <div class="lname" onClick="{{ r.onToggleDetail }}" title="Show source and notes"><b>{{ r.codeLabel }}</b><span>{{ r.name }}</span></div>
+            <select class="f" value="{{ r.transform }}" onChange="{{ r.onTransform }}">
+              <option value="lin">Level (as published)</option>
+              <option value="yoy">Change from a year ago, %</option>
+              <option value="pch">Change from previous period, %</option>
+              <option value="chg">Change from a year ago, units</option>
+              <option value="index">Index (start of range = 100)</option>
+            </select>
+            <div class="seg"><button aria-pressed="{{ r.axisL }}" onClick="{{ r.onAxisL }}" style="flex:1">L</button><button aria-pressed="{{ r.axisR }}" onClick="{{ r.onAxisR }}" style="flex:1">R</button></div>
+            <span class="note" style="text-align:right;color:var(--ink2)" title="{{ r.valueTip }}">{{ r.value }}</span>
+            <button class="b sm" onClick="{{ r.onRemove }}" title="Remove" style="padding:0;min-height:24px">✕</button>
+          </div>
+          <sc-if value="{{ r.detailOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="ldet">
+              <div>{{ r.about }}</div>
+              <dl><dt>Data from</dt><dd>{{ r.source }}</dd><dt>Units</dt><dd>{{ r.unitsLine }}</dd><dt>Frequency</dt><dd>{{ r.freq }}</dd><dt>Covers</dt><dd>{{ r.span }}</dd></dl>
+              <div class="note">{{ r.notes }}</div>
+              <div class="note" style="color:var(--warn)">{{ r.err }}</div>
+              <a href="{{ r.url }}" target="_blank" rel="noopener" style="font-size:12px">View on FRED ↗</a>
+            </div>
+          </sc-if>
+        </sc-for>
+      </section>
+
+      <aside class="about">
+        <div class="card">
+          <h4>What this chart shows</h4>
+          <p>{{ aboutSummary }}</p>
+          <sc-for list="{{ aboutLines }}" as="a" hint-placeholder-count="0">
+            <div class="lineinfo"><b style="color:{{ a.color }}">{{ a.name }}</b> {{ a.why }} <i>How to read it:</i> {{ a.read }}</div>
+          </sc-for>
+        </div>
+        <div class="card">
+          <h4>Explain it in plain words <button class="b sm pri" onClick="{{ onExplain }}" disabled="{{ explainBusy }}">{{ explainLabel }}</button></h4>
+          <sc-if value="{{ explainEmpty }}" hint-placeholder-val="{{ true }}"><p class="note">Claude reads the chart's latest numbers and explains what the lines are, what they show, and how they connect. It takes about 20 seconds.</p></sc-if>
+          <div>{{ explainEl }}</div>
+        </div>
+        <div class="card">
+          <h4>Things to be aware of</h4>
+          <sc-for list="{{ cautions }}" as="cn" hint-placeholder-count="0"><div class="caution"><span>▲</span><span>{{ cn }}</span></div></sc-for>
+        </div>
+        <div class="card">
+          <h4>How these lines connect</h4>
+          <sc-if value="{{ noLinks }}" hint-placeholder-val="{{ true }}"><p class="note">No direct link between these lines on the map. Open <a href="#" onClick="{{ goRelationsLink }}">How it connects</a> to see the chains.</p></sc-if>
+          <sc-for list="{{ links }}" as="r" hint-placeholder-count="0">
+            <div class="rel1"><b class="{{ r.cls }}">{{ r.sign }}</b><div class="t"><b style="font-weight:500">{{ r.name }}</b><span>{{ r.detail }}</span></div></div>
+          </sc-for>
+        </div>
+        <div class="card">
+          <h4>Your notes</h4>
+          <textarea class="f" value="{{ edNotes }}" onInput="{{ onNotes }}" placeholder="What you notice, questions to follow up…"></textarea>
+          <div class="note" style="margin-top:6px">{{ notesHint }}</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ===== Add series ===== -->
+  <sc-if value="{{ catalogOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{ closeCatalog }}">
+    <div class="modal" onClick="{{ stop }}">
+      <div class="mh"><h3>Add a series <button class="b sm" onClick="{{ closeCatalog }}">✕</button></h3><input class="f" value="{{ search }}" onInput="{{ onSearch }}" placeholder="Search by name or FRED code…"></div>
+      <div class="mb">
+        <sc-for list="{{ catalogList }}" as="it" hint-placeholder-count="0">
+          <div class="sitem" onClick="{{ it.onAdd }}"><span class="dot" style="background:{{ it.color }}"></span><div class="t"><b>{{ it.short }}</b><span>{{ it.sub }}</span></div><span class="note">{{ it.tag }}</span></div>
+        </sc-for>
+        <p class="note" style="padding:8px">{{ catalogMoreLabel }}</p>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== Formula ===== -->
+  <sc-if value="{{ formulaOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{ closeFormula }}">
+    <div class="modal" onClick="{{ stop }}" style="width:540px">
+      <div class="mh"><h3>Custom formula line <button class="b sm" onClick="{{ closeFormula }}">✕</button></h3></div>
+      <div class="mb" style="padding:14px 16px">
+        <div class="lbl">Formula</div>
+        <input class="f" value="{{ fFormula }}" onInput="{{ onFormula }}" style="font-family:ui-monospace,monospace;font-size:16px;margin-top:6px">
+        <p class="note" style="margin-top:6px">Use the letters a, b and c with numbers and + − * / ( ). Each letter has its own transform. Examples: <code>a - b</code>, <code>100*(a/b-1)</code>.</p>
+        <sc-for list="{{ fVarRows }}" as="v" hint-placeholder-count="3">
+          <div class="row" style="margin-top:10px"><b style="width:16px;color:var(--acc)">{{ v.key }}</b>
+            <select class="f" value="{{ v.series }}" onChange="{{ v.onSeries }}" style="flex:1"><option value="">— none —</option><sc-for list="{{ formulaOpts }}" as="o" hint-placeholder-count="0"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select>
+            <select class="f" value="{{ v.transform }}" onChange="{{ v.onTransform }}" style="width:120px"><option value="lin">Level</option><option value="yoy">% year ago</option><option value="pch">% period</option><option value="chg">Δ year ago</option></select>
+          </div>
+        </sc-for>
+        <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="b" onClick="{{ closeFormula }}">Cancel</button><button class="b pri" onClick="{{ addFormula }}">Add line</button></div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== FRED key ===== -->
+  <sc-if value="{{ keyOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{ closeKey }}">
+    <div class="modal" onClick="{{ stop }}" style="width:500px">
+      <div class="mh"><h3>Data sources <button class="b sm" onClick="{{ closeKey }}">✕</button></h3></div>
+      <div class="mb" style="padding:14px 16px">
+        <p class="note">FRED has more than 800,000 series and search. It needs a free API key, from <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" rel="noopener">fred.stlouisfed.org</a> (sign in, then "Request API key"). The key is kept in this computer's settings.json and used only by the local server.</p>
+        <p class="note" style="margin-top:8px">Without a key, or while FRED cannot be reached, the core series still load: rates, money and industrial production from the Federal Reserve, GDP, spending, income and PCE prices from BEA (both via DBnomics), and jobs and CPI from the BLS.</p>
+        <input class="f" value="{{ keyDraft }}" onInput="{{ onKeyDraft }}" placeholder="32-character FRED API key" style="font-family:ui-monospace,monospace;margin-top:12px">
+        <p class="note" style="margin-top:6px;color:var(--warn)">{{ keyMsg }}</p>
+        <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="b" onClick="{{ clearKey }}">Remove key</button><button class="b pri" onClick="{{ saveKey }}">Save key</button></div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}"><div class="toast">{{ toastMsg }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;chartHeight&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:430,&quot;min&quot;:320,&quot;max&quot;:620,&quot;tsType&quot;:&quot;number&quot;}}">
+// ---- The Macro page: U.S. economic series charted with Recharts, a map of how the indicators drive one another, and
+// plain-words explanations. Data comes from the local server (/api/macro/...), which uses FRED with a key and keyless
+// sources for the core series otherwise. Built from the FRED Studio catalog design.
+const PAL = ['#8ab4f8', '#f28b82', '#81c995', '#fdd663', '#c58af9', '#78d9ec', '#fcad70', '#ff8bcb', '#a8dab5', '#d7aefb', '#e6c79c', '#9aa0ff', '#5fb3a1', '#f6a6c1', '#c9e07a', '#b0b4c8'];
+const UPC = 'oklch(0.78 0.14 155)', DOWNC = 'oklch(0.72 0.16 25)';
+const addM = (k, n) => { let [y, m] = k.split('-').map(Number); m += n; y += Math.floor((m - 1) / 12); m = (((m - 1) % 12) + 12) % 12 + 1; return y + '-' + String(m).padStart(2, '0'); };
+const monthsBetween = (a, b) => { const out = []; if (!a || !b) return out; for (let k = a; k <= b && out.length < 2000; k = addM(k, 1)) out.push(k); return out; };
+const nowMonth = () => new Date().toISOString().slice(0, 7);
+const getJSON = url => fetch(url).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
+const postJSON = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
+const loadScript = src => new Promise((ok, fail) => { if (document.querySelector('script[data-src="' + src + '"]')) return ok(); const s = document.createElement('script'); s.src = src; s.dataset.src = src; s.onload = ok; s.onerror = () => fail(new Error('could not load ' + src)); document.head.appendChild(s); });
+const lsGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+// ---- The catalog. why = why it matters, read = how to read it. add = parts of one total in the same units (can be stacked or shown as a pie).
+const S = (id, short, name, units, freq, sec, x) => Object.assign({ id, short, name, units, freq, sec }, x || {});
+const CORE = [
+  S('GDPC1', 'Real GDP', 'Real Gross Domestic Product', 'Bil. of chained 2017 $', 'Quarterly', 'output', { why: 'The broadest measure of what the economy produces, after inflation.', read: 'Switch to change from a year ago: above about 2% is solid growth; falling output for two quarters is the rough sign of a recession.' }),
+  S('GDP', 'Nominal GDP', 'Gross Domestic Product', 'Bil. of $', 'Quarterly', 'output', { why: 'Output in today\'s dollars, so it grows with both real activity and inflation.', read: 'The gap between its growth and real GDP\'s growth is roughly the inflation rate.' }),
+  S('INDPRO', 'Industrial Production', 'Industrial Production: Total Index', 'Index 2017=100', 'Monthly', 'output', { why: 'Monthly output of factories, mines and utilities: an early read on the cycle.', read: 'Several months of decline often come before or with a recession.' }),
+  S('GPDIC1', 'Real Private Investment', 'Real Gross Private Domestic Investment', 'Bil. of chained 2017 $', 'Quarterly', 'output', { why: 'Business spending on equipment, buildings and software plus home building: the most cyclical part of GDP.', read: 'Swings far more than GDP; higher interest rates bite here first.' }),
+  S('PCEC96', 'Real Consumer Spending', 'Real Personal Consumption Expenditures', 'Bil. of chained 2017 $', 'Monthly', 'output', { why: 'What households spend after inflation: about two-thirds of GDP.', read: 'Steady growth of 2–3% a year is normal; a slowdown here drags the whole economy.' }),
+  S('GCEC1', 'Real Government Spending', 'Real Government Consumption Expenditures and Gross Investment', 'Bil. of chained 2017 $', 'Quarterly', 'output', { why: 'What governments buy: services, equipment, roads. Transfers like Social Security are not included.', read: 'Tends to rise in recessions and wars; it adds to GDP directly.' }),
+  S('PCE', 'Consumer Spending ($)', 'Personal Consumption Expenditures', 'Bil. of $', 'Monthly', 'output', { add: 'gdpparts', why: 'Household spending in today\'s dollars.', read: 'Compare with GDP to see the share of the economy that is consumption.' }),
+  S('GPDI', 'Private Investment ($)', 'Gross Private Domestic Investment', 'Bil. of $', 'Quarterly', 'output', { add: 'gdpparts', why: 'Business and housing investment in today\'s dollars.', read: 'Falls hard in recessions.' }),
+  S('GCE', 'Government Spending ($)', 'Government Consumption Expenditures and Gross Investment', 'Bil. of $', 'Quarterly', 'output', { add: 'gdpparts', why: 'Government purchases in today\'s dollars.', read: 'A steady share of GDP, near a sixth.' }),
+  S('NETEXP', 'Net Exports', 'Net Exports of Goods and Services', 'Bil. of $', 'Quarterly', 'output', { why: 'Exports minus imports; negative means the U.S. buys more abroad than it sells.', read: 'A stronger dollar usually makes it more negative a few quarters later.' }),
+  S('TCU', 'Capacity Utilization', 'Capacity Utilization: Total Industry', '% of capacity', 'Monthly', 'output', { why: 'How much of the country\'s industrial capacity is in use.', read: 'Above about 80% tends to push prices up; below 75% signals slack.' }),
+  S('UNRATE', 'Unemployment Rate', 'Unemployment Rate', 'Percent', 'Monthly', 'labor', { why: 'Share of the labor force without a job and looking for one.', read: 'Around 4% is a tight job market. A rise of half a point from its low has signalled past recessions (the Sahm rule).' }),
+  S('PAYEMS', 'Nonfarm Payrolls', 'All Employees, Total Nonfarm', 'Thousands of persons', 'Monthly', 'labor', { why: 'Jobs on employers\' payrolls: the headline jobs number.', read: 'Look at the monthly change (change from previous period): about 100,000 a month keeps up with population growth.' }),
+  S('JTSJOL', 'Job Openings', 'Job Openings: Total Nonfarm', 'Thousands', 'Monthly', 'labor', { why: 'Unfilled jobs: how hard employers are looking for workers.', read: 'Openings well above the number of unemployed means employers compete for workers and wages rise.' }),
+  S('CIVPART', 'Labor Force Participation', 'Labor Force Participation Rate', 'Percent', 'Monthly', 'labor', { why: 'Share of adults working or looking for work.', read: 'Drifts down as the population ages; sudden drops (as in 2020) mean people left the job market.' }),
+  S('EMRATIO', 'Employment-Population Ratio', 'Employment-Population Ratio', 'Percent', 'Monthly', 'labor', { why: 'Share of adults with a job.', read: 'Avoids the question of who counts as looking for work.' }),
+  S('U6RATE', 'U-6 Underemployment', 'Total Unemployed Plus Marginally Attached and Part-Time for Economic Reasons', 'Percent', 'Monthly', 'labor', { why: 'The broadest measure of slack: includes people stuck in part-time work.', read: 'Runs several points above the headline rate; the gap widens in downturns.' }),
+  S('ICSA', 'Initial Jobless Claims', 'Initial Claims', 'Number', 'Weekly', 'labor', { why: 'New filings for unemployment benefits each week: the most timely labor signal.', read: 'A sustained rise above about 300,000 has come before past recessions.' }),
+  S('CES0500000003', 'Avg Hourly Earnings', 'Average Hourly Earnings of All Employees, Total Private', '$ per hour', 'Monthly', 'labor', { why: 'Average pay per hour in the private sector.', read: 'Wage growth (change from a year ago) above about 3.5% keeps service prices rising unless productivity is strong.' }),
+  S('CPIAUCSL', 'CPI', 'Consumer Price Index for All Urban Consumers', 'Index 1982-84=100', 'Monthly', 'prices', { why: 'Prices of what urban households buy: the headline inflation number.', read: 'Switch to change from a year ago. The Fed aims for about 2%, measured on PCE prices.' }),
+  S('CPILFESL', 'Core CPI', 'CPI Less Food and Energy', 'Index 1982-84=100', 'Monthly', 'prices', { why: 'CPI without food and energy, which swing with weather and oil.', read: 'Shows the underlying trend; slower to turn than headline CPI.' }),
+  S('PCEPI', 'PCE Prices', 'Personal Consumption Expenditures Price Index', 'Index 2017=100', 'Monthly', 'prices', { why: 'Prices of everything households consume, including what is paid for them (like health insurance).', read: 'Usually runs a little below CPI inflation.' }),
+  S('PCEPILFE', 'Core PCE Prices', 'PCE Price Index Excluding Food and Energy', 'Index 2017=100', 'Monthly', 'prices', { why: 'The Federal Reserve\'s preferred inflation gauge.', read: 'Compare its change from a year ago with the 2% target: above it, the Fed leans toward higher rates.' }),
+  S('PPIACO', 'Producer Prices', 'Producer Price Index: All Commodities', 'Index 1982=100', 'Monthly', 'prices', { why: 'Prices businesses get for their output, before retail.', read: 'Moves ahead of consumer prices and swings more, with commodities.' }),
+  S('DFII10', '10-Yr Real Yield', '10-Year Treasury Inflation-Indexed Yield', 'Percent', 'Monthly', 'prices', { why: 'The yield on inflation-protected Treasuries: the real cost of long-term money.', read: 'Rising real yields tighten financial conditions and weigh on stocks and gold.' }),
+  S('T10YIE', '10-Yr Breakeven Inflation', '10-Year Breakeven Inflation Rate', 'Percent', 'Monthly', 'prices', { calc: ['DGS10', 'DFII10'], why: 'The inflation rate markets expect over ten years (nominal minus real yield).', read: 'Near 2–2.5% means markets trust the Fed\'s target; a jump means inflation worries.' }),
+  S('DCOILWTICO', 'WTI Crude Oil', 'Crude Oil Prices: West Texas Intermediate', '$ per barrel', 'Daily', 'prices', { why: 'The U.S. benchmark oil price.', read: 'Feeds headline inflation within months; spikes have come before several recessions.' }),
+  S('FEDFUNDS', 'Fed Funds Rate', 'Federal Funds Effective Rate', 'Percent', 'Monthly', 'rates', { why: 'The overnight rate the Fed targets: its main policy tool.', read: 'Rising means the Fed is tightening to cool inflation; cuts usually come when unemployment rises.' }),
+  S('DGS3MO', '3-Month Treasury', '3-Month Treasury Constant Maturity Rate', 'Percent', 'Monthly', 'rates', { why: 'The short-term risk-free rate, close to the Fed funds rate.', read: 'Moves with Fed policy.' }),
+  S('DGS2', '2-Year Treasury', '2-Year Treasury Constant Maturity Rate', 'Percent', 'Monthly', 'rates', { why: 'Moves with where markets expect the Fed funds rate to go over two years.', read: 'Falls ahead of rate cuts.' }),
+  S('DGS10', '10-Year Treasury', '10-Year Treasury Constant Maturity Rate', 'Percent', 'Monthly', 'rates', { why: 'The benchmark long-term rate behind mortgage and corporate borrowing costs.', read: 'When it rises, bond prices fall and borrowing gets costlier for homes and businesses.' }),
+  S('DGS30', '30-Year Treasury', '30-Year Treasury Constant Maturity Rate', 'Percent', 'Monthly', 'rates', { why: 'The longest standard Treasury yield.', read: 'Reflects long-run growth, inflation and deficit worries.' }),
+  S('T10Y2Y', '10Y–2Y Spread', '10-Year Minus 2-Year Treasury Spread', 'Percent', 'Monthly', 'rates', { calc: ['DGS10', 'DGS2'], why: 'The slope of the yield curve.', read: 'Below zero (inverted) means markets expect rate cuts; every U.S. recession since the 1970s followed an inversion, usually 6–24 months later.' }),
+  S('MORTGAGE30US', '30-Yr Mortgage Rate', '30-Year Fixed Rate Mortgage Average', 'Percent', 'Weekly', 'rates', { why: 'The average rate on a new 30-year fixed mortgage.', read: 'Follows the 10-year Treasury plus a spread; above about 7% housing activity slows sharply.' }),
+  S('BAA', 'Baa Corporate Yield', 'Moody\'s Seasoned Baa Corporate Bond Yield', 'Percent', 'Monthly', 'rates', { why: 'What medium-grade companies pay to borrow long term.', read: 'Its gap over Treasuries widens when investors fear defaults.' }),
+  S('M2SL', 'M2 Money Supply', 'M2 Money Stock', 'Bil. of $', 'Monthly', 'rates', { why: 'Cash, checking and savings deposits and retail money funds.', read: 'Very fast growth (2020–21) came before inflation; a shrinking M2 is rare and signals tight money.' }),
+  S('WALCL', 'Fed Balance Sheet', 'Assets: Total Assets', 'Mil. of $', 'Weekly', 'rates', { why: 'Everything the Fed owns; grows with bond buying (QE), shrinks with runoff (QT).', read: 'Growth adds money to markets; runoff takes it out.' }),
+  S('HOUST', 'Housing Starts', 'New Privately-Owned Housing Units Started', 'Thousands, annual rate', 'Monthly', 'housing', { why: 'New homes started: very sensitive to mortgage rates.', read: 'Falls months before the broader economy turns down.' }),
+  S('PERMIT', 'Building Permits', 'New Housing Units Authorized by Building Permits', 'Thousands, annual rate', 'Monthly', 'housing', { why: 'Permits come before starts, so they lead housing.', read: 'A falling trend points to fewer starts ahead.' }),
+  S('CSUSHPINSA', 'Home Prices', 'S&P CoreLogic Case-Shiller U.S. National Home Price Index', 'Index Jan 2000=100', 'Monthly', 'housing', { why: 'Repeat-sale prices of the same homes across the country.', read: 'Use change from a year ago; falling prices hurt household wealth and spending.' }),
+  S('MSPUS', 'Median Home Price', 'Median Sales Price of Houses Sold', '$', 'Quarterly', 'housing', { why: 'The middle price of new homes sold.', read: 'Moves with the mix of homes sold as well as prices.' }),
+  S('UMCSENT', 'Consumer Sentiment', 'University of Michigan: Consumer Sentiment', 'Index 1966:Q1=100', 'Monthly', 'housing', { why: 'How households feel about their finances and the economy.', read: 'Swings with gas prices and the news; very low readings often come near downturns.' }),
+  S('RSAFS', 'Retail Sales', 'Advance Retail Sales: Retail and Food Services', 'Mil. of $', 'Monthly', 'housing', { why: 'Spending at stores and restaurants, out early each month.', read: 'Not adjusted for inflation, so compare its growth with CPI.' }),
+  S('PSAVERT', 'Personal Saving Rate', 'Personal Saving Rate', 'Percent', 'Monthly', 'housing', { why: 'Share of after-tax income households save.', read: 'High saving means caution (or stimulus checks); very low saving leaves little cushion.' }),
+  S('DSPIC96', 'Real Disposable Income', 'Real Disposable Personal Income', 'Bil. of chained 2017 $', 'Monthly', 'housing', { why: 'Household income after taxes, adjusted for inflation.', read: 'Spending cannot outgrow it for long without saving falling.' }),
+  S('SP500', 'S&P 500', 'S&P 500 Index', 'Index', 'Daily', 'markets', { why: '500 of the largest U.S. companies: the stock market\'s headline.', read: 'Usually turns before the economy does.' }),
+  S('VIXCLS', 'VIX', 'CBOE Volatility Index', 'Index', 'Daily', 'markets', { why: 'The volatility the options market expects over the next month: the "fear gauge".', read: 'Below 15 is calm; above 30 is stress.' }),
+  S('DTWEXBGS', 'U.S. Dollar Index', 'Nominal Broad U.S. Dollar Index', 'Index Jan 2006=100', 'Monthly', 'markets', { why: 'The dollar against a broad basket of trading partners\' currencies.', read: 'A rising dollar makes imports cheaper and exports harder.' }),
+  S('DEXUSEU', 'USD per Euro', 'U.S. Dollars to One Euro', '$ per euro', 'Daily', 'markets', { why: 'How many dollars one euro buys.', read: 'Up means a weaker dollar against the euro.' }),
+  S('BAMLH0A0HYM2', 'High-Yield Spread', 'ICE BofA US High Yield Option-Adjusted Spread', 'Percent', 'Daily', 'markets', { why: 'Extra yield junk-rated companies pay over Treasuries.', read: 'Widening spreads mean credit is tightening; above about 6% signals stress.' }),
+  S('NFCI', 'Financial Conditions', 'Chicago Fed National Financial Conditions Index', 'Index', 'Weekly', 'markets', { why: 'One number for how easy it is to borrow and raise money.', read: 'Above zero is tighter than average; below zero, looser.' }),
+  S('GFDEBTN', 'Federal Debt', 'Federal Debt: Total Public Debt', 'Mil. of $', 'Quarterly', 'fiscal', { why: 'Everything the federal government owes.', read: 'Compare with GDP (debt-to-GDP) rather than the dollar total.' }),
+  S('GFDEGDQ188S', 'Debt-to-GDP', 'Federal Debt as Percent of GDP', 'Percent of GDP', 'Quarterly', 'fiscal', { why: 'Debt measured against the economy that carries it.', read: 'Rising steadily means debt is growing faster than the economy.' }),
+  S('FYFSD', 'Federal Deficit', 'Federal Surplus or Deficit', 'Mil. of $', 'Annual', 'fiscal', { flow: true, why: 'Receipts minus spending in each fiscal year; negative is a deficit.', read: 'Deficits widen in recessions as taxes fall and spending rises.' }),
+  S('W006RC1Q027SBEA', 'Federal Tax Receipts', 'Federal Government Current Tax Receipts', 'Bil. of $', 'Quarterly', 'fiscal', { why: 'Taxes the federal government collects.', read: 'Rises with incomes and profits, falls in recessions.' }),
+  S('TOTALSL', 'Consumer Credit', 'Total Consumer Credit Outstanding', 'Bil. of $', 'Monthly', 'fiscal', { why: 'Household debt other than mortgages: credit cards, auto and student loans.', read: 'Fast growth can mean confidence or strain; compare with income.' }),
+];
+const INDUSTRY = [['USMINE', 'Mining & Logging'], ['USCONS', 'Construction'], ['MANEMP', 'Manufacturing'], ['USWTRADE', 'Wholesale Trade'], ['USTRADE', 'Retail Trade'], ['CES4300000001', 'Transportation & Warehousing'], ['CES4422000001', 'Utilities'], ['USINFO', 'Information'], ['USFIRE', 'Financial Activities'], ['USPBS', 'Professional & Business Services'], ['USEHS', 'Education & Health'], ['USLAH', 'Leisure & Hospitality'], ['USSERV', 'Other Services'], ['USGOVT', 'Government']];
+const CPICOMP = [['CPIFABSL', 'Food & Beverages'], ['CPIHOSSL', 'Housing'], ['CPIAPPSL', 'Apparel'], ['CPITRNSL', 'Transportation'], ['CPIMEDSL', 'Medical Care'], ['CPIRECSL', 'Recreation'], ['CPIEDUSL', 'Education & Communication'], ['CPIOGSSL', 'Other Goods & Services'], ['CPIENGSL', 'Energy'], ['CUSR0000SAF11', 'Food at Home'], ['CUSR0000SETA01', 'New Vehicles'], ['CUSR0000SEHA', 'Rent of Primary Residence']];
+const STATES = [['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'], ['CA', 'California'], ['CO', 'Colorado'], ['CT', 'Connecticut'], ['DE', 'Delaware'], ['FL', 'Florida'], ['GA', 'Georgia'], ['HI', 'Hawaii'], ['ID', 'Idaho'], ['IL', 'Illinois'], ['IN', 'Indiana'], ['IA', 'Iowa'], ['KS', 'Kansas'], ['KY', 'Kentucky'], ['LA', 'Louisiana'], ['ME', 'Maine'], ['MD', 'Maryland'], ['MA', 'Massachusetts'], ['MI', 'Michigan'], ['MN', 'Minnesota'], ['MS', 'Mississippi'], ['MO', 'Missouri'], ['MT', 'Montana'], ['NE', 'Nebraska'], ['NV', 'Nevada'], ['NH', 'New Hampshire'], ['NJ', 'New Jersey'], ['NM', 'New Mexico'], ['NY', 'New York'], ['NC', 'North Carolina'], ['ND', 'North Dakota'], ['OH', 'Ohio'], ['OK', 'Oklahoma'], ['OR', 'Oregon'], ['PA', 'Pennsylvania'], ['RI', 'Rhode Island'], ['SC', 'South Carolina'], ['SD', 'South Dakota'], ['TN', 'Tennessee'], ['TX', 'Texas'], ['UT', 'Utah'], ['VT', 'Vermont'], ['VA', 'Virginia'], ['WA', 'Washington'], ['WV', 'West Virginia'], ['WI', 'Wisconsin'], ['WY', 'Wyoming']];
+const EXT = { industry: [], components: [], states: [], hpstates: [] };
+INDUSTRY.forEach(([id, n]) => { CORE.push(S(id, n + ' Jobs', 'All Employees, ' + n, 'Thousands of persons', 'Monthly', 'labor', { add: 'payrolls', group: 'industry', why: 'Payroll jobs in ' + n.toLowerCase() + ', part of total nonfarm payrolls.', read: 'Chart several industries as a pie for shares, or as change from a year ago for growth.' })); EXT.industry.push(id); });
+CPICOMP.forEach(([id, n]) => { CORE.push(S(id, 'CPI: ' + n, 'Consumer Price Index: ' + n, 'Index 1982-84=100', 'Monthly', 'prices', { group: 'components', why: 'Consumer prices for ' + n.toLowerCase() + '.', read: 'Use change from a year ago to see which parts of the basket drive inflation.' })); EXT.components.push(id); });
+STATES.forEach(([ab, n]) => { CORE.push(S(ab + 'UR', n + ' Unemployment', 'Unemployment Rate in ' + n, 'Percent', 'Monthly', 'labor', { group: 'states', why: 'Share of ' + n + '\'s labor force without a job.', read: 'Compare with the national rate.' })); EXT.states.push(ab + 'UR'); });
+STATES.forEach(([ab, n]) => { CORE.push(S(ab + 'STHPI', n + ' Home Prices', 'All-Transactions House Price Index for ' + n, 'Index 1980:Q1=100', 'Quarterly', 'housing', { group: 'hpstates', why: 'Home prices in ' + n + ' from repeat sales.', read: 'Use change from a year ago.' })); EXT.hpstates.push(ab + 'STHPI'); });
+const CAT = Object.fromEntries(CORE.map(s => [s.id, s]));
+const SECTIONS = [
+  { key: 'output', title: 'Output & Growth', blurb: 'How much the economy produces and who spends it', groups: [] },
+  { key: 'labor', title: 'Labor Market', blurb: 'Jobs, unemployment, wages', groups: [{ key: 'industry', title: 'Payrolls by industry', why: 'Payroll jobs in each industry; together they make up total nonfarm payrolls.' }, { key: 'states', title: 'Unemployment by state', why: 'The unemployment rate in each state.' }] },
+  { key: 'prices', title: 'Inflation & Prices', blurb: 'Cost of living, inflation expectations, oil', groups: [{ key: 'components', title: 'CPI components', why: 'Consumer prices for each part of the CPI basket.' }] },
+  { key: 'rates', title: 'Interest Rates & Money', blurb: 'Policy rate, yields, money supply, the Fed\'s balance sheet', groups: [] },
+  { key: 'housing', title: 'Housing & Consumers', blurb: 'Homes, sentiment, income, saving', groups: [{ key: 'hpstates', title: 'Home prices by state', why: 'Home prices in each state, from repeat sales of the same homes.' }] },
+  { key: 'markets', title: 'Financial Markets', blurb: 'Stocks, volatility, the dollar, credit', groups: [] },
+  { key: 'fiscal', title: 'Government & Debt', blurb: 'Federal debt, deficits, taxes, credit', groups: [] },
+];
+SECTIONS.forEach(sec => { sec.ids = CORE.filter(s => s.sec === sec.key && !s.group).map(s => s.id); sec.groups.forEach(g => { g.ids = EXT[g.key]; }); });
+// NBER recession months
+const RECESSIONS = [['1948-11', '1949-10'], ['1953-07', '1954-05'], ['1957-08', '1958-04'], ['1960-04', '1961-02'], ['1969-12', '1970-11'], ['1973-11', '1975-03'], ['1980-01', '1980-07'], ['1981-07', '1982-11'], ['1990-07', '1991-03'], ['2001-03', '2001-11'], ['2007-12', '2009-06'], ['2020-02', '2020-04']];
+const PRESETS = [
+  { key: 'okun', name: 'Okun\'s Law', type: 'scatter', desc: 'Faster growth comes with falling unemployment.', read: 'Each dot is a quarter: growth from a year ago across, the change in unemployment up. The dots slope down: each point of growth above about 2% has lowered unemployment by roughly half a point.', lines: [{ series: 'GDPC1', transform: 'yoy' }, { series: 'UNRATE', transform: 'chg' }], axisLabels: { x: 'Real GDP, % change from a year ago', y: 'Unemployment rate, change from a year ago (points)' } },
+  { key: 'phillips', name: 'Phillips Curve', type: 'scatter', desc: 'The trade-off between unemployment and inflation.', read: 'Each dot is a month. Low unemployment has tended to come with higher inflation, but the link has been loose since the 1990s, and 2021–22 showed supply shocks can push inflation up on their own.', lines: [{ series: 'UNRATE', transform: 'lin' }, { series: 'PCEPILFE', transform: 'yoy' }], axisLabels: { x: 'Unemployment rate, %', y: 'Core PCE inflation, %' }, years: 30 },
+  { key: 'curve', name: 'Yield Curve', type: 'line', desc: '10-year minus 2-year Treasury. Below zero has come before recessions.', read: 'Above zero is normal: lenders want more to lend for longer. Below zero (inverted) means markets expect the Fed to cut. Every U.S. recession since the 1970s followed an inversion, usually 6–24 months later, though not every inversion was followed by one quickly.', lines: [{ series: 'T10Y2Y', transform: 'lin' }], zeroLine: true, years: 40 },
+  { key: 'taylor', name: 'The Fed\'s reaction', type: 'line', desc: 'The policy rate against core inflation and unemployment.', read: 'The Fed tends to raise the funds rate when core inflation runs above 2% and cut when unemployment jumps. The gaps show when policy was loose (2021) or tight (2023).', lines: [{ series: 'FEDFUNDS', transform: 'lin' }, { series: 'PCEPILFE', transform: 'yoy' }, { series: 'UNRATE', transform: 'lin' }], years: 25 },
+  { key: 'money', name: 'Money and inflation', type: 'line', desc: 'M2 growth against CPI inflation.', read: 'Money growth surged in 2020–21 and inflation followed about a year later. In ordinary times the link is weak, so treat it as a warning light rather than a rule.', lines: [{ series: 'M2SL', transform: 'yoy' }, { series: 'CPIAUCSL', transform: 'yoy' }], years: 25 },
+  { key: 'growth', name: 'GDP growth', type: 'bar', desc: 'Real GDP, change from a year earlier.', read: 'Each bar is one quarter\'s growth from the same quarter a year before. Negative bars are shrinking output; the shaded areas are recessions.', lines: [{ series: 'GDPC1', transform: 'yoy' }], years: 30 },
+  { key: 'jobs', name: 'Jobs by industry', type: 'pie', desc: 'Where the country\'s payroll jobs are.', read: 'Each slice is an industry\'s share of payroll jobs on the chosen date. Change the date to see the economy shift toward services.', lines: INDUSTRY.map(([id]) => ({ series: id, transform: 'lin' })) },
+  { key: 'gdpmix', name: 'Who spends the GDP', type: 'stack', desc: 'Consumers, business and government, stacked.', read: 'The stacked areas add up consumer spending, private investment and government purchases in dollars. Net exports are left out because they are negative.', lines: [{ series: 'PCE', transform: 'lin' }, { series: 'GPDI', transform: 'lin' }, { series: 'GCE', transform: 'lin' }], years: 25 },
+  { key: 'beveridge', name: 'Beveridge Curve', type: 'scatter', desc: 'Job openings against unemployment: how tight the job market is.', read: 'Each dot is a month. Moving up and left means a tighter market (more openings, fewer jobless); a shift outward means matching workers to jobs got harder.', lines: [{ series: 'UNRATE', transform: 'lin' }, { series: 'JTSJOL', transform: 'lin' }], axisLabels: { x: 'Unemployment rate, %', y: 'Job openings, thousands' } },
+  { key: 'realnom', name: 'Real vs nominal GDP', type: 'line', desc: 'Output in today\'s dollars against output after inflation.', read: 'The widening gap is inflation. Real GDP is in 2017 dollars, so the lines cross in 2017.', lines: [{ series: 'GDP', transform: 'lin' }, { series: 'GDPC1', transform: 'lin' }], years: 30 },
+];
+// ---- How the indicators drive one another. sign +1: moves the next one the same way; -1: the opposite way. fb: feedback.
+const NODES = [
+  { id: 'WALCL', label: 'Fed balance sheet', col: 0, row: 0 }, { id: 'FEDFUNDS', label: 'Fed funds rate', col: 0, row: 2 },
+  { id: 'M2SL', label: 'Money supply (M2)', col: 1, row: 0 }, { id: 'BONDP', label: 'Bond prices', col: 1, row: 1, concept: 'Bond prices are not a published series: they move opposite to yields, so watch the 10-year yield.' },
+  { id: 'DGS10', label: '10-year yield', col: 2, row: 1 }, { id: 'DGS2', label: '2-year yield', col: 2, row: 2 },
+  { id: 'MORTGAGE30US', label: 'Mortgage rate', col: 3, row: 0 }, { id: 'BAMLH0A0HYM2', label: 'Credit spreads', col: 3, row: 1 }, { id: 'T10Y2Y', label: 'Yield curve (10y−2y)', col: 3, row: 2 },
+  { id: 'SP500', label: 'Stock prices', col: 3, row: 3 }, { id: 'DTWEXBGS', label: 'Dollar', col: 3, row: 5 },
+  { id: 'HOUST', label: 'Housing starts', col: 4, row: 0 }, { id: 'GPDIC1', label: 'Investment', col: 4, row: 1 }, { id: 'GCEC1', label: 'Government spending', col: 4, row: 2 },
+  { id: 'PCEC96', label: 'Consumption', col: 4, row: 3 }, { id: 'UMCSENT', label: 'Consumer sentiment', col: 4, row: 4 }, { id: 'NETEXP', label: 'Net exports', col: 4, row: 5 },
+  { id: 'INDPRO', label: 'Industrial production', col: 5, row: 1 }, { id: 'GDPC1', label: 'Output (real GDP)', col: 5, row: 2 }, { id: 'PAYEMS', label: 'Payroll jobs', col: 5, row: 3 },
+  { id: 'UNRATE', label: 'Unemployment', col: 5, row: 4 }, { id: 'JTSJOL', label: 'Job openings', col: 5, row: 5 },
+  { id: 'W006RC1Q027SBEA', label: 'Taxes', col: 6, row: 1 }, { id: 'DSPIC96', label: 'Disposable income', col: 6, row: 2 }, { id: 'PSAVERT', label: 'Saving rate', col: 6, row: 3 },
+  { id: 'CES0500000003', label: 'Wages', col: 6, row: 4, yoy: true }, { id: 'PCEPILFE', label: 'Inflation (core PCE)', col: 6, row: 5, yoy: true }, { id: 'DCOILWTICO', label: 'Oil price', col: 6, row: 6 },
+];
+const COLS = ['The Fed', 'Money & bonds', 'Interest rates', 'Markets & credit', 'Spending', 'Output & jobs', 'Income & prices'];
+const E = (from, to, sign, lag, why, fb) => ({ from, to, sign, lag, why, fb: !!fb });
+const EDGES = [
+  E('FEDFUNDS', 'DGS2', 1, 'days', 'Two-year yields track where the Fed is expected to set its rate.'),
+  E('FEDFUNDS', 'DGS10', 1, 'weeks to months', 'Long rates follow the policy rate, but less than one for one.'),
+  E('FEDFUNDS', 'M2SL', -1, 'months', 'Higher rates slow bank lending and make deposits less attractive than bonds.'),
+  E('WALCL', 'BONDP', 1, 'immediate', 'Quantitative easing: the Fed buys bonds, pushing their prices up.'),
+  E('WALCL', 'M2SL', 1, 'months', 'Fed bond purchases create bank reserves and deposits.'),
+  E('M2SL', 'BONDP', 1, 'weeks', 'More money looking for a home raises demand for bonds.'),
+  E('BONDP', 'DGS10', -1, 'immediate', 'Bond prices and yields move in opposite directions, by arithmetic.'),
+  E('DGS10', 'MORTGAGE30US', 1, 'days to weeks', 'Mortgage rates are priced off the 10-year Treasury plus a spread.'),
+  E('DGS2', 'T10Y2Y', -1, 'immediate', 'The curve is the 10-year minus the 2-year yield.'),
+  E('DGS10', 'T10Y2Y', 1, 'immediate', 'The curve is the 10-year minus the 2-year yield.'),
+  Object.assign(E('T10Y2Y', 'UNRATE', -1, '12–24 months', 'A warning sign rather than a cause: an inverted curve (below zero) has come before rising unemployment in every recession since the 1970s.'), { signal: true }),
+  E('DGS10', 'GPDIC1', -1, '2–6 quarters', 'Higher long rates raise the cost of capital, so firms invest less.'),
+  E('MORTGAGE30US', 'HOUST', -1, '3–9 months', 'Costlier mortgages mean fewer buyers and fewer new homes.'),
+  E('HOUST', 'GPDIC1', 1, 'same quarter', 'Home building is part of private investment.'),
+  E('DGS10', 'SP500', -1, 'immediate', 'Higher yields lower the value of future profits and make bonds a rival.'),
+  E('BAMLH0A0HYM2', 'GPDIC1', -1, '2–4 quarters', 'Wider credit spreads make borrowing costlier for riskier firms.'),
+  E('DGS10', 'DTWEXBGS', 1, 'weeks', 'Higher U.S. yields draw in foreign money, lifting the dollar.'),
+  E('DTWEXBGS', 'NETEXP', -1, '2–4 quarters', 'A stronger dollar makes U.S. exports dearer and imports cheaper.'),
+  E('SP500', 'PCEC96', 1, '1–4 quarters', 'The wealth effect: richer shareholders spend more.'),
+  E('UMCSENT', 'PCEC96', 1, 'months', 'Confident households spend more freely.'),
+  E('GPDIC1', 'GDPC1', 1, 'same quarter', 'Investment is part of GDP (Y = C + I + G + NX).'),
+  E('PCEC96', 'GDPC1', 1, 'same quarter', 'Consumption is about two-thirds of GDP.'),
+  E('GCEC1', 'GDPC1', 1, 'same quarter', 'Government purchases are part of GDP.'),
+  E('NETEXP', 'GDPC1', 1, 'same quarter', 'Net exports are part of GDP.'),
+  E('W006RC1Q027SBEA', 'DSPIC96', -1, 'immediate', 'Disposable income is income after taxes (Yd = Y − T).'),
+  E('GDPC1', 'INDPRO', 1, 'same month', 'Factory output moves with the overall cycle.'),
+  E('GDPC1', 'PAYEMS', 1, '1–2 quarters', 'Firms hire when demand grows.'),
+  E('GDPC1', 'UNRATE', -1, '1–2 quarters', 'Okun\'s law: growth above about 2% lowers unemployment.'),
+  E('GDPC1', 'DSPIC96', 1, 'same quarter', 'What is produced becomes income.'),
+  E('PAYEMS', 'DSPIC96', 1, 'same month', 'More jobs means more wage income.'),
+  E('DSPIC96', 'PCEC96', 1, 'months', 'Households spend part of each extra dollar of income.'),
+  E('DSPIC96', 'PSAVERT', 1, 'months', 'What is not spent is saved (S = Yd − C).'),
+  E('UNRATE', 'UMCSENT', -1, 'months', 'Job worries lower confidence.'),
+  E('UNRATE', 'CES0500000003', -1, '6–12 months', 'A slack job market slows wage growth.'),
+  E('JTSJOL', 'CES0500000003', 1, '6–12 months', 'More openings than workers bids wages up.'),
+  E('CES0500000003', 'PCEPILFE', 1, '6–18 months', 'Wages are the biggest cost in services, so pay growth feeds service prices.'),
+  E('UNRATE', 'PCEPILFE', -1, '6–18 months', 'The Phillips curve: slack eases price pressure.'),
+  E('DCOILWTICO', 'PCEPILFE', 1, '1–6 months', 'Energy costs pass into transport and goods prices (more in headline than core).'),
+  E('PCEPILFE', 'FEDFUNDS', 1, 'months', 'The Fed raises rates when inflation runs above 2%.', true),
+  E('UNRATE', 'FEDFUNDS', -1, 'months', 'The Fed cuts rates when unemployment rises.', true),
+  E('PCEPILFE', 'DGS10', 1, 'months', 'Investors demand higher yields to cover expected inflation.', true),
+  E('GDPC1', 'W006RC1Q027SBEA', 1, 'same year', 'Tax receipts rise with incomes and profits.', true),
+];
+const NODE = Object.fromEntries(NODES.map(n => [n.id, n]));
+const shortUnits = u => (u || '').replace(/^Index.*/, '').replace(/^Thousands of persons$/, 'K').replace(/^Thousands(, annual rate)?$/, 'K$1').replace(/^Bil\. of chained (\d+) \$$/, '$B ($1 $)').replace(/^Bil\. of \$$/, '$B').replace(/^Mil\. of \$$/, '$M').replace(/^\$ per hour$/, '$/hr').replace(/^\$ per barrel$/, '$/bbl').replace(/^Number$/, '').trim();
+// a formula line's name, with what each letter stands for
+const fName = l => 'ƒ ' + l.formula + ' (' + Object.entries(l.vars || {}).map(([k, v]) => k + ' = ' + v.series + (v.transform !== 'lin' ? ', ' + ({ yoy: '% year ago', pch: '% period', chg: 'Δ year ago' })[v.transform] : '')).join('; ') + ')';
+const TLABEL = { lin: 'level', yoy: '% change from a year ago', pch: '% change from previous period', chg: 'change from a year ago', index: 'index, start = 100' };
+
+class Component extends DCLogic {
+  data = {}; asked = new Set(); extMeta = lsGet('diligence.macro.meta', {});
+  state = {
+    view: 'dashboard', editor: null, saved: lsGet('diligence.macro.saved', []), heroQ: '', browseCat: 'output', browseGroup: null, browseShowAll: false,
+    sideQ: '', sideOpen: {}, detailRows: {}, rangePickerOpen: false, catalogOpen: false, search: '',
+    formulaOpen: false, fFormula: 'a - b', fVars: { a: { series: '', transform: 'lin' }, b: { series: '', transform: 'lin' }, c: { series: '', transform: 'lin' } },
+    keyOpen: false, keyDraft: '', keyMsg: '', toast: null, status: null, dataVer: 0, libs: false,
+    fred: { q: '', results: [], loading: false, needsKey: false, error: '' }, explain: null,
+    rel: { sel: null, start: null, dir: 1, fb: false }, relW: 0, recent: lsGet('diligence.macro.recent', []), chartW: 800,
+  };
+
+  componentDidMount() {
+    // Recharts needs React (already on the page) and PropTypes, loaded in order; marked turns explanations into HTML
+    const libs = ['https://unpkg.com/prop-types@15.8.1/prop-types.min.js', 'https://unpkg.com/recharts@2.12.7/umd/Recharts.js', 'vendor/marked-12.0.2.min.js'];
+    libs.reduce((p, src) => p.then(() => loadScript(src)), Promise.resolve()).then(() => this.setState({ libs: true }), e => this.toast(e.message));
+    getJSON('/api/macro/status').then(st => this.setState({ status: st }), () => this.setState({ status: { error: true } }));
+    const v = lsGet('diligence.macro.view', null);
+    if (v && v.editor) this.setState({ view: v.view, editor: v.editor }, () => this.ensure(this.editorIds())); else if (v && v.view === 'relations') this.setState({ view: 'relations' });
+  }
+  componentDidUpdate() { lsSet('diligence.macro.view', { view: this.state.view, editor: this.state.editor }); }
+
+  toast(msg) { this.setState({ toast: msg }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 2600); }
+  meta(id) {
+    const c = CAT[id]; if (c) return c;
+    const x = this.extMeta[id] || (this.data[id] && this.data[id].meta && { short: this.data[id].meta.title, name: this.data[id].meta.title, units: this.data[id].meta.units, freq: this.data[id].meta.freq });
+    return x ? Object.assign({ id, sec: 'other', why: '', read: '' }, x, { short: x.short || x.name || id, name: x.name || x.short || id }) : { id, short: id, name: id, units: '', freq: '', sec: 'other' };
+  }
+
+  // ---- Data: ask the server for series not yet on hand, in batches
+  ensure(ids) {
+    const want = [];
+    ids.forEach(id => { if (!id) return; const m = CAT[id]; (m && m.calc ? [id].concat(m.calc) : [id]).forEach(x => { if (!this.asked.has(x)) { this.asked.add(x); want.push(x); } }); });
+    for (let i = 0; i < want.length; i += 30) {
+      const part = want.slice(i, i + 30);
+      getJSON('/api/macro/batch?ids=' + encodeURIComponent(part.join(','))).then(d => {
+        Object.entries(d).forEach(([id, r]) => { this.data[id] = this.parse(r); });
+        this.setState(s => ({ dataVer: s.dataVer + 1 }));
+      }, e => { part.forEach(id => { this.data[id] = { pts: [], error: e.message }; }); this.setState(s => ({ dataVer: s.dataVer + 1 })); });
+    }
+  }
+  parse(r) {
+    const pts = (r.points || []).map(([d, v]) => ({ t: d.slice(0, 7), v })).filter(p => typeof p.v === 'number' && isFinite(p.v));
+    let freq = 'M';
+    if (pts.length > 3) { const gaps = []; for (let i = Math.max(1, pts.length - 24); i < pts.length; i++) { const [y0, m0] = pts[i - 1].t.split('-').map(Number), [y1, m1] = pts[i].t.split('-').map(Number); gaps.push((y1 - y0) * 12 + m1 - m0); } gaps.sort((a, b) => a - b); const g = gaps[gaps.length >> 1]; freq = g >= 12 ? 'A' : g >= 3 ? 'Q' : 'M'; }
+    return { pts, freq, source: r.source, note: r.note, error: r.error, meta: r.meta };
+  }
+  // a series' points, worked out from two others when it is a spread with no data of its own
+  pts(id) {
+    const d = this.data[id], m = CAT[id];
+    if (d && d.pts.length) return d;
+    if (m && m.calc) {
+      const a = this.data[m.calc[0]], b = this.data[m.calc[1]];
+      if (a && b && a.pts.length && b.pts.length) {
+        const bm = new Map(b.pts.map(p => [p.t, p.v]));
+        return { pts: a.pts.filter(p => bm.has(p.t)).map(p => ({ t: p.t, v: Math.round((p.v - bm.get(p.t)) * 1000) / 1000 })), freq: 'M', source: 'worked out as ' + m.calc[0] + ' − ' + m.calc[1] + ' (' + (a.source || '') + ')', calc: true };
+      }
+    }
+    return d || null;
+  }
+  // a series after its transform, by month
+  series(id, tr) {
+    const d = this.pts(id); if (!d || !d.pts.length) return null;
+    const map = new Map(d.pts.map(p => [p.t, p.v])), out = new Map();
+    d.pts.forEach((p, i) => {
+      let v = p.v;
+      if (tr === 'yoy') { const o = map.get(addM(p.t, -12)); v = o ? (p.v / o - 1) * 100 : null; }
+      else if (tr === 'chg') { const o = map.get(addM(p.t, -12)); v = o != null ? p.v - o : null; }
+      else if (tr === 'pch') { const o = i ? d.pts[i - 1].v : null; v = o ? (p.v / o - 1) * 100 : null; }
+      if (v != null && isFinite(v)) out.set(p.t, v);
+    });
+    return { map: out, freq: d.freq, first: d.pts[0].t, last: d.pts[d.pts.length - 1].t, src: d };
+  }
+  editorIds() { const ed = this.state.editor; if (!ed) return []; const ids = []; ed.lines.forEach(l => { if (l.custom) Object.values(l.vars || {}).forEach(v => v && v.series && ids.push(v.series)); else ids.push(l.series); }); return ids; }
+
+  // ---- The chart's model: months shown, each line's values, ready for Recharts and the tables
+  model() {
+    const ed = this.state.editor; if (!ed) return null;
+    const lines = ed.lines.map((l, i) => {
+      if (l.custom) return Object.assign({ l, i }, this.formulaSeries(l));
+      const s = this.series(l.series, l.transform === 'index' ? 'lin' : l.transform);
+      return { l, i, s, m: this.meta(l.series), d: this.data[l.series], ready: !!s, err: (!s && this.data[l.series]) ? (this.data[l.series].error || 'No data') : '' };
+    });
+    const have = lines.filter(x => x.s);
+    if (!have.length) return { lines, tl: [], have };
+    const first = have.reduce((a, x) => x.s.first < a ? x.s.first : a, '9999'), last = have.reduce((a, x) => x.s.last > a ? x.s.last : a, '0000');
+    let a = first, b = last;
+    if (ed.range) { a = ed.range[0] > first ? ed.range[0] : first; b = ed.range[1] < last ? ed.range[1] : last; }
+    else if (ed.years) { const s = addM(last, -12 * ed.years + 1); a = s > first ? s : first; }
+    const tl = monthsBetween(a, b);
+    have.forEach(x => {
+      const fill = x.s.freq === 'A' ? 11 : x.s.freq === 'Q' ? 2 : 0;
+      x.gaps = tl.map(t => x.s.map.has(t) ? x.s.map.get(t) : null);
+      // carried forward until the next figure (a quarter's value stands for its three months)
+      let lastV = null, lastT = null;
+      const pre = [...x.s.map.keys()].filter(t => t < a).pop(); if (pre) { lastV = x.s.map.get(pre); lastT = pre; }
+      x.filled = tl.map(t => { if (x.s.map.has(t)) { lastV = x.s.map.get(t); lastT = t; return lastV; } return lastT && addM(lastT, fill) >= t && t <= x.s.last ? lastV : null; });
+      if (x.l.transform === 'index') { const base = x.filled.find(v => v != null && v !== 0); if (base) { x.gaps = x.gaps.map(v => v == null ? null : v / base * 100); x.filled = x.filled.map(v => v == null ? null : v / base * 100); } }
+      const vals = x.filled.filter(v => v != null); x.min = Math.min(...vals); x.max = Math.max(...vals);
+      x.latest = null; x.latestT = null; for (let i = tl.length - 1; i >= 0; i--) if (x.gaps[i] != null) { x.latest = x.gaps[i]; x.latestT = tl[i]; break; }
+      x.firstV = x.filled.find(v => v != null);
+    });
+    return { lines, have, tl, a, b };
+  }
+  formulaSeries(l) {
+    const maps = {};
+    for (const k of Object.keys(l.vars || {})) { const v = l.vars[k]; if (!v || !v.series) continue; const s = this.series(v.series, v.transform); if (!s) return { s: null, ready: false, m: { short: l.label || l.formula, name: fName(l), units: '' } }; maps[k] = s.map; }
+    const rpn = this.toRPN(this.tokenize(l.formula || '')), keys = new Set(); Object.values(maps).forEach(m => m.forEach((v, t) => keys.add(t)));
+    const out = new Map();
+    [...keys].sort().forEach(t => { try { const st = []; for (const tok of rpn) { if (/^[0-9.]+$/.test(tok)) st.push(parseFloat(tok)); else if (/^[a-zA-Z]+$/.test(tok)) { const x = maps[tok] && maps[tok].get(t); if (x == null) throw 0; st.push(x); } else { const b = st.pop(), a = st.pop(); st.push(tok === '+' ? a + b : tok === '-' ? a - b : tok === '*' ? a * b : a / b); } } const r = st.pop(); if (r != null && isFinite(r)) out.set(t, r); } catch (e) {} });
+    const ks = [...out.keys()];
+    return { s: ks.length ? { map: out, freq: 'M', first: ks[0], last: ks[ks.length - 1] } : null, ready: ks.length > 0, m: { short: l.label || l.formula, name: fName(l), units: '' } };
+  }
+  tokenize(s) { const out = []; const re = /\s*([0-9]*\.?[0-9]+|[a-zA-Z]+|[()+\-*/])/g; let m; while ((m = re.exec(s)) !== null) out.push(m[1]); return out; }
+  toRPN(tokens) { const out = [], ops = [], prec = { '+': 1, '-': 1, '*': 2, '/': 2 }; for (const t of tokens) { if (/^[0-9.]+$/.test(t) || /^[a-zA-Z]+$/.test(t)) out.push(t); else if (t in prec) { while (ops.length && ops[ops.length - 1] in prec && prec[ops[ops.length - 1]] >= prec[t]) out.push(ops.pop()); ops.push(t); } else if (t === '(') ops.push(t); else if (t === ')') { while (ops.length && ops[ops.length - 1] !== '(') out.push(ops.pop()); ops.pop(); } } while (ops.length) out.push(ops.pop()); return out; }
+
+  // ---- Which kinds of chart make sense for these lines, and why the others do not
+  typeRules(M) {
+    const ed = this.state.editor, n = ed.lines.length, ls = M ? M.have : [];
+    const plain = ed.lines.every(l => !l.custom), metas = ed.lines.filter(l => !l.custom).map(l => this.meta(l.series));
+    const units = new Set(metas.map(m => m.units)), part = plain && metas.length === n && metas.every(m => m.add) && new Set(metas.map(m => m.add)).size === 1 && units.size === 1;
+    const levels = ed.lines.every(l => l.transform === 'lin'), changes = ed.lines.every(l => ['yoy', 'pch', 'chg'].includes(l.transform));
+    const lowFreq = ls.length && ls.every(x => x.s.freq !== 'M'), nonneg = ls.length && ls.every(x => x.min >= 0), right = ed.lines.some(l => l.axis === 'R');
+    const r = {
+      line: { ok: n >= 1, why: '' },
+      area: { ok: n >= 1 && n <= 3 && nonneg, why: n > 3 ? 'Shaded areas hide one another beyond three lines; use Line.' : 'An area fills down to zero, which misleads for lines that go negative (growth rates, spreads, balances).' },
+      stack: { ok: n >= 2 && part && levels && !right, why: 'Stacking adds the lines together, so they must be parts of one total in the same units, such as payroll jobs by industry or GDP\'s spending parts, shown as levels.' },
+      bar: { ok: n >= 1 && n <= 4 && (changes || lowFreq || metas.some(m => m.flow)), why: n > 4 ? 'Bars for more than four lines are hard to read.' : 'Bars suit changes and growth rates (switch the transform to a change) or quarterly and yearly figures. For a level that moves month by month, use Line.' },
+      scatter: { ok: n === 2, why: 'A scatter plots one line against another, so it needs exactly two (the first across, the second up).' },
+      pie: { ok: n >= 2 && n <= 14 && part && levels, why: 'A pie shows shares of one total on one date, so the lines must be non-negative parts of the same total in the same units, shown as levels.' },
+    };
+    r.best = r.pie.ok && n > 3 ? 'pie' : r.stack.ok ? 'stack' : n === 2 && ed.type === 'scatter' ? 'scatter' : r.bar.ok && changes && lowFreq ? 'bar' : 'line';
+    return r;
+  }
+
+  // ---- Drawing with Recharts
+  fmt(v) { if (v == null || isNaN(v)) return '—'; const a = Math.abs(v); if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (a >= 1e4) return (v / 1e3).toFixed(0) + 'K'; if (a >= 1e3) return (v / 1e3).toFixed(1) + 'K'; return v.toFixed(a < 10 ? 2 : 1); }
+  unitOf(x) { const t = x.l.transform; if (t === 'yoy' || t === 'pch') return '%'; if (t === 'index') return ''; const u = (x.m && x.m.units) || ''; return /percent/i.test(u) ? (t === 'chg' ? ' pts' : '%') : ''; }
+  full(v, x) { if (v == null || isNaN(v)) return '—'; const n = Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 }); const u = this.unitOf(x); if (u) return n + u; const units = (x.m && x.m.units) || ''; return n + (units && x.l.transform !== 'index' ? ' ' + shortUnits(units) : ''); }
+  chartEl(M, type) {
+    const R = window.Recharts, h = React.createElement, H = this.props.chartHeight || 430, ed = this.state.editor;
+    if (!this.state.libs || !R) return h('div', { className: 'note', style: { padding: 20 } }, 'Loading the charting library…');
+    if (!M || !M.have.length) { const errs = M ? M.lines.filter(x => x.err).map(x => x.l.series + ': ' + x.err) : []; return h('div', { className: 'note', style: { padding: 20, lineHeight: 1.7 } }, ed.lines.length ? (errs.length ? errs.join(' · ') : 'Loading data…') : 'Add a series from the left to start.'); }
+    const tick = { fill: '#9397ab', fontSize: 11 }, grid = h(R.CartesianGrid, { stroke: 'rgba(255,255,255,.07)', vertical: false });
+    const tipBox = { background: '#232532', border: '1px solid #3f424d', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#e9e9ed', maxWidth: 320 };
+    const L = M.have;
+    if (type === 'pie') {
+      const tl = M.tl, date = this.pieDate(M), i = tl.indexOf(date);
+      const data = L.map(x => ({ name: x.m.short, value: i >= 0 ? x.filled[i] : null, color: x.l.color })).filter(d => d.value != null && d.value > 0).sort((p, q) => q.value - p.value);
+      const total = data.reduce((s, d) => s + d.value, 0);
+      return h(R.ResponsiveContainer, { width: '100%', height: H }, h(R.PieChart, null,
+        h(R.Tooltip, { content: ({ active, payload }) => active && payload && payload.length ? h('div', { style: tipBox }, h('b', null, payload[0].name), h('div', null, this.fmt(payload[0].value) + ' · ' + (payload[0].value / total * 100).toFixed(1) + '%')) : null }),
+        h(R.Legend, { layout: 'vertical', align: 'right', verticalAlign: 'middle', wrapperStyle: { fontSize: 12, color: '#cfd3e5' } }),
+        h(R.Pie, { data, dataKey: 'value', nameKey: 'name', outerRadius: '80%', innerRadius: '45%', paddingAngle: 1, isAnimationActive: false, label: ({ percent }) => percent > 0.03 ? (percent * 100).toFixed(0) + '%' : '',
+          labelLine: p => p.percent > 0.03 ? h('polyline', { points: p.points.map(q => q.x + ',' + q.y).join(' '), stroke: p.stroke, fill: 'none' }) : h('g') }, data.map((d, k) => h(R.Cell, { key: k, fill: d.color, stroke: 'none' })))));
+    }
+    if (type === 'scatter') {
+      const [X, Y] = L; if (!X || !Y) return h('div', { className: 'note', style: { padding: 20 } }, 'A scatter needs two lines with data.');
+      // one dot per figure of the slower series (a quarter, for GDP)
+      const slow = X.s.freq !== 'M' ? X : Y.s.freq !== 'M' ? Y : X, pts = [];
+      M.tl.forEach((t, k) => { if (slow.gaps[k] == null) return; const xv = X.filled[k], yv = Y.filled[k]; if (xv != null && yv != null) pts.push({ x: xv, y: yv, t }); });
+      const n = pts.length, lab = ed.axisLabels || {};
+      return h(R.ResponsiveContainer, { width: '100%', height: H }, h(R.ScatterChart, { margin: { top: 10, right: 20, bottom: 26, left: 10 } }, grid,
+        h(R.XAxis, { type: 'number', dataKey: 'x', name: X.m.short, tick, domain: ['auto', 'auto'], label: { value: lab.x || X.m.short + ' (' + TLABEL[X.l.transform] + ')', position: 'bottom', fill: '#9397ab', fontSize: 12, offset: 8 } }),
+        h(R.YAxis, { type: 'number', dataKey: 'y', name: Y.m.short, tick, domain: ['auto', 'auto'], width: 60, label: { value: lab.y || Y.m.short, angle: -90, position: 'insideLeft', fill: '#9397ab', fontSize: 12, style: { textAnchor: 'middle' } } }),
+        h(R.Tooltip, { content: ({ active, payload }) => active && payload && payload.length ? h('div', { style: tipBox }, h('div', { style: { color: '#9397ab' } }, payload[0].payload.t), h('div', null, X.m.short + ': ' + this.full(payload[0].payload.x, X)), h('div', null, Y.m.short + ': ' + this.full(payload[0].payload.y, Y))) : null }),
+        h(R.Scatter, { data: pts, isAnimationActive: false }, pts.map((p, k) => h(R.Cell, { key: k, fill: 'hsl(' + (220 - 190 * k / Math.max(1, n - 1)) + ' 70% ' + (45 + 20 * k / Math.max(1, n - 1)) + '%)', fillOpacity: .85 })))));
+    }
+    // time charts: line, area, stacked, bar
+    let rows = M.tl.map((t, k) => { const r = { t }; L.forEach(x => { r['l' + x.i] = (type === 'stack' || type === 'bar') ? x.filled[k] : x.gaps[k]; }); return r; });
+    let agg = '';
+    if (type === 'bar' && rows.length > 150) {   // too many bars to see: average them by quarter, or by year
+      const byYear = rows.length > 600, groups = new Map();
+      rows.forEach(r => { const g = byYear ? r.t.slice(0, 4) : r.t.slice(0, 4) + ' Q' + (Math.floor((+r.t.slice(5) - 1) / 3) + 1); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); });
+      rows = [...groups.entries()].map(([g, rs]) => { const o = { t: g }; L.forEach(x => { const vs = rs.map(r => r['l' + x.i]).filter(v => v != null); o['l' + x.i] = vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null; }); return o; });
+      agg = byYear ? 'year' : 'quarter';
+    }
+    const right = type !== 'stack' && L.some(x => x.l.axis === 'R'), years = rows.length > 1 ? (rows.length / 12) : 1;
+    const step = agg ? 1 : years > 50 ? 10 : years > 24 ? 5 : years > 10 ? 2 : 1;
+    const ticks = agg ? undefined : rows.filter(r => r.t.endsWith('-01') && (+r.t.slice(0, 4)) % step === 0).map(r => r.t);
+    const els = [grid,
+      h(R.XAxis, { key: 'x', dataKey: 't', tick, ticks, interval: agg ? 'preserveStartEnd' : 0, minTickGap: 8, tickFormatter: v => agg ? v : (ticks && ticks.length < 4 ? v : v.slice(0, 4)), axisLine: { stroke: '#3f424d' }, tickLine: false }),
+      h(R.YAxis, { key: 'yl', yAxisId: 'L', tick, width: 58, tickFormatter: v => this.fmt(v), axisLine: false, tickLine: false, domain: ['auto', 'auto'] })];
+    if (right) els.push(h(R.YAxis, { key: 'yr', yAxisId: 'R', orientation: 'right', tick, width: 58, tickFormatter: v => this.fmt(v), axisLine: false, tickLine: false, domain: ['auto', 'auto'] }));
+    const lab = t => agg === 'year' ? t.slice(0, 4) : agg ? t.slice(0, 4) + ' Q' + (Math.floor((+t.slice(5) - 1) / 3) + 1) : t, labels = new Set(rows.map(r => r.t));
+    if (ed.recession) RECESSIONS.forEach(([a, b], k) => { if (b < M.a || a > M.b) return; const x1 = lab(a < M.a ? M.a : a), x2 = lab(b > M.b ? M.b : b); if (!labels.has(x1) || !labels.has(x2)) return;
+      els.push(h(R.ReferenceArea, { key: 'rec' + k, yAxisId: 'L', x1, x2, fill: '#ffffff', fillOpacity: .06, strokeOpacity: 0, ifOverflow: 'hidden' })); });
+    const zero = L.some(x => x.min < 0 && x.max > 0) || ed.zeroLine; if (zero) els.push(h(R.ReferenceLine, { key: 'z', yAxisId: 'L', y: 0, stroke: '#6b6f8a', strokeDasharray: '3 3' }));
+    els.push(h(R.Tooltip, { key: 'tip', content: ({ active, payload, label }) => active && payload && payload.length ? h('div', { style: tipBox }, h('div', { style: { color: '#9397ab', marginBottom: 4 } }, label),
+      payload.filter(p => p.value != null).map((p, k) => { const x = L.find(z => 'l' + z.i === p.dataKey); return h('div', { key: k, style: { display: 'flex', gap: 8, alignItems: 'baseline' } }, h('span', { style: { width: 8, height: 8, borderRadius: 2, background: x.l.color, flex: 'none' } }), h('span', { style: { flex: 1, color: '#cfd3e5' } }, x.m.short), h('b', { style: { fontWeight: 500 } }, this.full(p.value, x))); })) : null }));
+    L.forEach(x => {
+      const key = 'l' + x.i, base = { key, dataKey: key, name: x.m.short, yAxisId: type === 'stack' ? 'L' : (x.l.axis === 'R' ? 'R' : 'L'), stroke: x.l.color, fill: x.l.color, isAnimationActive: false };
+      if (type === 'bar') els.push(h(R.Bar, Object.assign(base, { fillOpacity: .9, radius: rows.length < 60 ? [2, 2, 0, 0] : 0 })));
+      else if (type === 'area' || type === 'stack') els.push(h(R.Area, Object.assign(base, { type: 'monotone', strokeWidth: 1.6, fillOpacity: type === 'stack' ? .5 : .15, stackId: type === 'stack' ? 's' : undefined, connectNulls: true, dot: false })));
+      else els.push(h(R.Line, Object.assign(base, { type: 'monotone', strokeWidth: 2, dot: false, connectNulls: true })));
+    });
+    const Chart = type === 'bar' ? R.ComposedChart : type === 'line' ? R.ComposedChart : R.ComposedChart;
+    return h(R.ResponsiveContainer, { width: '100%', height: H }, h(Chart, { data: rows, margin: { top: 10, right: right ? 4 : 16, bottom: 4, left: 4 }, barCategoryGap: rows.length > 80 ? 0 : '15%' }, els));
+  }
+  pieDate(M) { const ed = this.state.editor, tl = M.tl; if (ed.pieDate && tl.includes(ed.pieDate)) return ed.pieDate; for (let k = tl.length - 1; k >= 0; k--) if (M.have.every(x => x.filled[k] != null)) return tl[k]; return tl[tl.length - 1]; }
+
+  // small charts for cards: plain SVG, no library needed
+  spark(id, w, hgt) {
+    const h = React.createElement, s = this.series(id, 'lin'); if (!s) return null;
+    const pts = [...s.map.entries()].slice(-(s.freq === 'Q' ? 44 : s.freq === 'A' ? 15 : 132)); if (pts.length < 2) return null;
+    const vs = pts.map(p => p[1]), mn = Math.min(...vs), mx = Math.max(...vs), pad = 3;
+    const sx = i => pad + i / (pts.length - 1) * (w - 2 * pad), sy = v => hgt - pad - (v - mn) / ((mx - mn) || 1) * (hgt - 2 * pad);
+    let d = ''; pts.forEach((p, i) => { d += (i ? 'L' : 'M') + sx(i).toFixed(1) + ' ' + sy(p[1]).toFixed(1) + ' '; });
+    return h('svg', { width: '100%', height: '100%', viewBox: '0 0 ' + w + ' ' + hgt, preserveAspectRatio: 'none', style: { display: 'block' } },
+      h('path', { d: d + 'L' + sx(pts.length - 1) + ' ' + (hgt - pad) + ' L' + pad + ' ' + (hgt - pad) + ' Z', fill: '#8ab4f8', fillOpacity: .08 }), h('path', { d, fill: 'none', stroke: '#8ab4f8', strokeWidth: 1.5 }));
+  }
+  mini(cfg, w, hgt) {
+    const h = React.createElement, lines = (cfg.lines || []).slice(0, 4).map(l => l.custom ? null : this.series(l.series, l.transform === 'index' ? 'lin' : l.transform)).filter(Boolean);
+    if (!lines.length) return h('div', { className: 'note', style: { padding: 10 } }, cfg.lines && cfg.lines.some(l => !l.custom && this.data[l.series] && this.data[l.series].error) ? 'Needs a FRED key' : '…');
+    const yrs = cfg.years || 20, end = lines.reduce((a, s) => s.last > a ? s.last : a, '0000'), start = addM(end, -12 * yrs), tl = monthsBetween(start, end), pad = 6;
+    let mn = Infinity, mx = -Infinity; const arrs = lines.map(s => tl.map(t => s.map.has(t) ? s.map.get(t) : null)); arrs.forEach(a => a.forEach(v => { if (v != null) { mn = Math.min(mn, v); mx = Math.max(mx, v); } }));
+    const sx = i => pad + i / (tl.length - 1) * (w - 2 * pad), sy = v => hgt - pad - (v - mn) / ((mx - mn) || 1) * (hgt - 2 * pad);
+    return h('svg', { width: '100%', height: '100%', viewBox: '0 0 ' + w + ' ' + hgt, preserveAspectRatio: 'none', style: { display: 'block' } },
+      arrs.map((a, li) => { let d = ''; a.forEach((v, i) => { if (v == null) return; d += (d ? 'L' : 'M') + sx(i).toFixed(1) + ' ' + sy(v).toFixed(1) + ' '; }); return h('path', { key: li, d, fill: 'none', stroke: PAL[li], strokeWidth: 1.5 }); }));
+  }
+
+  // ---- The map of connections
+  propagate() {
+    const { start, dir, fb } = this.state.rel; if (!start) return null;
+    const res = new Map([[start, { dir, depth: 0, via: null }]]), q = [start], mixed = new Set();
+    while (q.length) { const n = q.shift(), cur = res.get(n); if (cur.depth >= 8) continue;
+      EDGES.forEach(e => { if (e.from !== n || e.signal || (e.fb && !fb)) return; const d = cur.dir * e.sign, ex = res.get(e.to);
+        if (!ex) { res.set(e.to, { dir: d, depth: cur.depth + 1, via: e }); q.push(e.to); } else if (ex.dir !== d && e.to !== start) mixed.add(e.to); }); }
+    return { res, mixed };
+  }
+  latestOf(id) {
+    const s = this.series(id, 'lin'); if (!s) return null; const ks = [...s.map.keys()], t = ks[ks.length - 1], v = s.map.get(t);
+    const o = s.map.get(addM(t, -12)); const m = CAT[id] || {}; const pct = /percent|%/i.test(m.units || '');
+    return { t, v, ch: o == null ? null : pct ? v - o : (v / o - 1) * 100, pct };
+  }
+  // the map fills its box: measure the box, and lay the columns out across it
+  mapRef = el => {
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
+    if (!el || !window.ResizeObserver) return;
+    this._ro = new ResizeObserver(([en]) => { const w = Math.round(en.contentRect.width); if (Math.abs(w - (this.state.relW || 0)) > 3) this.setState({ relW: w }); });
+    this._ro.observe(el);
+  };
+  relMap(P) {
+    const h = React.createElement, fbOn = this.state.rel.fb, sel = this.state.rel.sel, res = P ? P.res : null;
+    const Wc = Math.max(this.state.relW || 1300, 600), X0 = 10, n = COLS.length, avail = Wc - 2 * X0;
+    const W = Math.round(Math.min(224, Math.max(156, avail / n - 40))), CW = Math.max(W + 34, (avail - W) / (n - 1)), fs = W < 172 ? 12.2 : 13, G = CW - W, Hn = 56, RH = 84, Y0 = 34;
+    const pos = id => ({ x: X0 + NODE[id].col * CW, y: Y0 + NODE[id].row * RH });
+    const taken = new Set(NODES.map(nd => nd.col + ':' + nd.row)), maxRow = Math.max(...NODES.map(nd => nd.row));
+    const edges = EDGES.filter(e => fbOn || !e.fb), lanes = edges.filter(e => e.fb && NODE[e.to].col < NODE[e.from].col);
+    const lanesY = Y0 + maxRow * RH + Hn + 18, width = X0 * 2 + (n - 1) * CW + W, height = lanes.length ? lanesY + lanes.length * 12 + 8 : Y0 + maxRow * RH + Hn + 10;
+    const gapY = (ra, rb) => Y0 + Math.min(maxRow - 1, Math.max(0, Math.round((ra + rb) / 2 - 0.5))) * RH + Hn + (RH - Hn) / 2;
+    let lane = 0;
+    // where an arrow runs, and the middle of it (for its + or − badge)
+    const route = e => {
+      const A = NODE[e.from], B = NODE[e.to], a = pos(e.from), b = pos(e.to), ya = a.y + Hn / 2, yb = b.y + Hn / 2;
+      if (e.fb && B.col < A.col) {   // feedback to an earlier column: along a lane under the map
+        lane++; const ly = lanesY + (lane - 1) * 12, x1 = a.x - 8 - lane * 4, x2 = b.x + W + 8 + lane * 4, y1 = a.y + Hn - 12, y2 = b.y + Hn - 12;
+        return { d: 'M' + a.x + ' ' + y1 + ' L' + x1 + ' ' + y1 + ' L' + x1 + ' ' + ly + ' L' + x2 + ' ' + ly + ' L' + x2 + ' ' + y2 + ' L' + (b.x + W + 6) + ' ' + y2, mx: (x1 + x2) / 2, my: ly };
+      }
+      if (A.col === B.col) {
+        if (Math.abs(A.row - B.row) === 1) { const x = a.x + W / 2, down = B.row > A.row, y1 = down ? a.y + Hn : a.y, y2 = down ? b.y - 5 : b.y + Hn + 5; return { d: 'M' + x + ' ' + y1 + ' L' + x + ' ' + y2, mx: x + 14, my: (y1 + y2) / 2 }; }
+        const x1 = a.x + W, bx = x1 + Math.min(G * 0.6, 40), y1 = ya + (yb > ya ? 12 : -12), y2 = yb + (yb > ya ? -12 : 12);
+        return { d: 'M' + x1 + ' ' + y1 + ' C' + bx + ' ' + y1 + ' ' + bx + ' ' + y2 + ' ' + (x1 + 6) + ' ' + y2, mx: x1 + (bx - x1) * 0.75, my: (y1 + y2) / 2 };
+      }
+      const fwd = B.col > A.col, s = fwd ? 1 : -1, span = Math.abs(B.col - A.col), x1 = fwd ? a.x + W : a.x, xb = fwd ? b.x : b.x + W, x2 = xb - s * 6;
+      const clear = A.row === B.row && Array.from({ length: span - 1 }, (_, i) => Math.min(A.col, B.col) + 1 + i).every(c => !taken.has(c + ':' + A.row));
+      if (span === 1 || clear) { const mx = (x1 + x2) / 2; return { d: 'M' + x1 + ' ' + ya + ' C' + mx + ' ' + ya + ' ' + mx + ' ' + yb + ' ' + x2 + ' ' + yb, mx, my: (ya + yb) / 2 }; }
+      const gy = gapY(A.row, B.row), g1 = x1 + s * G, g2 = xb - s * G;   // skips a column: through the gap between two rows, never through a box
+      return { d: 'M' + x1 + ' ' + ya + ' C' + (x1 + s * G / 2) + ' ' + ya + ' ' + (x1 + s * G / 2) + ' ' + gy + ' ' + g1 + ' ' + gy + ' L' + g2 + ' ' + gy + ' C' + (xb - s * G / 2) + ' ' + gy + ' ' + (xb - s * G / 2) + ' ' + yb + ' ' + x2 + ' ' + yb, mx: (g1 + g2) / 2, my: gy };
+    };
+    const on = e => res && !e.signal && res.has(e.from) && res.get(e.to) && res.get(e.to).via === e;
+    const els = [], badges = [], nb = {};
+    NODES.forEach(nd => { nb[nd.id] = new Set([nd.id]); });
+    edges.forEach(e => { nb[e.from].add(e.to); nb[e.to].add(e.from); });
+    COLS.forEach((c, i) => els.push(h('text', { key: 'c' + i, x: X0 + i * CW, y: 18, fill: '#9397ab', fontSize: 11, letterSpacing: '.08em' }, c.toUpperCase())));
+    edges.forEach((e, k) => {
+      const r = route(e), active = on(e), dirTo = res && res.get(e.to) ? res.get(e.to).dir : 0, cls = ' f-' + e.from + ' t-' + e.to;
+      const col = e.signal ? '#fdd663' : res ? (active ? (dirTo > 0 ? UPC : DOWNC) : '#4a4d5c') : (e.sign > 0 ? '#81c995' : '#f28b82');
+      els.push(h('path', { key: 'e' + k, className: 'edge' + cls, d: r.d, fill: 'none', stroke: col, strokeWidth: active ? 2.4 : 1.4, strokeDasharray: e.signal ? '2 4' : e.fb ? '6 4' : undefined,
+        opacity: res ? (active ? 1 : 0.18) : 0.45, markerEnd: 'url(#' + (e.signal ? 'ms' : res ? (active ? (dirTo > 0 ? 'mu' : 'md') : 'mn') : (e.sign > 0 ? 'mp' : 'mm')) + ')' },
+        h('title', null, NODE[e.from].label + (e.sign > 0 ? ' → (+) ' : ' → (−) ') + NODE[e.to].label + ' · ' + e.lag + ': ' + e.why)));
+      const bc = e.signal ? '#fdd663' : e.sign > 0 ? '#81c995' : '#f28b82';
+      badges.push(h('g', { key: 'b' + k, className: 'ebadge' + cls + (active ? ' on' : ''), transform: 'translate(' + r.mx + ',' + r.my + ')', style: { pointerEvents: 'none' } },
+        h('circle', { r: 8, fill: '#1b1d2b', stroke: bc, strokeWidth: 1.2 }), h('text', { y: 4, textAnchor: 'middle', fill: bc, fontSize: 12, fontWeight: 700 }, e.signal ? '!' : e.sign > 0 ? '+' : '−')));
+    });
+    NODES.forEach(nd => {
+      const p = pos(nd.id), r = res && res.get(nd.id), isSel = nd.id === sel, L = nd.concept ? null : this.latestOf(nd.id), m = CAT[nd.id] || {};
+      const arrow = r ? (P.mixed.has(nd.id) ? ' ±' : r.dir > 0 ? ' ↑' : ' ↓') : '', chg = L && L.ch != null ? (L.ch >= 0 ? '+' : '') + L.ch.toFixed(1) : '';
+      const sub = nd.concept ? 'moves opposite to yields' : L ? (nd.yoy && chg ? chg + '% from a year ago' : this.fmt(L.v) + (L.pct ? '%' : '') + (chg ? '  ' + chg + (L.pct ? ' pts' : '%') + ' y/y' : ''))
+        : (this.data[nd.id] && this.data[nd.id].error) || (m.calc && this.pts(nd.id) == null && this.data[m.calc[0]]) ? 'needs a FRED key' : 'loading…';
+      els.push(h('g', { key: 'n' + nd.id, className: 'node ' + [...nb[nd.id]].map(x => 'nb-' + x).join(' '), transform: 'translate(' + p.x + ',' + p.y + ')', style: { cursor: 'pointer' }, opacity: res && !r ? 0.35 : 1,
+        onClick: () => this.setState(s => ({ rel: Object.assign({}, s.rel, { sel: s.rel.sel === nd.id && !s.rel.start ? null : nd.id }) })),
+        onMouseEnter: ev => { if (!this.state.rel.start) ev.currentTarget.ownerSVGElement.setAttribute('data-focus', nd.id); },
+        onMouseLeave: ev => { if (!this.state.rel.start) ev.currentTarget.ownerSVGElement.setAttribute('data-focus', this.state.rel.sel || ''); } },
+        h('title', null, (m.why || nd.concept || '') + ' Click to select it.'),
+        h('rect', { width: W, height: Hn, rx: 9, fill: r ? (r.dir > 0 ? 'rgba(129,201,149,.13)' : 'rgba(242,139,130,.13)') : '#20222f', stroke: isSel ? '#b5abfc' : r ? (P.mixed.has(nd.id) ? '#fdd663' : r.dir > 0 ? UPC : DOWNC) : '#3f424d', strokeWidth: isSel ? 2 : 1 }),
+        h('text', { x: 11, y: 22, fill: '#e9e9ed', fontSize: fs, fontWeight: 500 }, nd.label + arrow),
+        h('text', { x: 11, y: 41, fill: L && L.ch != null ? (L.ch >= 0 ? '#9fd5ae' : '#f2a49e') : '#8a8ea6', fontSize: 11.5 }, sub)));
+    });
+    // hovering or selecting an indicator lights up its own arrows and fades the rest, without redrawing
+    const css = '.rmap .edge,.rmap .node{transition:opacity .12s}.rmap .ebadge{display:none}.rmap .ebadge.on{display:inline}'
+      + '.rmap[data-focus]:not([data-focus=""]) .edge{opacity:.07}.rmap[data-focus]:not([data-focus=""]) .node{opacity:.4}'
+      + NODES.map(nd => { const f = '.rmap[data-focus="' + nd.id + '"]'; return f + ' .edge.f-' + nd.id + ',' + f + ' .edge.t-' + nd.id + '{opacity:1;stroke-width:2.3px}' + f + ' .ebadge.f-' + nd.id + ',' + f + ' .ebadge.t-' + nd.id + '{display:inline}' + f + ' .node.nb-' + nd.id + '{opacity:1}'; }).join('');
+    const mk = (id, c) => h('marker', { key: id, id, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, h('path', { d: 'M0,0 L10,5 L0,10 z', fill: c }));
+    return h('div', { ref: this.mapRef }, h('svg', { className: 'rmap', 'data-focus': res ? '' : (sel || ''), width, height, style: { display: 'block' },
+        onClick: ev => { if (ev.target === ev.currentTarget && !this.state.rel.start) this.setState(s => ({ rel: Object.assign({}, s.rel, { sel: null }) })); } },
+      h('style', null, css), h('defs', null, mk('mp', '#81c995'), mk('mm', '#f28b82'), mk('mu', UPC), mk('md', DOWNC), mk('mn', '#4a4d5c'), mk('ms', '#fdd663')), els, badges));
+  }
+  // what follows a push, as a tree read left to right: each indicator hangs off the one whose arrow reached it first
+  relTree(P) {
+    const h = React.createElement, res = P.res, start = this.state.rel.start, kids = {}, order = id => NODES.findIndex(nd => nd.id === id);
+    res.forEach((r, id) => { if (r.via) (kids[r.via.from] = kids[r.via.from] || []).push(id); });
+    Object.values(kids).forEach(k => k.sort((a, b) => order(a) - order(b)));
+    const maxD = Math.max(...[...res.values()].map(r => r.depth)), Wc = Math.max(this.state.relW || 1300, 600);
+    const colW = Math.max(196, Math.min(270, (Wc - 10) / (maxD + 1))), bw = colW - 44, bh = 44, rh = 54, place = {};
+    let leaf = 0;
+    const walk = (id, d) => { const ks = kids[id] || []; if (!ks.length) { place[id] = { d, y: leaf++ }; return place[id].y; } const ys = ks.map(k => walk(k, d + 1)); place[id] = { d, y: (ys[0] + ys[ys.length - 1]) / 2 }; return place[id].y; };
+    walk(start, 0);
+    const X = id => 4 + place[id].d * colW, Y = id => 4 + place[id].y * rh, els = [];
+    Object.keys(place).forEach(id => { const r = res.get(id); if (!r.via) return; const pa = r.via.from, x1 = X(pa) + bw, y1 = Y(pa) + bh / 2, x2 = X(id) - 6, y2 = Y(id) + bh / 2, mx = (x1 + x2) / 2;
+      els.push(h('path', { key: 'p' + id, d: 'M' + x1 + ' ' + y1 + ' C' + mx + ' ' + y1 + ' ' + mx + ' ' + y2 + ' ' + x2 + ' ' + y2, fill: 'none', stroke: r.dir > 0 ? UPC : DOWNC, strokeWidth: 1.6, markerEnd: 'url(#t' + (r.dir > 0 ? 'u' : 'd') + ')' })); });
+    Object.keys(place).forEach(id => { const r = res.get(id), mixed = P.mixed.has(id), c = mixed ? '#fdd663' : r.dir > 0 ? UPC : DOWNC;
+      els.push(h('g', { key: 'g' + id, transform: 'translate(' + X(id) + ',' + Y(id) + ')' },
+        h('title', null, r.via ? NODE[r.via.from].label + (r.via.sign > 0 ? ' → (+) ' : ' → (−) ') + NODE[id].label + ': ' + r.via.why : 'Where the push starts.'),
+        h('rect', { width: bw, height: bh, rx: 8, fill: r.dir > 0 ? 'rgba(129,201,149,.12)' : 'rgba(242,139,130,.12)', stroke: c, strokeWidth: id === start ? 2 : 1 }),
+        h('text', { x: 10, y: 19, fill: '#e9e9ed', fontSize: 12.5, fontWeight: 500 }, NODE[id].label + (mixed ? ' ±' : r.dir > 0 ? ' ↑' : ' ↓')),
+        h('text', { x: 10, y: 35, fill: '#8a8ea6', fontSize: 11 }, r.via ? (r.via.sign > 0 ? '+ ' : '− ') + r.via.lag : 'the push')));
+    });
+    const mk = (id, c) => h('marker', { key: id, id, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, h('path', { d: 'M0,0 L10,5 L0,10 z', fill: c }));
+    return h('svg', { width: 8 + maxD * colW + bw, height: 8 + leaf * rh, style: { display: 'block' } }, h('defs', null, mk('tu', UPC), mk('td', DOWNC)), els);
+  }
+  linkRows(id, dirn) {
+    return EDGES.filter(e => dirn === 'in' ? e.to === id : e.from === id).map(e => { const other = dirn === 'in' ? e.from : e.to;
+      return { name: (dirn === 'in' ? NODE[other].label + ' → this' : 'this → ' + NODE[other].label), sign: e.signal ? '!' : e.sign > 0 ? '+' : '−', cls: e.signal ? 'dim' : e.sign > 0 ? 'up' : 'down', detail: e.why + (e.fb ? ' (feedback)' : '') + ' · ' + e.lag, other }; });
+  }
+
+  // ---- Opening and changing charts
+  openEditorWith(cfg) {
+    const lines = (cfg.lines || []).map((l, i) => l.custom ? { id: this.uid(), custom: true, formula: l.formula, vars: l.vars, transform: 'lin', axis: l.axis || 'L', color: l.color || PAL[i % PAL.length], label: l.label }
+      : { id: this.uid(), custom: false, series: l.series, transform: l.transform || 'lin', axis: l.axis || 'L', color: l.color || PAL[i % PAL.length] });
+    const editor = { savedId: cfg.savedId || null, title: cfg.title || '', presetKey: cfg.key || cfg.presetKey || null, notes: cfg.notes || '', type: cfg.type || 'line', lines,
+      range: cfg.range || null, years: cfg.range ? null : (cfg.years != null ? cfg.years : 20), recession: cfg.recession != null ? cfg.recession : true, axisLabels: cfg.axisLabels, zeroLine: cfg.zeroLine, pieDate: cfg.pieDate || null };
+    this.setState({ view: 'editor', editor, explain: null, rangePickerOpen: false, detailRows: {} }, () => this.ensure(this.editorIds()));
+  }
+  updEditor(patch) { this.setState(s => ({ editor: Object.assign({}, s.editor, patch), explain: null })); }
+  updLine(id, patch) { this.setState(s => ({ editor: Object.assign({}, s.editor, { lines: s.editor.lines.map(l => l.id === id ? Object.assign({}, l, patch) : l) }), explain: null })); }
+  removeLine(id) { this.setState(s => ({ editor: Object.assign({}, s.editor, { lines: s.editor.lines.filter(l => l.id !== id) }), explain: null })); }
+  uid() { return 'l' + Math.random().toString(36).slice(2, 8); }
+  nextColor() { const used = new Set(this.state.editor.lines.map(l => l.color)); return PAL.find(c => !used.has(c)) || PAL[this.state.editor.lines.length % PAL.length]; }
+  rememberMeta(r) { if (!r || !r.id || CAT[r.id]) return; this.extMeta[r.id] = { short: r.title, name: r.title, units: r.units || '', freq: r.freq || '', notes: r.notes || '' }; lsSet('diligence.macro.meta', this.extMeta); }
+  addSeries(id) {
+    if (!this.state.editor) { this.openEditorWith({ title: this.meta(id).short, lines: [{ series: id }] }); this.pushRecent(id); return; }
+    if (this.state.editor.lines.some(l => l.series === id)) return;
+    const M = this.model(); let axis = 'L';
+    const s = this.series(id, 'lin');
+    if (M && M.have.length && s) { const vs = [...s.map.values()].slice(-120).map(Math.abs).sort((a, b) => a - b), mag = vs[vs.length >> 1], left = M.have.filter(x => x.l.axis !== 'R').map(x => Math.abs(x.filled.filter(v => v != null).slice(-1)[0] || 0)).filter(Boolean);
+      if (left.length && mag && Math.max(mag / left[0], left[0] / mag) >= 25 && !M.have.some(x => x.l.axis === 'R')) axis = 'R'; }
+    const line = { id: this.uid(), series: id, transform: 'lin', axis, color: this.nextColor(), custom: false };
+    this.setState(s2 => ({ editor: Object.assign({}, s2.editor, { lines: s2.editor.lines.concat([line]) }), catalogOpen: false, search: '', explain: null }), () => this.ensure([id]));
+    if (axis === 'R') this.toast(this.meta(id).short + ' went on the right axis: its scale differs');
+    this.pushRecent(id);
+  }
+  toggleSeries(id) { const ed = this.state.editor; const ln = ed && ed.lines.find(l => l.series === id); if (ln) this.removeLine(ln.id); else this.addSeries(id); }
+  pushRecent(id) { const recent = [id].concat(this.state.recent.filter(x => x !== id)).slice(0, 10); lsSet('diligence.macro.recent', recent); this.setState({ recent }); }
+  fredSearch(q) {
+    clearTimeout(this._fq); if (!q || q.trim().length < 2) { this.setState({ fred: { q: '', results: [], loading: false } }); return; }
+    this._fq = setTimeout(() => { this.setState(s => ({ fred: Object.assign({}, s.fred, { q, loading: true }) }));
+      getJSON('/api/macro/search?q=' + encodeURIComponent(q)).then(d => { if (q !== this.state.heroQ && q !== this.state.sideQ && q !== this.state.search) return; this.setState({ fred: { q, results: d.results || [], loading: false, needsKey: !!d.needs_key, error: d.error || '' } }); },
+        e => this.setState({ fred: { q, results: [], loading: false, error: e.message } })); }, 350);
+  }
+  saveChart() {
+    const ed = this.state.editor, title = (ed.title || '').trim() || 'Untitled chart';
+    const rec = { id: ed.savedId || ('g' + Date.now()), title, type: ed.type, presetKey: ed.presetKey, lines: ed.lines.map(l => l.custom ? { custom: true, formula: l.formula, vars: l.vars, axis: l.axis, color: l.color, label: l.label } : { series: l.series, transform: l.transform, axis: l.axis, color: l.color }),
+      range: ed.range, years: ed.years, recession: ed.recession, zeroLine: ed.zeroLine, axisLabels: ed.axisLabels, notes: ed.notes || '', pieDate: ed.pieDate, created: Date.now() };
+    const saved = [rec].concat(this.state.saved.filter(g => g.id !== rec.id)); lsSet('diligence.macro.saved', saved);
+    this.setState({ saved, editor: Object.assign({}, ed, { savedId: rec.id }) }); this.toast('Saved “' + title + '”');
+  }
+  exportCSV(M) {
+    if (!M || !M.have.length) return;
+    let csv = 'month,' + M.have.map(x => '"' + (x.l.custom ? x.l.formula : x.l.series + ' ' + TLABEL[x.l.transform]).replace(/"/g, '') + '"').join(',') + '\n';
+    M.tl.forEach((t, k) => { csv += t + ',' + M.have.map(x => x.gaps[k] == null ? '' : x.gaps[k]).join(',') + '\n'; });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = ((this.state.editor.title || 'macro-chart').replace(/[^a-z0-9]+/gi, '-').toLowerCase()) + '.csv'; a.click();
+  }
+  explain(M, type) {
+    const ed = this.state.editor; if (!M || !M.have.length) return;
+    const preset = PRESETS.find(p => p.key === ed.presetKey), ids = new Set(ed.lines.map(l => l.series));
+    const body = { title: ed.title || '', chart: type, range: [M.a, M.b], preset: preset ? preset.name + ': ' + preset.desc : null,
+      lines: M.have.map(x => ({ id: x.l.custom ? 'formula' : x.l.series, name: x.m.name, units: x.m.units, shown_as: TLABEL[x.l.transform], first: x.firstV, latest: x.latest, latest_month: x.latestT, low: x.min, high: x.max })),
+      links: EDGES.filter(e => ids.has(e.from) && ids.has(e.to)).map(e => NODE[e.from].label + (e.sign > 0 ? ' raises ' : ' lowers ') + NODE[e.to].label + ' (' + e.lag + '): ' + e.why) };
+    this.setState({ explain: { loading: true } });
+    postJSON('/api/macro/explain', body).then(d => this.setState({ explain: { text: d.text } }), e => this.setState({ explain: { error: e.message } }));
+  }
+  cautions(M, type) {
+    const ed = this.state.editor, out = [], metas = M.have.map(x => x.m);
+    const axes = new Set(ed.lines.map(l => l.axis)); if (axes.size > 1 && type !== 'scatter' && type !== 'pie') out.push('Two scales: the left and right axes differ, so compare directions and turning points, not heights.');
+    const fr = new Set(M.have.map(x => x.s.freq)); if (fr.size > 1) out.push('Mixed frequencies: quarterly figures are carried across their three months to line up with monthly ones.');
+    if (metas.some(m => /real|chained/i.test(m.name + m.units)) && metas.some(m => /\$/.test(m.units) && !/chained/i.test(m.units))) out.push('Mixes inflation-adjusted and current-dollar series: their trends part ways because of inflation, not just growth.');
+    if (ed.lines.some(l => l.transform === 'yoy')) out.push('Change from a year ago smooths out seasons but turns late at sharp turning points.');
+    if (ed.lines.some(l => l.transform === 'index')) out.push('Indexed lines all start at 100, so they show relative growth, not size.');
+    if (type === 'scatter') out.push('A scatter shows that two things move together, not that one causes the other.');
+    if (type === 'bar' && M.tl.length > 150) out.push('Each bar is the average of a ' + (M.tl.length > 600 ? 'year' : 'quarter') + ', so the bars stay readable.');
+    if (M.have.some(x => x.d && x.d.note)) out.push('Some series came from a backup source: ' + M.have.filter(x => x.d && x.d.note).map(x => x.l.series + ' (' + x.d.source + ')').join(', ') + '.');
+    out.push('Recent figures get revised: the last month or quarter may change.');
+    if (ed.recession && type !== 'pie' && type !== 'scatter') out.push('Shaded bands are recessions as dated by the NBER.');
+    return out;
+  }
+
+  // ---- What the page shows
+  renderVals() {
+    const st = this.state, h = React.createElement, ed = st.editor, status = st.status;
+    const v = {
+      stop: e => e.stopPropagation(), toast: !!st.toast, toastMsg: st.toast,
+      tabs: [['dashboard', 'Dashboard'], ['relations', 'How it connects']].concat(ed ? [['editor', 'Chart']] : []).map(([k, label]) => ({ label, on: st.view === k, go: () => { this.setState({ view: k }); if (k === 'relations') this.ensure(NODES.filter(n => !n.concept).map(n => n.id)); if (k === 'editor') this.ensure(this.editorIds()); } })),
+      isDashboard: st.view === 'dashboard', isRelations: st.view === 'relations', isEditor: st.view === 'editor' && !!ed,
+      goHome: () => this.setState({ view: 'dashboard' }), goRelations: () => { this.setState({ view: 'relations' }); this.ensure(NODES.filter(n => !n.concept).map(n => n.id)); },
+      goRelationsLink: e => { e.preventDefault(); v.goRelations(); },
+      srcLabel: !status ? 'Checking data sources…' : status.error ? 'Server not answering' : status.fred_key && status.fred_ok ? 'FRED live' : status.fred_key ? 'FRED unreachable · backup sources' : 'Keyless sources · no FRED key',
+      srcDot: !status ? '#6b6f8a' : status.fred_key && status.fred_ok ? UPC : status.fred_key ? '#fdd663' : '#8a8ea6',
+      srcTip: !status ? '' : status.fred_key && !status.fred_ok ? 'FRED: ' + (status.fred_msg || 'not answering') + '. Core series come from DBnomics and the BLS meanwhile.' : status.fred_key ? 'Every FRED series and search are available.' : 'Core series come from DBnomics (Federal Reserve, BEA) and the BLS. Add a free FRED key for the rest and for search.',
+      keyBtnLabel: status && status.fred_key ? 'FRED key' : 'Add FRED key',
+      openKey: () => this.setState({ keyOpen: true, keyDraft: '', keyMsg: '' }), closeKey: () => this.setState({ keyOpen: false }),
+      keyDraft: st.keyDraft, keyMsg: st.keyMsg, onKeyDraft: e => this.setState({ keyDraft: e.target.value }),
+      saveKey: () => postJSON('/api/macro/key', { key: st.keyDraft }).then(s => { this.setState({ status: s, keyOpen: false }); this.asked = new Set(); this.data = {}; this.ensure(this.editorIds()); this.toast(s.fred_ok ? 'FRED key saved: live' : 'Key saved. FRED is not answering right now: ' + (s.fred_msg || '')); }, e => this.setState({ keyMsg: e.message })),
+      clearKey: () => postJSON('/api/macro/key', { key: '' }).then(s => this.setState({ status: s, keyOpen: false }), e => this.setState({ keyMsg: e.message })),
+    };
+
+    // ---- dashboard
+    const card = id => { const m = this.meta(id), L = this.latestOf(id), d = this.data[id];
+      const good = L && L.ch != null ? (L.ch >= 0) : null;
+      return { code: id, short: m.short, units: m.units, spark: this.spark(id, 200, 44), latest: L ? this.fmt(L.v) : d && (d.error || (m.calc && this.pts(id) == null)) ? '—' : '…',
+        change: L && L.ch != null ? (L.ch >= 0 ? '+' : '') + L.ch.toFixed(1) + (L.pct ? ' pts' : '%') : d && d.error ? 'FRED key' : '',
+        badgeBg: good == null ? 'transparent' : good ? 'rgba(129,201,149,.15)' : 'rgba(242,139,130,.15)', badgeFg: good == null ? '#8a8ea6' : good ? '#9fd5ae' : '#f2a49e',
+        onOpen: () => { this.openEditorWith({ title: m.short, lines: [{ series: id }] }); this.pushRecent(id); } }; };
+    const hq = (st.heroQ || '').trim().toLowerCase(), match = q => id => { const m = this.meta(id); return (id + ' ' + m.short + ' ' + m.name + ' ' + (m.units || '')).toLowerCase().includes(q); };
+    v.heroQ = st.heroQ; v.onHeroQ = e => { this.setState({ heroQ: e.target.value }); this.fredSearch(e.target.value); };
+    v.searchPlaceholder = 'Search ' + CORE.length + ' catalog series' + (status && status.fred_key ? ', or all of FRED' : '') + ' — try "mortgage", "Texas", "wages"…';
+    v.isSearching = !!hq; v.notSearching = !hq;
+    const shown = [];
+    if (hq) {
+      const hits = CORE.map(s => s.id).filter(match(hq)); v.searchItems = hits.slice(0, 18).map(card); v.searchEmpty = !hits.length; shown.push(...hits.slice(0, 18));
+      v.searchCountLabel = hits.length + ' match' + (hits.length === 1 ? '' : 'es') + (hits.length > 18 ? ', showing 18' : '');
+      const fr = st.fred; v.fredItems = (fr.results || []).filter(r => !CAT[r.id]).map(r => ({ id: r.id, title: r.title, meta: [r.units, r.freq, r.sa, (r.start || '').slice(0, 4) + '–' + (r.end || '').slice(0, 4)].filter(Boolean).join(' · '), notes: r.notes, onOpen: () => { this.rememberMeta(r); this.openEditorWith({ title: r.title, lines: [{ series: r.id }] }); } }));
+      v.fredCountLabel = fr.loading ? 'searching…' : v.fredItems.length ? v.fredItems.length + ' by popularity' : '';
+      v.fredNote = fr.needsKey ? 'Add a free FRED API key (top right) to search all 800,000+ FRED series here.' : fr.error ? fr.error : (!fr.loading && !v.fredItems.length && fr.q) ? 'No other FRED series match.' : '';
+    } else { v.searchItems = []; v.fredItems = []; }
+    v.saved = st.saved; v.noSaved = !st.saved.length; v.savedCountLabel = st.saved.length ? st.saved.length + ' saved' : '';
+    v.savedList = st.saved.map(g => ({ title: g.title, sub: (g.type || 'line') + ' · ' + g.lines.map(l => l.custom ? 'ƒ ' + (l.label || l.formula) : l.series).join(' · '), mini: this.mini(g, 260, 74),
+      onOpen: () => this.openEditorWith(Object.assign({}, g, { savedId: g.id })), onDelete: e => { e.stopPropagation(); const saved = st.saved.filter(x => x.id !== g.id); lsSet('diligence.macro.saved', saved); this.setState({ saved }); } }));
+    v.presetCards = PRESETS.map(p => ({ name: p.name, desc: p.desc, mini: this.mini(p, 260, 74), onOpen: () => this.openEditorWith(Object.assign({ title: p.name }, p)) }));
+    const cur = SECTIONS.find(s => s.key === st.browseCat) || SECTIONS[0], grp = cur.groups.find(g => g.key === st.browseGroup);
+    v.catalogStatLabel = CORE.length + ' series in ' + SECTIONS.length + ' groups';
+    v.catTree = SECTIONS.map(sec => ({ title: sec.title, count: sec.ids.length + sec.groups.reduce((a, g) => a + g.ids.length, 0), on: sec.key === cur.key && !grp,
+      onSelect: () => this.setState({ browseCat: sec.key, browseGroup: null, browseShowAll: false }),
+      groups: sec.key === cur.key ? sec.groups.map(g => ({ title: g.title, count: g.ids.length, on: grp && grp.key === g.key, onSelect: () => this.setState({ browseCat: sec.key, browseGroup: g.key, browseShowAll: false }) })) : [] }));
+    const bIds = grp ? grp.ids : cur.ids, showIds = st.browseShowAll ? bIds : bIds.slice(0, 18);
+    v.browseItems = showIds.map(card); v.resTitle = grp ? cur.title + ' — ' + grp.title : cur.title; v.resBlurb = cur.blurb;
+    v.resCountLabel = showIds.length < bIds.length ? 'showing ' + showIds.length + ' of ' + bIds.length : bIds.length + ' series';
+    v.moreVisible = showIds.length < bIds.length; v.moreLabel = 'Show all ' + bIds.length; v.onShowMore = () => this.setState({ browseShowAll: true });
+    v.openBlank = () => this.openEditorWith({ title: '', lines: [] });
+    if (st.view === 'dashboard') {   // the data the visible cards need
+      const want = shown.concat(hq ? [] : showIds); st.saved.forEach(g => g.lines.forEach(l => l.series && want.push(l.series))); PRESETS.forEach(p => p.lines.slice(0, 4).forEach(l => want.push(l.series)));
+      if (want.some(id => !this.asked.has(id))) Promise.resolve().then(() => this.ensure(want));
+    }
+
+    // ---- relations
+    const P = this.propagate(), sel = st.rel.sel ? NODE[st.rel.sel] : null, selM = sel ? CAT[sel.id] || {} : {};
+    if (st.view === 'relations' && NODES.some(nd => !nd.concept && !this.asked.has(nd.id))) Promise.resolve().then(() => this.ensure(NODES.filter(nd => !nd.concept).map(nd => nd.id)));
+    v.relMap = st.view === 'relations' ? this.relMap(P) : null; v.relHasSel = !!sel; v.relNoSel = !sel;
+    v.relSelName = sel ? sel.label : ''; v.relSelWhy = sel ? sel.concept || [selM.why, selM.read].filter(Boolean).join(' ') : '';
+    v.relQuick = ['M2SL', 'FEDFUNDS', 'DCOILWTICO', 'GCEC1', 'DGS10'].map(id => ({ label: NODE[id].label, go: () => this.setState(s => ({ rel: Object.assign({}, s.rel, { sel: id }) })) }));
+    v.relNoSeries = !sel || !!sel.concept; v.relFb = st.rel.fb;
+    v.relUp = () => sel && this.setState(s => ({ rel: Object.assign({}, s.rel, { start: sel.id, dir: 1 }) })); v.relDown = () => sel && this.setState(s => ({ rel: Object.assign({}, s.rel, { start: sel.id, dir: -1 }) }));
+    v.relClear = () => this.setState(s => ({ rel: Object.assign({}, s.rel, { start: null }) })); v.relToggleFb = e => this.setState(s => ({ rel: Object.assign({}, s.rel, { fb: e.target.checked }) }));
+    v.relChartOne = () => { if (!sel || sel.concept) return; this.openEditorWith({ title: sel.label, lines: [{ series: sel.id }] }); };
+    const chain = P ? [...P.res.entries()].sort((a, b) => a[1].depth - b[1].depth) : [];
+    v.relHasChain = chain.length > 1; v.relChainTitle = P ? NODE[st.rel.start].label + (st.rel.dir > 0 ? ' goes up' : ' goes down') : '';
+    v.relTree = P && chain.length > 1 && st.view === 'relations' ? this.relTree(P) : null;
+    v.relChain = chain.map(([id, r]) => ({ text: NODE[id].label + ' ' + (P.mixed.has(id) ? '↕ pulled both ways' : r.dir > 0 ? '↑' : '↓'), cls: r.dir > 0 ? 'up' : 'down', why: r.via ? 'via ' + NODE[r.via.from].label + ': ' + r.via.why + ' (' + r.via.lag + ')' : 'the starting push' }));
+    v.relChartChain = () => { const ids = chain.map(([id]) => id).filter(id => !NODE[id].concept).slice(0, 6);
+      this.openEditorWith({ title: NODE[st.rel.start].label + (st.rel.dir > 0 ? ' rises' : ' falls') + ': what follows', years: 25, lines: ids.map(id => ({ series: id, transform: /percent/i.test((CAT[id] || {}).units || '') ? 'lin' : 'yoy' })) }); };
+    v.relIn = sel ? this.linkRows(sel.id, 'in') : []; v.relOut = sel ? this.linkRows(sel.id, 'out') : []; v.relNoIn = !v.relIn.length; v.relNoOut = !v.relOut.length;
+    v.relNoInText = sel ? 'Nothing on the map points to it.' : 'Select an indicator.'; v.relNoOutText = sel ? 'It does not point to anything on the map.' : 'Select an indicator.';
+
+    // ---- editor
+    v.sideQ = st.sideQ; v.onSideQ = e => { this.setState({ sideQ: e.target.value }); this.fredSearch(e.target.value); };
+    if (!ed) return Object.assign(v, { lineRows: [], typeBtns: [], rangeBtns: [], sideLocal: [], sideFred: [], sideOn: [], sideRelated: [], sideRecent: [], sideSections: [], aboutLines: [], cautions: [], links: [], catalogList: [], fVarRows: [], formulaOpts: [] });
+    const M = this.model(), rules = this.typeRules(M), type = rules[ed.type] && rules[ed.type].ok ? ed.type : 'line';
+    v.chart = st.view === 'editor' ? this.chartEl(M, type) : null;
+    v.edTitle = ed.title; v.onTitle = e => this.updEditor({ title: e.target.value }); v.saveLabel = ed.savedId ? 'Update' : 'Save';
+    v.onSave = () => this.saveChart(); v.onExport = () => this.exportCSV(M);
+    v.typeBtns = [['line', 'Line'], ['area', 'Area'], ['stack', 'Stacked'], ['bar', 'Bar'], ['scatter', 'Scatter'], ['pie', 'Pie']].map(([k, label]) => ({ label, on: type === k, disabled: !rules[k].ok, cls: rules.best === k ? 'best' : '',
+      tip: rules[k].ok ? (rules.best === k ? 'Best fit for these lines' : '') : rules[k].why, onClick: () => this.updEditor({ type: k }) }));
+    v.typeNote = ed.type !== type ? 'Showing as a line chart. ' + rules[ed.type].why : '';
+    v.rangeBtns = [['1Y', 1], ['5Y', 5], ['10Y', 10], ['20Y', 20], ['Max', 0]].map(([label, y]) => ({ label, on: !ed.range && (ed.years || 0) === y, onClick: () => this.updEditor({ years: y, range: null }) }));
+    v.rangeCustomOn = !!ed.range; v.rangePickerOpen = st.rangePickerOpen; v.draftStart = M && M.a || ''; v.draftEnd = M && M.b || '';
+    v.rangeStartRef = el => { this._rs = el; }; v.rangeEndRef = el => { this._re = el; };
+    v.onOpenRangePicker = () => this.setState({ rangePickerOpen: !st.rangePickerOpen }); v.onCancelRange = () => this.setState({ rangePickerOpen: false });
+    v.onApplyRange = () => { const a = this._rs && this._rs.value, b = this._re && this._re.value; if (a && b) this.updEditor({ range: a <= b ? [a, b] : [b, a], years: null }); this.setState({ rangePickerOpen: false }); };
+    v.recOn = !!ed.recession; v.recStyle = ed.recession ? 'border-color:var(--color-accent);color:var(--acc)' : ''; v.onToggleRec = () => this.updEditor({ recession: !ed.recession }); v.recOff = type === 'pie' || type === 'scatter';
+    v.rangeText = M && M.tl.length ? M.a + ' — ' + M.b : '';
+    v.pieMode = type === 'pie'; v.pieDate = M && M.tl.length ? this.pieDate(M) : ''; v.onPieDate = e => this.updEditor({ pieDate: e.target.value });
+    v.pieNote = v.pieMode && M ? 'Total ' + this.fmt(M.have.reduce((s, x) => { const k = M.tl.indexOf(v.pieDate); return s + (k >= 0 && x.filled[k] ? x.filled[k] : 0); }, 0)) + ' ' + ((M.have[0] && M.have[0].m.units) || '') : '';
+    v.scatterNote = type === 'scatter' ? 'first line across, second up · dots run from blue (oldest) to yellow (latest)' : '';
+    // scale mismatch on one axis
+    v.scaleWarn = false;
+    if (M && type !== 'scatter' && type !== 'pie' && type !== 'stack' && M.have.length > 1 && !ed.lines.every(l => l.transform === 'index')) {
+      const mag = x => { const vs = x.filled.filter(v2 => v2 != null && v2 !== 0).map(Math.abs).sort((a, b) => a - b); return vs.length ? vs[vs.length >> 1] : null; };
+      ['L', 'R'].forEach(ax => { const ms = M.have.filter(x => (x.l.axis === 'R') === (ax === 'R')).map(mag).filter(Boolean).sort((a, b) => a - b); if (ms.length > 1 && ms[ms.length - 1] / ms[0] >= 25) { v.scaleWarn = true; v.scaleWarnText = 'These lines differ about ' + Math.round(ms[ms.length - 1] / ms[0]).toLocaleString() + '× in size, so the smaller ones flatten against the axis.'; } });
+    }
+    v.onIndexAll = () => this.setState(s => ({ editor: Object.assign({}, s.editor, { lines: s.editor.lines.map(l => Object.assign({}, l, { transform: 'index' })) }) }));
+    v.onSplitAxes = () => { const mags = M.have.map(x => ({ id: x.l.id, m: Math.abs(x.filled.filter(v2 => v2 != null).slice(-1)[0] || 0) })), top = Math.max(...mags.map(x => x.m)) || 1;
+      this.setState(s => ({ editor: Object.assign({}, s.editor, { lines: s.editor.lines.map(l => { const x = mags.find(z => z.id === l.id); return Object.assign({}, l, { axis: x && x.m > 0 && top / x.m >= 25 ? 'R' : 'L' }); }) }) })); };
+    // the lines table
+    const byId = new Map((M ? M.lines : []).map(x => [x.l.id, x]));
+    v.lineRows = ed.lines.map(l => { const x = byId.get(l.id) || {}, m = l.custom ? { short: l.label || l.formula, name: fName(l), units: '' } : this.meta(l.series), d = l.custom ? null : this.pts(l.series), open = !!st.detailRows[l.id];
+      return { color: l.color, codeLabel: (open ? '▾ ' : '▸ ') + (l.custom ? 'ƒ' : l.series), name: m.name, transform: l.transform, detailOpen: open,
+        onToggleDetail: () => this.setState(s => ({ detailRows: Object.assign({}, s.detailRows, { [l.id]: !s.detailRows[l.id] }) })),
+        axisL: l.axis !== 'R', axisR: l.axis === 'R', onAxisL: () => this.updLine(l.id, { axis: 'L' }), onAxisR: () => this.updLine(l.id, { axis: 'R' }),
+        onColor: () => this.updLine(l.id, { color: PAL[(PAL.indexOf(l.color) + 1) % PAL.length] }), onTransform: e => this.updLine(l.id, { transform: e.target.value }), onRemove: () => this.removeLine(l.id),
+        value: x.latest != null ? this.full(x.latest, x) : x.err ? (/key/i.test(x.err) ? 'needs FRED key' : 'no data') : '…', valueTip: x.latestT ? 'Latest in range: ' + x.latestT : (x.err || ''),
+        about: [m.why, m.read && 'How to read it: ' + m.read].filter(Boolean).join(' '), source: d ? (d.source || '—') : '—', unitsLine: (m.units || '—') + ' · shown as ' + TLABEL[l.transform],
+        freq: m.freq || (d && d.freq) || '—', span: d && d.pts && d.pts.length ? d.pts[0].t + ' to ' + d.pts[d.pts.length - 1].t : '—', notes: (m.notes || (d && d.meta && d.meta.notes) || '').slice(0, 600),
+        err: x.err || (d && d.note) || '', url: l.custom ? '#' : 'https://fred.stlouisfed.org/series/' + l.series }; });
+    // the sidebar
+    const onChart = new Set(ed.lines.filter(l => !l.custom).map(l => l.series));
+    const sitem = id => { const m = this.meta(id), on = onChart.has(id); return { code: id, short: m.short, tip: m.name, pm: on ? '✓' : '+', pmCls: 'pm' + (on ? ' on' : ''), onToggle: () => this.toggleSeries(id) }; };
+    const sq = (st.sideQ || '').trim().toLowerCase(); v.sideSearching = !!sq; v.sideNotSearching = !sq;
+    if (sq) { const hits = CORE.map(s => s.id).filter(match(sq)); v.sideLocal = hits.slice(0, 40).map(sitem); v.sideLocalCount = hits.length;
+      v.sideFred = (st.fred.results || []).filter(r => !CAT[r.id]).slice(0, 30).map(r => ({ code: r.id, short: r.title, meta: [r.units, r.freq].filter(Boolean).join(' · '), tip: r.notes, pm: onChart.has(r.id) ? '✓' : '+', pmCls: 'pm' + (onChart.has(r.id) ? ' on' : ''), onToggle: () => { this.rememberMeta(r); this.toggleSeries(r.id); } }));
+      v.sideFredNote = st.fred.needsKey ? 'Add a free FRED key (top right) to search every FRED series.' : st.fred.loading ? 'Searching…' : st.fred.error || (!v.sideFred.length ? 'No other matches.' : ''); }
+    else { v.sideLocal = []; v.sideFred = []; }
+    v.sideOn = ed.lines.filter(l => !l.custom).map(l => Object.assign(sitem(l.series), { color: l.color }));
+    const rel = []; ed.lines.forEach(l => { if (l.custom) return; EDGES.forEach(e => { if (e.from === l.series && !NODE[e.to].concept && !onChart.has(e.to)) rel.push([e.to, (e.sign > 0 ? '↑ ' : '↓ ') + 'moved by ' + NODE[e.from].label + ' (' + e.lag + ')']); if (e.to === l.series && !NODE[e.from].concept && !onChart.has(e.from)) rel.push([e.from, 'moves ' + NODE[e.to].label + (e.sign > 0 ? ' the same way' : ' the opposite way')]); }); });
+    const seenR = new Set(); v.sideRelated = rel.filter(([id]) => !seenR.has(id) && seenR.add(id)).slice(0, 10).map(([id, why]) => Object.assign(sitem(id), { why })); v.sideNoRelated = !v.sideRelated.length;
+    v.sideRecent = st.recent.filter(id => !onChart.has(id)).slice(0, 6).map(sitem); v.sideHasRecent = v.sideRecent.length > 0;
+    v.sideSections = SECTIONS.map(sec => { const open = !!st.sideOpen[sec.key]; const ids = open ? sec.ids.concat(...sec.groups.map(g => st.sideOpen[sec.key + ':' + g.key] ? g.ids : [])) : [];
+      return { title: sec.title, chev: open ? '▾' : '▸', count: sec.ids.length + sec.groups.reduce((a, g) => a + g.ids.length, 0), onToggle: () => this.setState(s => ({ sideOpen: Object.assign({}, s.sideOpen, { [sec.key]: !s.sideOpen[sec.key] }) })),
+        items: open ? sec.ids.map(sitem).concat(...sec.groups.map(g => [{ code: st.sideOpen[sec.key + ':' + g.key] ? 'hide' : g.ids.length + ' series', short: (st.sideOpen[sec.key + ':' + g.key] ? '▾ ' : '▸ ') + g.title, pm: '', pmCls: '', tip: '', onToggle: () => this.setState(s => ({ sideOpen: Object.assign({}, s.sideOpen, { [sec.key + ':' + g.key]: !s.sideOpen[sec.key + ':' + g.key] }) })) }].concat(st.sideOpen[sec.key + ':' + g.key] ? g.ids.map(sitem) : []))) : [] }; });
+    // the explanations
+    const preset = PRESETS.find(p => p.key === ed.presetKey);
+    v.aboutSummary = preset ? preset.read : !ed.lines.length ? 'Add a series to see what the chart shows.' : ed.lines.length === 1 ? (this.meta(ed.lines[0].series || '').name || '') + ', shown as ' + TLABEL[ed.lines[0].transform] + '.' : 'Overlays ' + ed.lines.length + ' lines on one timeline to compare them.';
+    const seenG = new Map(); v.aboutLines = [];   // lines from one group (payrolls by industry, CPI parts, states) share one note
+    ed.lines.filter(l => !l.custom).forEach(l => { const m = this.meta(l.series), g = m.group && seenG.get(m.group);
+      if (g) { const gd = SECTIONS.flatMap(sc => sc.groups).find(x => x.key === m.group) || { title: '' }; g.n++; g.name = g.first + ' and ' + (g.n - 1) + ' more: ' + gd.title.toLowerCase(); if (gd.why) g.why = gd.why; return; }
+      const row = { name: m.short, first: m.short, n: 1, color: l.color, why: m.why || (m.notes ? m.notes.slice(0, 220) + (m.notes.length > 220 ? '…' : '') : ''), read: m.read || 'Use Explain below for a reading of this series.' };
+      if (m.group) seenG.set(m.group, row);
+      v.aboutLines.push(row); });
+    v.cautions = M ? this.cautions(M, type) : [];
+    v.links = EDGES.filter(e => onChart.has(e.from) && onChart.has(e.to)).map(e => ({ name: NODE[e.from].label + ' → ' + NODE[e.to].label, sign: e.signal ? '!' : e.sign > 0 ? '+' : '−', cls: e.signal ? 'dim' : e.sign > 0 ? 'up' : 'down', detail: e.why + ' · ' + e.lag })); v.noLinks = !v.links.length;
+    const ex = st.explain; v.explainBusy = !!(ex && ex.loading) || !M || !M.have.length; v.explainLabel = ex && ex.loading ? 'Thinking…' : ex && ex.text ? 'Again' : 'Explain';
+    v.explainEmpty = !ex; v.onExplain = () => this.explain(M, type);
+    v.explainEl = ex && ex.text && window.marked ? h('div', { className: 'md', dangerouslySetInnerHTML: { __html: window.marked.parse(ex.text.replace(/</g, '&lt;')) } }) : ex && ex.error ? h('p', { className: 'note', style: { color: 'var(--down)' } }, ex.error) : ex && ex.loading ? h('p', { className: 'note' }, 'Reading the chart…') : null;
+    v.edNotes = ed.notes || ''; v.onNotes = e => this.updEditor({ notes: e.target.value }); v.notesHint = ed.savedId ? 'Kept with this chart when you press Update.' : 'Save the chart to keep these notes.';
+    // modals
+    v.catalogOpen = st.catalogOpen; v.openCatalog = () => this.setState({ catalogOpen: true, search: '' }); v.closeCatalog = () => this.setState({ catalogOpen: false });
+    v.search = st.search; v.onSearch = e => { this.setState({ search: e.target.value }); this.fredSearch(e.target.value); };
+    const q2 = (st.search || '').trim().toLowerCase(), cm = CORE.filter(s => !q2 || match(q2)(s.id));
+    const fredExtra = q2 ? (st.fred.results || []).filter(r => !CAT[r.id]).map(r => ({ short: r.title, sub: r.id + ' · ' + [r.units, r.freq].filter(Boolean).join(' · ') + ' · FRED', color: '#6b6f8a', tag: onChart.has(r.id) ? 'added' : '+ add', onAdd: () => { this.rememberMeta(r); if (!onChart.has(r.id)) this.addSeries(r.id); } })) : [];
+    v.catalogList = cm.slice(0, 80).map(s => ({ short: s.short, sub: s.id + ' · ' + s.units + ' · ' + s.freq, color: '#8ab4f8', tag: onChart.has(s.id) ? 'added' : '+ add', onAdd: () => { if (!onChart.has(s.id)) this.addSeries(s.id); } })).concat(fredExtra);
+    v.catalogMoreLabel = cm.length > 80 ? 'Showing 80 of ' + cm.length + ' catalog series; keep typing to narrow.' : (q2 && st.fred.needsKey ? 'Add a FRED key to search beyond the catalog.' : '');
+    v.formulaOpen = st.formulaOpen; v.openFormula = () => this.setState({ formulaOpen: true }); v.closeFormula = () => this.setState({ formulaOpen: false });
+    v.fFormula = st.fFormula; v.onFormula = e => this.setState({ fFormula: e.target.value });
+    v.formulaOpts = [...new Set([...onChart, ...CORE.filter(s => !s.group).map(s => s.id)])].map(id => ({ id, label: id + ' — ' + this.meta(id).short }));
+    v.fVarRows = ['a', 'b', 'c'].map(k => ({ key: k, series: st.fVars[k].series, transform: st.fVars[k].transform,
+      onSeries: e => this.setState(s => ({ fVars: Object.assign({}, s.fVars, { [k]: Object.assign({}, s.fVars[k], { series: e.target.value }) }) })),
+      onTransform: e => this.setState(s => ({ fVars: Object.assign({}, s.fVars, { [k]: Object.assign({}, s.fVars[k], { transform: e.target.value }) }) })) }));
+    v.addFormula = () => { const vars = {}; ['a', 'b', 'c'].forEach(k => { if (st.fVars[k].series) vars[k] = Object.assign({}, st.fVars[k]); });
+      const line = { id: this.uid(), custom: true, formula: st.fFormula, vars, transform: 'lin', axis: 'L', color: this.nextColor(), label: st.fFormula.trim() };
+      this.setState(s => ({ editor: Object.assign({}, s.editor, { lines: s.editor.lines.concat([line]) }), formulaOpen: false }), () => this.ensure(Object.values(vars).map(x => x.series))); };
+    return v;
+  }
+}
+</script>
+</body>
+</html>
