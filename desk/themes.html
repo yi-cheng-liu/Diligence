@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" sizes="64x64" href="./favicon.png?v=4">
 <link rel="stylesheet" href="_ds/nocturne-e1ee5842-13e2-4a15-8f5e-73e39018410f/styles.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap">
-<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link rel="stylesheet" href="vendor/phosphor-2.1.1/regular/style.css"><link rel="stylesheet" href="vendor/phosphor-2.1.1/fill/style.css">
 <script src="vendor/marked-12.0.2.min.js"></script>
 <script src="md-extras.js"></script>
 <style>
@@ -168,7 +168,7 @@ input[type=checkbox]{accent-color:var(--color-accent);cursor:pointer;margin-top:
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const KEY = 'diligence.themes.v1', SCREENER_KEY = 'diligence.screener.v1';
+const KEY = 'diligence.themes.v1';
 const V = Object.assign({ cur: null, report: null }, (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })());
 const keep = () => { try { localStorage.setItem(KEY, JSON.stringify(V)); } catch (e) {} };
 let LIST = { themes: [], kinds: {}, langs: {}, parallel: 3, claude: true }, TH = null, SUG = null, busyMsg = '', pollT = null, listT = null;
@@ -240,7 +240,6 @@ async function change(body) {
   catch (e) { busyMsg = e.message; }
   draw(); loadList(); loadTheme();
 }
-const tickersOf = th => [...new Set(th.topics.concat(th.others || []).filter(x => x.status === 'done' || !x.status).flatMap(x => x.tickers || []))];
 
 function draw() {
   if (V.report && TH) return drawReport();
@@ -259,12 +258,11 @@ function pageHTML() {
   }
   const kinds = Object.entries(LIST.kinds || {});
   const kindOpts = sel => kinds.map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
-  const tk = tickersOf(TH);
   let h = `<div class="wrap"><div class="eyebrow" id="eyebrow"><span>Theme</span><span>${esc(TH.where === 'Technical-research' ? 'Technical research' : 'Industry & theme')}</span>${TH.managed ? `<span>${TH.topics.filter(x => x.status === 'done').length} of ${TH.topics.length} done</span>` : `<span>${TH.topics.length} reports</span>`}</div>
     <h2 class="title">${esc(TH.name)}</h2>`;
   if (!TH.managed) {
     h += `<p class="brief empty">A folder of reports. ${TH.where === 'Industry-theme' ? 'Make it a theme to add topics and research them here; its reports stay as they are.' : ''}</p>
-      <div class="row acts">${TH.where === 'Industry-theme' ? '<button class="b pri" id="adopt"><i class="ph ph-plus"></i>Make it a theme</button>' : ''}${tk.length ? `<button class="b" id="screen"><i class="ph ph-funnel"></i>Screen ${tk.length} companies</button>` : ''}</div>
+      <div class="row acts">${TH.where === 'Industry-theme' ? '<button class="b pri" id="adopt"><i class="ph ph-plus"></i>Make it a theme</button>' : ''}</div>
       <div class="panel"><h4>Reports</h4>${TH.topics.map(x => `<div class="topic"><div class="t"><span class="${kindClass('other')}">${esc(x.kind || 'Report')}</span><a href="#" data-read="${esc(x.path)}">${esc(x.title)}</a></div><div class="meta">${esc(x.date || '')}${x.tickers && x.tickers.length ? ' · ' + x.tickers.length + ' companies' : ''}</div></div>`).join('')}</div></div>`;
     return h;
   }
@@ -278,7 +276,6 @@ function pageHTML() {
       <button class="b" id="suggest"${LIST.claude ? '' : ' disabled'}><i class="ph ph-sparkle"></i>Suggest topics</button>
       ${fresh.length ? `<button class="b pri" id="runAll"${LIST.claude ? '' : ' disabled'}><i class="ph ph-play"></i>Research all ${fresh.length} not started</button>` : ''}
       ${done.length >= 2 && !TH.topics.some(x => x.type === 'overview') ? '<button class="b" id="overview"><i class="ph ph-tree-structure"></i>Add an overview</button>' : ''}
-      ${tk.length ? `<button class="b" id="screen"><i class="ph ph-funnel"></i>Screen ${tk.length} companies</button>` : ''}
       <span class="msg${busyMsg && !/^Asking/.test(busyMsg) ? ' bad' : ''}">${esc(busyMsg)}</span>
     </div>`;
   if (SUG) h += `<div class="panel"><h4>Suggested topics</h4>${SUG.map((s, i) => `<label class="sug"><input type="checkbox" data-sug="${i}" checked><span><span class="${kindClass(s.type)}">${esc(LIST.kinds[s.type] || s.type)}</span> <b style="font-weight:500">${esc(s.title)}</b></span><span class="why">${esc(s.why)}</span></label>`).join('')}
@@ -312,7 +309,6 @@ function wire() {
   m.querySelectorAll('[data-run]').forEach(b => { if (b.dataset.run !== '1') b.onclick = () => change({ run: [b.dataset.run] }); });
   m.querySelectorAll('[data-stop]').forEach(b => b.onclick = () => change({ stop: [b.dataset.stop] }));
   m.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { const t = TH.topics.find(x => x.id === b.dataset.remove); if (confirm(`Remove "${t.title}"?${t.file ? ' Its report stays in the folder.' : ''}`)) change({ remove: [t.id] }); });
-  on('screen', () => screen(tickersOf(TH), TH.name));
   on('adopt', async () => { if (!confirm(`Make "${TH.name}" a theme? Its reports stay as they are; you can then add topics to it.`)) return; try { await post('/api/themes/create', { name: TH.name, brief: '', language: 'en' }); await loadList(); openTheme({ where: 'Industry-theme', name: TH.name }); } catch (e) { alert(e.message); } });
   on('editBrief', () => {
     const el = $('brief'); el.outerHTML = `<div id="briefEdit"><textarea class="f" id="briefText" style="min-height:90px;max-width:46em">${esc(TH.brief || '')}</textarea><div class="row" style="margin-top:8px"><button class="b pri" id="briefSave">Save</button><button class="b quiet" id="briefCancel">Cancel</button></div></div>`;
@@ -340,15 +336,6 @@ function wire() {
   };
 }
 
-// ---- Send companies to the screener: it reads its list from this browser's storage
-function screen(symbols, name) {
-  if (!symbols.length) return;
-  let S = {}; try { S = JSON.parse(localStorage.getItem(SCREENER_KEY)) || {}; } catch (e) {}
-  S.list = { kind: 'paste', symbols, label: name };
-  try { localStorage.setItem(SCREENER_KEY, JSON.stringify(S)); } catch (e) {}
-  if (window.parent !== window) tell({ type: 'workspace', to: 'screener' }); else location.href = 'screener.html';
-}
-
 // ---- Reading a report. Reports are written from web pages, so raw HTML in them is shown as text and only
 // ordinary web links are kept.
 marked.use({ renderer: { html: t => esc(typeof t === 'string' ? t : t.text) } });
@@ -363,8 +350,7 @@ async function drawReport() {
   const title = (doc.text.match(/^#\s+(.+)$/m) || [])[1] || topic.title || path;
   const date = (doc.text.match(/Report date[:：]\s*([0-9-]+)/i) || [])[1] || '';
   const tk = topic.tickers || [];
-  m.innerHTML = `<div class="rd"><div class="back"><button class="b quiet" id="back"><i class="ph ph-arrow-left"></i>${esc(TH.name)}</button>
-      ${tk.length ? `<button class="b" id="screenOne"><i class="ph ph-funnel"></i>Screen ${tk.length} companies</button>` : ''}</div>
+  m.innerHTML = `<div class="rd"><div class="back"><button class="b quiet" id="back"><i class="ph ph-arrow-left"></i>${esc(TH.name)}</button></div>
     <div class="head"><div class="eyebrow">${topic.label || topic.kind ? `<span>${esc(topic.label || topic.kind)}</span>` : ''}${date ? `<span>${esc(date)}</span>` : ''}</div><h1>${esc(title.replace(/\*\*/g, ''))}</h1>
       ${tk.length ? `<div class="tickers">${tk.slice(0, 40).map(t => `<button class="tk" data-open="${esc(t)}" title="Open ${esc(t)} in Companies">${esc(t)}</button>`).join('')}</div>` : ''}</div>
     <div class="rdg"><article class="md" id="md"></article><nav id="toc" aria-label="Sections"></nav></div></div>`;
@@ -374,10 +360,9 @@ async function drawReport() {
   md.querySelectorAll('table').forEach(t => { const w = document.createElement('div'); w.className = 'tw'; t.parentNode.insertBefore(w, t); w.appendChild(t); });
   md.querySelectorAll('a').forEach(a => { const href = a.getAttribute('href') || ''; if (/^https?:\/\//i.test(href)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; } else if (!href.startsWith('#')) a.removeAttribute('href'); });
   md.querySelectorAll('img').forEach(i => i.remove());
-  if (window.enhanceMarkdown) window.enhanceMarkdown(md);   // Mermaid diagrams and charts
+  if (window.enhanceMarkdown) window.enhanceMarkdown(md, { auto: true, diagrams: '/api/reports/diagram' });   // Mermaid diagrams and charts, and charts drawn from the tables
   $('back').onclick = () => { V.report = null; keep(); loadTheme(); };
   m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => tell({ type: 'open', symbol: b.dataset.open }));
-  const so = $('screenOne'); if (so) so.onclick = () => screen(tk, title.replace(/\*\*/g, ''));
   m.querySelectorAll('#toc a').forEach(a => a.onclick = e => { e.preventDefault(); const h = document.getElementById(a.getAttribute('href').slice(1)); if (h) h.scrollIntoView({ behavior: 'smooth' }); });
   m.scrollTop = 0; tocMark();
 }

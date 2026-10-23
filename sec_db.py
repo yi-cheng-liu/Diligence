@@ -14,7 +14,7 @@ Usage:
     python sec_db.py list                  # companies already in the database
     python sec_db.py search "supply chain" # full-text search of stored reports
     python sec_db.py export MSFT           # write MSFT.json for a website
-    python sec_db.py serve                 # Stock Research Desk + JSON API on http://localhost:8765
+    python sec_db.py serve                 # Diligence desk + JSON API on http://localhost:8765
 
 Only the Python standard library is used; nothing to install.
 """
@@ -22,6 +22,7 @@ Only the Python standard library is used; nothing to install.
 import argparse
 import codecs
 import concurrent.futures
+import errno
 import gzip
 import hashlib
 import html
@@ -33,6 +34,7 @@ import shutil
 import signal
 import socket
 import sqlite3
+import statistics
 import struct
 import subprocess
 import sys
@@ -42,17 +44,18 @@ import urllib.error
 import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, quote, unquote, urlparse
-from zoneinfo import ZoneInfo
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("SEC_DB_PATH", os.path.join(HERE, "sec.db"))
 SETTINGS_PATH = os.path.join(HERE, "settings.json")
 DESK_DIR = os.path.join(HERE, "desk")
-DESK_PAGE = "Stock Research Desk v2.dc.html"
+DESK_PAGE = "diligence.dc.html"
+OLD_DESK_PAGES = ("Stock Research Desk v2.dc.html",)   # earlier names of the page, sent on to the new one
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
@@ -160,17 +163,23 @@ FLOW_METRICS = {
     # companies that report the two halves separately (Alphabet, Amazon, Microsoft); added together when read back
     "selling_marketing": ["SellingAndMarketingExpense", "MarketingExpense"],
     "general_admin": ["GeneralAndAdministrativeExpense"],
-    "operating_income": ["OperatingIncomeLoss"],
-    "interest_expense": ["InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt"],
+    "operating_income": ["OperatingIncomeLoss", "rendered:OperatingIncome"],
+    # for companies with no operating income line: operating income is worked out from these (see _desk_row)
+    "operating_expenses": ["OperatingExpenses"],
+    "costs_and_expenses": ["CostsAndExpenses", "rendered:CostsAndExpenses"],
+    "sales": ["rendered:Sales"],
+    "interest_expense": ["InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt", "InterestExpenseOperating"],
     "nonoperating_income": ["NonoperatingIncomeExpense"],   # everything between operating and pre-tax income
     "pretax_income": [
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"],
     "income_tax": ["IncomeTaxExpenseBenefit"],
     "net_income": ["NetIncomeLoss", "ProfitLoss"],
-    "eps_basic": ["EarningsPerShareBasic"],
-    "eps_diluted": ["EarningsPerShareDiluted"],
-    "shares_diluted": ["WeightedAverageNumberOfDilutedSharesOutstanding"],
+    # after preferred dividends: what belongs to common shareholders, the basis of EPS and P/E (Boeing, AT&T)
+    "net_income_common": ["NetIncomeLossAvailableToCommonStockholdersDiluted", "NetIncomeLossAvailableToCommonStockholdersBasic"],
+    "eps_basic": ["EarningsPerShareBasic", "EarningsPerShareBasicAndDiluted"],
+    "eps_diluted": ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted", "rendered:EPS"],
+    "shares_diluted": ["WeightedAverageNumberOfDilutedSharesOutstanding", "rendered:Shares"],
     # Some companies (Alphabet, Microsoft, Tesla) put a line of their own on the cash flow statement and tag
     # only plain depreciation in the standard vocabulary, so that is the last resort: it leaves out the
     # amortization of intangibles, which is usually the smaller part.
@@ -183,7 +192,9 @@ FLOW_METRICS = {
     "stock_compensation": ["ShareBasedCompensation"],
     "operating_cash_flow": ["NetCashProvidedByUsedInOperatingActivities",
                             "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"],
-    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
+    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets",
+              "PaymentsToAcquireOtherPropertyPlantAndEquipment", "PaymentsToAcquireOilAndGasPropertyAndEquipment",
+              "PaymentsToAcquireOtherProductiveAssets", "rendered:Capex"],
     "dividends_paid": ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],
     "buybacks": ["PaymentsForRepurchaseOfCommonStock"],
     "eps_basic_shares": ["WeightedAverageNumberOfSharesOutstandingBasic"],
@@ -196,9 +207,11 @@ FLOW_METRICS = {
                     "ProceedsFromIssuanceOfSeniorLongTermDebt"],
     "debt_repaid": ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt", "RepaymentsOfSeniorDebt"],
 }
-METRICS_VERSION = "13"   # raise when the lists of metrics change, so stored companies are rebuilt
+METRICS_VERSION = "18"   # raise when the lists of metrics change, so stored companies are rebuilt
 # Per-share and share-count figures can't be added up across quarters.
 NON_ADDITIVE = {"eps_basic", "eps_diluted", "shares_diluted", "eps_basic_shares"}
+SHARE_COUNTS = {"shares_diluted", "eps_basic_shares", "shares_outstanding"}
+PER_SHARE = {"eps_basic", "eps_diluted"}
 INSTANT_METRICS = {
     "cash": ["CashAndCashEquivalentsAtCarryingValue",
              "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],
@@ -219,6 +232,16 @@ INSTANT_METRICS = {
     "current_liabilities": ["LiabilitiesCurrent"],
     "short_term_debt": ["LongTermDebtCurrent", "DebtCurrent", "ShortTermBorrowings", "CommercialPaper"],
     "long_term_debt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
+    # loans to customers (Deere's and Caterpillar's finance arms): when large, interest is a cost of that business
+    "finance_receivables": ["rendered:FinanceReceivables"],
+    "finance_leases": ["FinanceLeaseLiability"],
+    "finance_leases_current": ["FinanceLeaseLiabilityCurrent"],
+    "finance_leases_noncurrent": ["FinanceLeaseLiabilityNoncurrent"],
+    "preferred_equity": ["PreferredStockValue", "PreferredStockValueOutstanding", "PreferredStockIncludingAdditionalPaidInCapital"],
+    "trust_shares": ["CommonStockSharesHeldInEmployeeTrustShares"],
+    # short_term_debt, long_term_debt, total_debt and short_term_investments are then worked out again from every
+    # debt and investment line the company reports (see debt_from_tags and the presented balance sheet)
+    "total_debt": [],
     "total_liabilities": ["Liabilities"],
     "equity": ["StockholdersEquity",
                "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
@@ -247,6 +270,345 @@ INSTANT_METRICS = {
     "deferred_revenue_noncurrent": ["ContractWithCustomerLiabilityNoncurrent", "DeferredRevenueNoncurrent"],
 }
 METRICS = list(FLOW_METRICS) + list(INSTANT_METRICS)
+
+# Companies that report under IFRS (TSMC, Nokia) use the ifrs-full vocabulary instead.
+IFRS_FLOW = {
+    "revenue": ["Revenue", "RevenueFromContractsWithCustomers"],
+    "cost_of_revenue": ["CostOfSales"],
+    "gross_profit": ["GrossProfit"],
+    "research_development": ["ResearchAndDevelopmentExpense"],
+    "sga": ["SellingGeneralAndAdministrativeExpense"],
+    "selling_marketing": ["SellingExpense", "DistributionCosts"],
+    "general_admin": ["AdministrativeExpense", "GeneralAndAdministrativeExpense"],
+    "operating_income": ["ProfitLossFromOperatingActivities"],
+    "interest_expense": ["FinanceCosts", "InterestExpense"],
+    "pretax_income": ["ProfitLossBeforeTax"],
+    "income_tax": ["IncomeTaxExpenseContinuingOperations"],
+    "net_income": ["ProfitLossAttributableToOwnersOfParent", "ProfitLoss"],
+    "eps_basic": ["BasicEarningsLossPerShare", "BasicEarningsLossPerShareFromContinuingOperations"],
+    "eps_diluted": ["DilutedEarningsLossPerShare", "DilutedEarningsLossPerShareFromContinuingOperations", "rendered:EPS"],
+    "shares_diluted": ["AdjustedWeightedAverageShares", "rendered:Shares"],
+    "eps_basic_shares": ["WeightedAverageShares"],
+    "depreciation_amortization": ["DepreciationAndAmortisationExpense",
+                                  "AdjustmentsForDepreciationAndAmortisationExpense",
+                                  "DepreciationAmortisationAndImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss"],
+    "stock_compensation": ["AdjustmentsForSharebasedPayments"],
+    "operating_cash_flow": ["CashFlowsFromUsedInOperatingActivities"],
+    "capex": ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities", "PurchaseOfPropertyPlantAndEquipment",
+              "PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssets",
+              "rendered:Capex"],
+    "dividends_paid": ["DividendsPaidClassifiedAsFinancingActivities", "DividendsPaid"],
+    "buybacks": ["PaymentsToAcquireOrRedeemEntitysShares"],
+    "investing_cash_flow": ["CashFlowsFromUsedInInvestingActivities"],
+    "financing_cash_flow": ["CashFlowsFromUsedInFinancingActivities"],
+    "acquisitions": ["CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"],
+    "debt_issued": ["ProceedsFromBorrowingsClassifiedAsFinancingActivities", "ProceedsFromIssueOfBondsNotesAndDebentures"],
+    "debt_repaid": ["RepaymentsOfBorrowingsClassifiedAsFinancingActivities", "RepaymentsOfBondsNotesAndDebentures"],
+}
+IFRS_INSTANT = {
+    "cash": ["CashAndCashEquivalents"],
+    "receivables": ["TradeAndOtherCurrentReceivables", "CurrentTradeReceivables"],
+    "inventory": ["Inventories"],
+    "current_assets": ["CurrentAssets"],
+    "total_assets": ["Assets"],
+    "current_liabilities": ["CurrentLiabilities"],
+    "total_liabilities": ["Liabilities"],
+    "equity": ["EquityAttributableToOwnersOfParent", "Equity"],
+    "ppe": ["PropertyPlantAndEquipment"],
+    "goodwill": ["Goodwill"],
+    "intangibles": ["IntangibleAssetsOtherThanGoodwill"],
+    "long_term_investments": ["NoncurrentFinancialAssets", "InvestmentsAccountedForUsingEquityMethod"],
+    "accounts_payable": ["TradeAndOtherCurrentPayablesToTradeSuppliers", "TradeAndOtherCurrentPayables"],
+    "retained_earnings": ["RetainedEarnings"],
+    "minority_interest": ["NoncontrollingInterests"],
+    "lease_assets": ["RightofuseAssets"],
+    "lease_liabilities": ["NoncurrentLeaseLiabilities"],
+    "lease_liabilities_current": ["CurrentLeaseLiabilities"],
+    "deferred_tax_assets": ["DeferredTaxAssets"],
+    "deferred_tax_liabilities": ["DeferredTaxLiabilities"],
+    "shares_outstanding": ["NumberOfSharesOutstanding"],
+    "short_term_debt": [], "long_term_debt": [], "total_debt": [], "short_term_investments": [],
+}
+
+# Debt is added up from every tag that carries part of it. Tags in one family are different views of the same
+# amount (the largest is taken); the families are added together, so nothing is counted twice.
+DEBT_FAMILIES = {
+    "us": {
+        "borrowings": (["ShortTermBorrowings"], ["CommercialPaper", "OtherShortTermBorrowings", "ShortTermBankLoansAndNotesPayable",
+                                                 "LinesOfCreditCurrent", "BankLoans"]),
+        "current": (["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent"],
+                    ["ConvertibleNotesPayableCurrent", "ConvertibleDebtCurrent", "SeniorNotesCurrent", "NotesPayableCurrent",
+                     "LoansPayableCurrent", "SecuredDebtCurrent", "UnsecuredDebtCurrent", "OtherLongTermDebtCurrent"]),
+        "noncurrent": (["LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"],
+                       ["ConvertibleDebtNoncurrent", "ConvertibleLongTermNotesPayable", "SeniorLongTermNotes", "SeniorNotesNoncurrent",
+                        "LongTermNotesPayable", "UnsecuredLongTermDebt", "SecuredLongTermDebt", "LongTermLineOfCredit",
+                        "LongTermLoansPayable", "OtherLongTermDebtNoncurrent", "LongTermFederalHomeLoanBankAdvancesNoncurrent"]),
+        # totals of long-term debt with its current part
+        "long_all": (["LongTermDebt", "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities"],
+                     ["NotesPayable", "LoansPayable", "SecuredDebt", "UnsecuredDebt", "SeniorNotes", "ConvertibleNotesPayable",
+                      "OtherLongTermDebt"]),
+        "current_all": (["DebtCurrent"], []),
+        "everything": (["DebtLongtermAndShorttermCombinedAmount", "DebtAndCapitalLeaseObligations"], []),
+    },
+    "ifrs": {
+        "borrowings": (["ShorttermBorrowings"], []),
+        "current": (["CurrentPortionOfLongtermBorrowings"], ["CurrentPortionOfNoncurrentBondsIssued", "CurrentPortionOfNoncurrentLoansReceived",
+                                                             "CurrentBankLoansReceived", "CurrentLoansReceived"]),
+        "noncurrent": (["LongtermBorrowings", "NoncurrentPortionOfNoncurrentBorrowings"],
+                       ["NoncurrentPortionOfNoncurrentBondsIssued", "NoncurrentPortionOfNoncurrentLoansReceived", "NoncurrentLoansReceived"]),
+        "long_all": ([], []),
+        "current_all": (["CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings", "CurrentBorrowings"], []),
+        "everything": (["Borrowings"], []),
+    },
+}
+STI_FAMILIES = {
+    "us": (["ShortTermInvestments", "MarketableSecuritiesCurrent", "AvailableForSaleSecuritiesCurrent", "OtherShortTermInvestments"],
+           [["AvailableForSaleSecuritiesDebtSecuritiesCurrent", "DebtSecuritiesAvailableForSaleExcludingAccruedInterestCurrent",
+             "DebtSecuritiesCurrent"], ["HeldToMaturitySecuritiesCurrent"], ["EquitySecuritiesFvNiCurrent"], ["TradingSecuritiesCurrent"]]),
+    "ifrs": (["CurrentInvestments", "ShorttermInvestments"],
+             [["CurrentFinancialAssetsAtFairValueThroughProfitOrLoss"], ["CurrentFinancialAssetsAtFairValueThroughOtherComprehensiveIncome"],
+              ["CurrentFinancialAssetsAtAmortisedCost"], ["ShorttermDepositsNotClassifiedAsCashEquivalents"]]),
+}
+FAMILY_TAGS = {"FinanceLeaseLiability", "FinanceLeaseLiabilityCurrent", "FinanceLeaseLiabilityNoncurrent"} | \
+    {c for fam in DEBT_FAMILIES.values() for whole, parts in fam.values() for c in whole + parts} | \
+    {c for whole, groups in STI_FAMILIES.values() for c in whole + [x for g in groups for x in g]}
+
+
+def debt_from_tags(v, gaap="us"):
+    """(short-term, long-term, total) debt from every debt tag reported for one date, or None."""
+    fam = DEBT_FAMILIES[gaap]
+    def part(name):
+        whole, parts = fam[name]
+        got = [v[c] for c in whole if v.get(c) is not None] + [sum(v[c] for c in parts if v.get(c) is not None)]
+        return max(got) if any(c in v for c in whole + parts) else None
+    b, cur, nc, la, ca, ev = (part(k) for k in ("borrowings", "current", "noncurrent", "long_all", "current_all", "everything"))
+    if all(x is None for x in (b, cur, nc, la, ca, ev)):
+        return None
+    z = lambda x: x or 0
+    short = max(z(b) + z(cur), z(ca))
+    total = max(short + z(nc), z(b) + max(z(la), z(cur) + z(nc)), z(ev))
+    return short, max(total - short, 0), total
+
+
+def sti_from_tags(v, gaap="us"):
+    whole, groups = STI_FAMILIES[gaap]
+    got = [v[c] for c in whole if v.get(c) is not None]
+    parts = [max(v[c] for c in g if v.get(c) is not None) for g in groups if any(v.get(c) is not None for c in g)]
+    if parts:
+        got.append(sum(parts))
+    return max(got) if got else None
+
+
+# ---- Lines of the presented statements that the tags alone miss ----
+_DEBT_LINE = re.compile(r"Debt|Borrowing|NotesPayable|CommercialPaper|LoansPayable|SeniorNotes|ConvertibleNotes|LineOfCredit|"
+                        r"Bonds|Debentures|FederalHomeLoanBankAdvances|\b(debt|borrowings?|notes payable|commercial paper|loans payable|"
+                        r"senior notes|convertible (senior )?notes|term loans?|credit facilit\w*|line of credit|debentures|bonds)\b", re.I)
+_NOT_DEBT = re.compile(r"Interest|Accrued|Securities|Repurchase|Deposit|Trading|FairValue|Receivable|Investment|Unamortized|Discount|"
+                       r"IssuanceCost|Guarantee|Derivative|Asset|Beneficial|Collateral|"
+                       r"\b(interest|accrued|securities|repurchase|deposits?|trading|receivables?|investments?|guarantee|beneficial)\b", re.I)
+_LEASE_ONLY = re.compile(r"Lease|\bleases?\b", re.I)   # a lease line is left out unless it is debt and leases together
+_CURRENT_LINE = re.compile(r"Current|ShortTerm|CommercialPaper|\b(current|short-term|commercial paper|due within one year)\b", re.I)
+_STI_LINE = re.compile(r"ShortTermInvestments|MarketableSecuritiesCurrent|DebtSecurities\w*Current|AvailableForSale\w*Current|"
+                       r"CurrentFinancialAssetsAt\w+|ShorttermDepositsNotClassifiedAsCashEquivalents|CurrentInvestments|"
+                       r"HeldToMaturitySecuritiesCurrent|TradingSecuritiesCurrent|EquitySecuritiesFvNiCurrent|TreasuryBills|"
+                       r"\b(short-term investments?|marketable securities|treasury bills|time deposits)\b", re.I)
+_CAPEX_LINE = re.compile(r"PaymentsToAcquire(PropertyPlantAndEquipment|ProductiveAssets|OtherPropertyPlantAndEquipment|OilAndGasProperty)|"
+                         r"CapitalExpenditure|\b(capital expenditures?|additions to (property|plant|utility plant)|purchases? of (property|plant|premises)|"
+                         r"independent power and other investments|nuclear fuel purchases|expenditures for equipment leased to others|"
+                         r"cost of equipment on operating leases acquired)\b", re.I)
+_TOTAL_REVENUE = re.compile(r"^(Revenues|RevenuesNetOfInterestExpense|RegulatedAndUnregulatedOperatingRevenue|Revenue)$")
+_ANCHORS = {"bs": {"Assets", "LiabilitiesAndStockholdersEquity"}, "is": {"NetIncomeLoss", "ProfitLoss"},
+            "cf": {"NetCashProvidedByUsedInOperatingActivities", "CashFlowsFromUsedInOperatingActivities"}}
+
+
+def ticker_class(ticker):
+    """The share class a ticker trades: BRK-B -> B, GOOGL -> None (its class is not in the symbol)."""
+    m = re.search(r"[-./]([A-Z])$", ticker or "")
+    return m.group(1) if m else None
+
+
+def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
+    """What the presented statements add, as extra facts: {"flows": {concept: {(start, end): row}}, "instants":
+    {concept: {end: row}}, "class_ratio": number}. Synthetic concepts are named rendered:...; filings missing from the
+    SEC's company facts (NEE's newest 10-Qs) are filled in with their own tags."""
+    flows, instants = {}, {}
+    lines = db.execute("SELECT * FROM statement_lines WHERE cik=? AND kind IN ('bs','is','cf') ORDER BY filed, accession, kind, seq",
+                       (cik,)).fetchall()
+    if not lines:
+        return {"flows": flows, "instants": instants, "class_ratio": None}
+    by = {}
+    for r in lines:
+        by.setdefault((r["accession"], r["kind"]), []).append(r)
+    cls = ticker_class(ticker)
+    class_eps = {}   # class letter -> [EPS values], to learn how many of one class equal one of another (BRK: 1,500)
+
+    def add(store, concept, key, value, r, start=None):
+        row = {"concept": concept, "value": value, "accession": r["accession"], "filed": r["filed"], "form": r["form"],
+               "period_start": start, "period_end": key if start is None else key[1]}
+        cur = store.setdefault(concept, {}).get(key)
+        if cur is None or row["filed"] >= cur["filed"]:
+            store[concept][key] = row
+
+    for (accn, kind), rows in by.items():
+        blocks = {}
+        for r in rows:
+            blocks.setdefault(r["block"], []).append(r)
+        main = next((b for b, rs in blocks.items() if any(x["concept"] in _ANCHORS[kind] for x in rs)), "")
+        # Other sections with their own totals are either parts of the whole (Berkshire's insurance and railroad
+        # businesses, whose totals add up to the company's) or a second registrant in the same filing (NEE's Florida
+        # Power & Light, which is only part of it): the parts count, a second registrant is left out.
+        anchored = {b for b, rs in blocks.items() if b != main and any(x["concept"] in _ANCHORS[kind] for x in rs)}
+        part_anchor = next((c for c in sorted(_ANCHORS[kind]) if anchored and all(any(x["concept"] == c for x in blocks[b]) for b in anchored)), None)
+        def anchor_total(bs_, end):
+            return sum(x["value"] for b in bs_ for x in blocks[b] if x["concept"] == part_anchor and x["period_end"] == end and x["value"])
+        main_ends = {x["period_end"] for x in blocks.get(main, []) if x["concept"] == part_anchor}
+        parts = anchored if part_anchor and main_ends and all(
+            abs(anchor_total(anchored, e) - anchor_total([main], e)) <= 0.01 * abs(anchor_total([main], e) or 1) for e in main_ends) else set()
+        other_entities = anchored - parts
+        in_parts = {x["concept"] for b in parts for x in blocks[b]}
+        # the whole's own lines that the parts also show are counted once, in the parts
+        mine = [r for r in rows if r["block"] not in other_entities and not (parts and r["block"] == main and r["concept"] in in_parts
+                                                                              and r["concept"] not in _ANCHORS[kind])]
+        periods = {}
+        for r in mine:
+            periods.setdefault((r["period_start"], r["period_end"]), []).append(r)
+        for (ps, pe), rs in periods.items():
+            key = pe if ps is None else (ps, pe)
+            store = instants if ps is None else flows
+            if kind == "bs":
+                # each section's lines after its own total assets are liabilities and equity
+                assets_at = {}
+                for x in rs:
+                    if x["concept"] in ("Assets",):
+                        assets_at.setdefault(x["block"], x["seq"])
+                after_assets = lambda x: x["seq"] > assets_at.get(x["block"], assets_at.get(main, 10 ** 9))
+                cur_at = {}
+                for x in rs:
+                    if x["concept"] in ("AssetsCurrent", "CurrentAssets"):
+                        cur_at.setdefault(x["block"], x["seq"])
+                text = lambda x: x["concept"] + " " + x["label"]
+                debts = [x for x in rs if after_assets(x) and _DEBT_LINE.search(text(x)) and not _NOT_DEBT.search(text(x))
+                         and not (_LEASE_ONLY.search(text(x)) and not re.search(r"Debt|Borrowing|\bdebt\b|borrowings?", text(x), re.I))]
+                if rs:   # a balance sheet was read for this date: investments come from its lines only
+                    add(instants, "rendered:BalanceSheet", key, 1, rs[0])
+                # the consolidated lines, plus business-section lines for kinds of debt the consolidated ones do not show
+                # (Caterpillar shows short-term borrowings for the whole and long-term debt only by business line;
+                # Berkshire shows all of it by business line)
+                whole = {x["concept"] for x in debts if x["block"] == main}
+                debts = [x for x in debts if x["block"] == main or x["concept"] not in whole]
+                if debts:
+                    vals = [x["value"] for x in debts]
+                    # a line that is the sum of the others is their total: count the total alone
+                    tot = next((x for x in debts if len(debts) > 2 and abs(2 * x["value"] - sum(vals)) <= 0.005 * abs(sum(vals))), None)
+                    use = [tot] if tot else debts
+                    short = sum(x["value"] for x in use if _CURRENT_LINE.search(x["concept"] + " " + x["label"]))
+                    total = sum(x["value"] for x in use)
+                    add(instants, "rendered:TotalDebt", key, total, use[0])
+                    if any(_LEASE_ONLY.search(text(x)) for x in use):
+                        add(instants, "rendered:DebtHasLeases", key, 1, use[0])
+                    add(instants, "rendered:ShortDebt", key, short, use[0])
+                fin = [x for x in rs if x["value"] and
+                       re.search(r"FinancingReceivable|NotesAndLoansReceivable|\bfinanc\w* receivables?\b|receivables?\s*[–-]\s*financ", x["concept"] + " " + x["label"], re.I)
+                       and not re.search(r"Allowance|allowance", x["concept"] + " " + x["label"])]
+                if fin:
+                    add(instants, "rendered:FinanceReceivables", key, sum(x["value"] for x in fin), fin[0])
+                stis = [x for x in rs if _STI_LINE.search(x["concept"] + " " + x["label"]) and not re.search(r"Noncurrent|LongTerm|long-term|non-current", x["concept"] + " " + x["label"], re.I)
+                        and not re.match(r"total\b", x["label"], re.I) and not re.search(r"^Cash|CashAndCashEquivalents|cash", x["concept"] + " " + x["label"])
+                        and not after_assets(x) and x["seq"] < cur_at.get(x["block"], cur_at.get(main, 10 ** 9))]
+                # equity securities count only above a current-assets subtotal (NVIDIA's marketable equity securities);
+                # on an unclassified balance sheet (Berkshire's) they are long-term holdings
+                stis += [x for x in rs if re.search(r"EquitySecuritiesFvNi$|\bmarketable equity securities\b", x["concept"] + " " + x["label"], re.I)
+                         and x["block"] in cur_at and x["seq"] < cur_at[x["block"]] and x not in stis]
+                whole = {x["concept"] for x in stis if x["block"] == main}
+                stis = [x for x in stis if x["block"] == main or x["concept"] not in whole]
+                if stis:
+                    add(instants, "rendered:ShortTermInvestments", key, sum(x["value"] for x in stis), stis[0])
+            elif kind == "cf":
+                caps = [x for x in rs if _CAPEX_LINE.search(x["concept"] + " " + x["label"]) and x["value"] is not None
+                        and not re.search(r"Proceeds|sale|disposal|incurred|accrued|unpaid", x["concept"] + " " + x["label"], re.I)]
+                if caps:
+                    add(flows, "rendered:Capex", key, abs(sum(x["value"] for x in caps)), caps[0], ps)
+            else:
+                totals = [x for x in rs if x["block"] == main and (_TOTAL_REVENUE.match(x["concept"]) or
+                          re.match(r"total (net )?(revenues?|sales|revenues and other income|operating revenues?)$", x["label"], re.I))]
+                if totals:
+                    add(flows, "rendered:Revenues", key, max(x["value"] for x in totals), totals[0], ps)
+                is_sales = lambda t: re.match(r"(net )?sales( and other operating revenues?)?$|sales and other operating revenue", t, re.I)
+                # a sales line, or a revenue line inside a section named for sales (ExxonMobil's "Sales and other operating revenue")
+                sales = [x for x in rs if (x["block"] == main and is_sales(x["label"]))
+                         or (is_sales(re.sub(r"\s*\[Member\]$", "", x["block"])) and re.match(r"Revenues?$|RevenueFromContract", x["concept"]))]
+                if sales:
+                    add(flows, "rendered:Sales", key, sales[0]["value"], sales[0], ps)
+                    # income from equity affiliates shown as revenue: it is a share of others' profit, not sales
+                    if any(re.match(r"Revenues?$", x["concept"]) and re.search(r"equity (affiliates|method)|equity in (net )?(earnings|income)", x["block"], re.I) for x in rs):
+                        add(flows, "rendered:OperatingRevenue", key, sales[0]["value"], sales[0], ps)
+                costs = [x for x in rs if x["block"] == main and (x["concept"] == "CostsAndExpenses" or re.match(r"total costs and (other deductions|expenses)", x["label"], re.I))]
+                if costs:
+                    add(flows, "rendered:CostsAndExpenses", key, costs[0]["value"], costs[0], ps)
+                ops = [x for x in rs if x["block"] == main and x["prefix"] not in ("us-gaap", "ifrs-full")
+                       and re.match(r"(total )?(operating income|income from operations|operating profit)( \(loss\))?$", x["label"], re.I)]
+                if ops:
+                    add(flows, "rendered:OperatingIncome", key, ops[0]["value"], ops[0], ps)
+                # earnings per share and the share count of the ticker's own class (Berkshire's Class B)
+                eps = [x for x in rs if x["unit"].endswith("/shares") and re.search(r"EarningsPerShare|per (average )?(equivalent )?share", x["concept"] + " " + x["label"], re.I)]
+                shs = [x for x in rs if x["unit"] == "shares" and re.search(r"WeightedAverage|average", x["concept"] + " " + x["label"], re.I)]
+                for x in eps:
+                    m = re.search(r"Class ([A-Z])\b", x["block"])
+                    if m:
+                        class_eps.setdefault(m.group(1), []).append(x["value"])
+                pick = lambda xs: ([x for x in xs if cls and re.search(rf"Class {cls}\b", x["block"])] or
+                                   [x for x in xs if not re.search(r"Class [A-Z]\b", x["block"])] or xs[:1])
+                e = pick(sorted(eps, key=lambda x: "Diluted" not in x["concept"] and "dilution" not in x["label"].lower()))
+                if e:
+                    add(flows, "rendered:EPS", key, e[0]["value"], e[0], ps)
+                sh = pick(sorted(shs, key=lambda x: "Diluted" not in x["concept"] and "dilut" not in x["label"].lower()))
+                if sh:
+                    add(flows, "rendered:Shares", key, sh[0]["value"], sh[0], ps)
+            # a filing the SEC's company facts leave out: its lines under their own tags, where a tag is used once
+            if accn not in have_accessions:
+                seen = {}
+                for x in rs:
+                    if x["block"] == main and x["prefix"] in ("us-gaap", "ifrs-full"):
+                        seen.setdefault(x["concept"], []).append(x)
+                for concept, xs in seen.items():
+                    if len(xs) == 1:
+                        add(store, concept, key, xs[0]["value"], xs[0], ps)
+    ratio = None
+    if cls and cls in class_eps and len(class_eps) > 1:
+        mine_v = statistics.median(class_eps[cls])
+        other = [statistics.median(v) for k, v in class_eps.items() if k != cls]
+        if mine_v and other and other[0]:
+            ratio = max(other[0] / mine_v, mine_v / other[0])
+    return {"flows": flows, "instants": instants, "class_ratio": ratio}
+
+
+def split_events(db, cik):
+    """Stock splits, seen where a later filing restates the same period's share count by a whole ratio:
+    [(the first filing on the new basis, ratio)]. NVIDIA: 4 for 1 in 2021, 10 for 1 in 2024."""
+    obs = {}
+    for r in db.execute("SELECT concept, period_start, period_end, value, filed FROM facts WHERE cik=? AND concept IN "
+                        "('WeightedAverageNumberOfDilutedSharesOutstanding','WeightedAverageNumberOfSharesOutstandingBasic',"
+                        "'AdjustedWeightedAverageShares','WeightedAverageShares') AND value > 0 ORDER BY filed", (cik,)):
+        obs.setdefault((r["concept"], r["period_start"], r["period_end"]), []).append((r["filed"], r["value"]))
+    seen = []
+    for vals in obs.values():
+        for (f1, v1), (f2, v2) in zip(vals, vals[1:]):
+            if f2 <= f1:
+                continue
+            r = v2 / v1
+            for k in (2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 100, 1.5, 2.5):
+                for ratio in (k, 1 / k):
+                    if abs(r / ratio - 1) < 0.015:
+                        seen.append((f1, f2, ratio))
+    events = []
+    for f1, f2, ratio in sorted(seen, key=lambda x: x[1]):
+        same = next((e for e in events if abs(e[1] / ratio - 1) < 0.015 and e[2] <= f2 and f1 < e[0]), None)
+        if same:   # the same split seen in another period: its new basis starts at the earliest such filing
+            same[0] = min(same[0], f2)
+            same[2] = max(same[2], f1)
+        else:
+            events.append([f2, ratio, f1])
+    return [(e[0], e[1]) for e in events]
 # Registration statements count too: a newly listed company's full-year figures are only in its S-1 until its first 10-K.
 ANNUAL_FORMS = ("10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A", "10-KT", "10-KT/A",
                 "S-1", "S-1/A", "F-1", "F-1/A", "424B4", "424B1", "10-12B", "10-12B/A", "S-4", "S-4/A")
@@ -264,7 +626,7 @@ CREATE TABLE IF NOT EXISTS companies (
     sic TEXT, industry TEXT, entity_type TEXT, category TEXT,
     fiscal_year_end TEXT, state_of_incorporation TEXT,
     website TEXT, phone TEXT, business_address TEXT, description TEXT,
-    fetched_at TEXT
+    fetched_at TEXT, country TEXT
 );
 
 CREATE TABLE IF NOT EXISTS filings (
@@ -356,6 +718,19 @@ CREATE TABLE IF NOT EXISTS debt_split (      -- debt reported only per business 
     PRIMARY KEY (cik, accession, axis, member, concept, period_end)
 );
 CREATE TABLE IF NOT EXISTS debt_split_read (cik INTEGER, accession TEXT, PRIMARY KEY (cik, accession));
+-- The statements as each filing presents them (the SEC's rendered R pages): every line with its tag, label and the
+-- section it sits in. They fill what the SEC's company facts lack: lines under a company's own tags, figures split by
+-- business line or share class, and filings the company facts leave out. kind: bs, is, cf or cover.
+CREATE TABLE IF NOT EXISTS statement_lines (
+    cik INTEGER, accession TEXT, form TEXT, filed TEXT, kind TEXT, seq INTEGER, block TEXT,
+    prefix TEXT, concept TEXT, label TEXT, unit TEXT, period_start TEXT, period_end TEXT, value REAL,
+    PRIMARY KEY (cik, accession, kind, seq, period_start, period_end)
+);
+CREATE TABLE IF NOT EXISTS statement_read (cik INTEGER, accession TEXT, PRIMARY KEY (cik, accession));
+CREATE TABLE IF NOT EXISTS statement_pages (    -- the pages themselves, compressed, so they can be read again
+    cik INTEGER, accession TEXT, form TEXT, filed TEXT, kind TEXT, doc TEXT, body BLOB,
+    PRIMARY KEY (cik, accession, kind)
+);
 CREATE TABLE IF NOT EXISTS segment_filings_read (
     cik INTEGER, accession TEXT, PRIMARY KEY (cik, accession)
 );
@@ -372,9 +747,6 @@ CREATE TABLE IF NOT EXISTS holders_5pct_read (
 CREATE TABLE IF NOT EXISTS macro_cache (        -- the Macro page's data series and lookups, kept a few hours
     key TEXT PRIMARY KEY, fetched_at REAL, data TEXT
 );
-CREATE TABLE IF NOT EXISTS screen_financials (   -- the screener's figures from moomoo's income statements, kept a day
-    symbol TEXT PRIMARY KEY, fetched_at REAL, data TEXT
-);
 """
 
 SECTION_TITLES_10K = {
@@ -388,6 +760,11 @@ SECTION_TITLES_10K = {
 def connect():
     db = sqlite3.connect(DB_PATH, timeout=60)
     db.row_factory = sqlite3.Row
+    # WAL: the page keeps reading while a download writes, instead of waiting on a locked file
+    db.execute("PRAGMA journal_mode=WAL")
+    cols = [r[1] for r in db.execute("PRAGMA table_info(companies)")]
+    if cols and "country" not in cols:
+        db.execute("ALTER TABLE companies ADD COLUMN country TEXT")
     cols = [r[1] for r in db.execute("PRAGMA table_info(metrics)")]
     migrate = bool(cols) and "fiscal_quarter" not in cols
     if migrate:  # metrics are derived data: rebuild them in the new layout
@@ -466,16 +843,16 @@ def resolve(db, client, ticker_or_cik):
     q = ticker_or_cik.strip().upper()
     if q.isdigit():
         return int(q), None
-    # Accept BRK.B / BRK-B style
-    for candidate in (q, q.replace(".", "-"), q.replace("-", ".")):
-        row = db.execute("SELECT cik, ticker FROM tickers WHERE ticker=?", (candidate,)).fetchone()
-        if row:
-            return row["cik"], row["ticker"]
-    if client is not None:
+    # Accept BRK.B / BRK-B / BRK/B style: the SEC writes BRK-B
+    spellings = list(dict.fromkeys((q, q.replace(".", "-"), q.replace("-", "."), q.replace("/", "-"), q.replace("/", "."))))
+    find = lambda: next((row for c in spellings
+                         for row in [db.execute("SELECT cik, ticker FROM tickers WHERE ticker=?", (c,)).fetchone()] if row), None)
+    row = find()
+    if row is None and client is not None:   # a new listing: fetch the SEC's list again and try every spelling
         refresh_tickers(db, client, force=True)
-        row = db.execute("SELECT cik, ticker FROM tickers WHERE ticker=?", (q,)).fetchone()
-        if row:
-            return row["cik"], row["ticker"]
+        row = find()
+    if row:
+        return row["cik"], row["ticker"]
     raise SystemExit(f"Could not find ticker {ticker_or_cik} in the SEC's company list.")
 
 
@@ -494,7 +871,7 @@ def predecessor_of(cik):
     return extra.get(cik) or PREDECESSORS.get(cik)
 
 
-def fetch_company(db, client, ticker_or_cik, docs=1, insiders=40, log=print):
+def fetch_company(db, client, ticker_or_cik, docs=1, insiders=40, log=print, statements=(12, 8)):
     refresh_tickers(db, client)
     cik, ticker = resolve(db, client, ticker_or_cik)
     log(f"Fetching CIK {cik} ({ticker or ticker_or_cik}) from SEC EDGAR...")
@@ -510,7 +887,9 @@ def fetch_company(db, client, ticker_or_cik, docs=1, insiders=40, log=print):
 
     addr = (sub.get("addresses") or {}).get("business") or {}
     address = ", ".join(x for x in (addr.get("street1"), addr.get("street2"), addr.get("city"),
-                                    addr.get("stateOrCountry"), addr.get("zipCode")) if x)
+                                    addr.get("stateOrCountry"), addr.get("zipCode"), addr.get("country")) if x)
+    # the SEC names the country for addresses abroad; at home it gives only the state (TX)
+    country = addr.get("country") or ("United States" if addr.get("stateOrCountry") else None)
     tickers = sub.get("tickers") or []
     company = dict(
         cik=cik, ticker=ticker or (tickers[0] if tickers else None), name=sub.get("name"),
@@ -518,7 +897,7 @@ def fetch_company(db, client, ticker_or_cik, docs=1, insiders=40, log=print):
         sic=sub.get("sic"), industry=sub.get("sicDescription"), entity_type=sub.get("entityType"),
         category=sub.get("category"), fiscal_year_end=sub.get("fiscalYearEnd"),
         state_of_incorporation=sub.get("stateOfIncorporation"), website=sub.get("website"),
-        phone=sub.get("phone"), business_address=address, description=sub.get("description"),
+        phone=sub.get("phone"), business_address=address, description=sub.get("description"), country=country,
         fetched_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
 
@@ -545,6 +924,11 @@ def fetch_company(db, client, ticker_or_cik, docs=1, insiders=40, log=print):
         db.executemany("INSERT OR REPLACE INTO concepts VALUES (?,?,?,?)", concepts)
         build_metrics(db, cik)
     log(f"  {company['name']}: {len(filings)} filings, {len(facts)} reported numbers.")
+    # the statements as presented (newest annual and quarterly reports): debt and investment lines under the company's
+    # own tags, share classes, and figures the company facts leave out
+    if statements and fetch_statement_lines(db, client, cik, annual=statements[0], quarterly=statements[1], log=log):
+        with db:
+            build_metrics(db, cik)
 
     if docs:
         fetch_documents(db, client, cik, docs, log)
@@ -600,11 +984,33 @@ def main_currency(db, cik):
     return row["unit"] if row else None
 
 
+def uses_ifrs(db, cik):
+    """True for a company that reports under IFRS now (TSMC, Nokia), judged by its newest annual report: IREN filed
+    IFRS 20-Fs until 2024 and US GAAP 10-Ks since."""
+    row = db.execute("SELECT taxonomy, COUNT(*) n FROM facts WHERE cik=? AND taxonomy IN ('us-gaap','ifrs-full') AND accession="
+                     "(SELECT accession FROM facts WHERE cik=? AND taxonomy IN ('us-gaap','ifrs-full') AND form IN ('10-K','20-F','40-F') "
+                     "ORDER BY filed DESC LIMIT 1) GROUP BY taxonomy ORDER BY n DESC LIMIT 1", (cik, cik)).fetchone()
+    return bool(row) and row["taxonomy"] == "ifrs-full"
+
+
+def cover_shares_dei(db, cik):
+    """The newest share count on a filing's cover page (all classes added up), from the company facts."""
+    row = db.execute("SELECT period_end, accession FROM facts WHERE cik=? AND concept='EntityCommonStockSharesOutstanding' "
+                     "AND value > 0 ORDER BY period_end DESC, filed DESC LIMIT 1", (cik,)).fetchone()
+    if not row:
+        return None
+    return db.execute("SELECT SUM(value) FROM (SELECT DISTINCT value FROM facts WHERE cik=? AND accession=? AND period_end=? "
+                      "AND concept='EntityCommonStockSharesOutstanding')", (cik, row["accession"], row["period_end"])).fetchone()[0]
+
+
 def build_metrics(db, cik):
     """Turn raw facts into one clean number per metric per fiscal year and quarter."""
     db.execute("DELETE FROM metrics WHERE cik=?", (cik,))
     D = date.fromisoformat
-    wanted = {c for names in list(FLOW_METRICS.values()) + list(INSTANT_METRICS.values()) for c in names}
+    ifrs = uses_ifrs(db, cik)
+    gaap, taxonomy = ("ifrs", "ifrs-full") if ifrs else ("us", "us-gaap")
+    flow_map, inst_map = (IFRS_FLOW, IFRS_INSTANT) if ifrs else (FLOW_METRICS, INSTANT_METRICS)
+    wanted = {c for names in list(flow_map.values()) + list(inst_map.values()) for c in names} | FAMILY_TAGS
 
     # A company that changed its reporting currency (Yandex in roubles became Nebius in dollars) has both on file.
     # Only the currency it reports in now is used, so years in the old one are left out instead of being mixed in.
@@ -612,9 +1018,9 @@ def build_metrics(db, cik):
     # Latest-filed value for each (concept, start, end): later filings carry restatements.
     flows, instants = {}, {}
     for r in db.execute(
-            f"SELECT * FROM facts WHERE cik=? AND taxonomy='us-gaap' AND form IN "
+            f"SELECT * FROM facts WHERE cik=? AND taxonomy=? AND form IN "
             f"({','.join('?' * len(ANNUAL_FORMS + QUARTER_FORMS))})",
-            (cik, *ANNUAL_FORMS, *QUARTER_FORMS)):
+            (cik, taxonomy, *ANNUAL_FORMS, *QUARTER_FORMS)):
         if r["concept"] not in wanted or r["value"] is None:
             continue
         money = re.match(r"[A-Z]{3}(?=$|/)", r["unit"] or "")
@@ -630,6 +1036,18 @@ def build_metrics(db, cik):
         if cur is None or (r["filed"] or "") > (cur["filed"] or ""):
             store[key] = r
 
+    # What the presented statements add: lines under the company's own tags, figures by business line or share class,
+    # and filings the company facts leave out
+    co = db.execute("SELECT ticker, sic, fiscal_year_end FROM companies WHERE cik=?", (cik,)).fetchone()
+    have = {r[0] for r in db.execute("SELECT DISTINCT accession FROM facts WHERE cik=? AND taxonomy=?", (cik, taxonomy))}
+    rend = rendered_inputs(db, cik, co["ticker"] if co else None, have, gaap)
+    for target, extra in ((flows, rend["flows"]), (instants, rend["instants"])):
+        for concept, periods in extra.items():
+            mine = target.setdefault(concept, {})
+            for k, r in periods.items():
+                if k not in mine:
+                    mine[k] = r
+
     # Fiscal years come from the 12-month periods reported in annual reports.
     fy_starts = {}
     for concept, periods in flows.items():
@@ -644,7 +1062,6 @@ def build_metrics(db, cik):
     else:
         # No full-year report at all (a new registrant, or a new holding company that has only filed 10-Qs):
         # lay the fiscal years out from the year end the company declares, so its quarters can still be placed.
-        co = db.execute("SELECT fiscal_year_end FROM companies WHERE cik=?", (cik,)).fetchone()
         fye = (co["fiscal_year_end"] or "") if co else ""
         ends = [D(e) for periods in flows.values() for (_s, e) in periods]
         if re.fullmatch(r"\d{4}", fye) and ends:
@@ -669,16 +1086,20 @@ def build_metrics(db, cik):
 
     annual, quarterly = {}, {}   # (period key, metric) -> (priority, value, row, start)
     q_ends = {}                  # (fy index, q) -> end date string
+    cands = {}                   # every concept's value for a period, for the revenue rules below
 
     def put(store, key, metric, prio, value, row, start=None):
+        cands.setdefault((store is annual, key, metric), {})[row["concept"]] = (prio, value, row, start)
         cur = store.get((key, metric))
         if cur is None or prio < cur[0]:
             store[(key, metric)] = (prio, value, row, start)
 
-    for metric, names in FLOW_METRICS.items():
+    flow_lists = dict(flow_map)
+    flow_lists["revenue"] = list(flow_map["revenue"]) + (["Revenues"] if "Revenues" not in flow_map["revenue"] and not ifrs else []) + ["rendered:Revenues", "rendered:OperatingRevenue"]
+    for metric, names in flow_lists.items():
         for prio, concept in enumerate(names):
             periods = flows.get(concept, {})
-            disc, ytd = {}, {}   # (fy, q) -> row
+            disc, ytd, disc_start = {}, {}, {}   # (fy, q) -> row
             for (s, e), r in periods.items():
                 ds, de = D(s), D(e)
                 days = (de - ds).days
@@ -690,15 +1111,24 @@ def build_metrics(db, cik):
                 i, q, n, at_start = loc
                 if n == 1:
                     disc[(i, q)] = r
+                    disc_start[(i, q)] = ds
                 if at_start and n == q:
                     ytd[(i, q)] = r
                 q_ends.setdefault((i, q), e)
             for i in {k[0] for k in list(disc) + list(ytd)}:
+                def back(q):
+                    """The year to date at quarter q from the next quarter's: a company's first 10-Q (SpaceX's is for
+                    June) gives the half year and the second quarter, but not the first quarter on its own."""
+                    nxt = (i, q + 1)
+                    return ytd[nxt]["value"] - disc[nxt]["value"] if nxt in ytd and nxt in disc else None
+
                 def Y(q):
                     if q == 0:
                         return 0.0
                     if (i, q) in ytd:
                         return ytd[(i, q)]["value"]
+                    if back(q) is not None:
+                        return back(q)
                     prev = Y(q - 1)
                     return prev + disc[(i, q)]["value"] if prev is not None and (i, q) in disc else None
                 for q in range(1, 5):
@@ -711,22 +1141,169 @@ def build_metrics(db, cik):
                             continue
                     else:
                         a, b = Y(q), Y(q - 1)
-                        if a is None or b is None or (i, q) not in ytd:
+                        if a is None or b is None:
                             continue
-                        v, src = a - b, ytd[(i, q)]
+                        if (i, q) in ytd:
+                            src = ytd[(i, q)]
+                        elif back(q) is not None:
+                            src = ytd[(i, q + 1)]
+                            q_ends.setdefault((i, q), (disc_start[(i, q + 1)] - timedelta(days=1)).isoformat())
+                        else:
+                            continue
+                        v = a - b
                     put(quarterly, (i, q), metric, prio, v, src)
+
+    # Revenue: a tag holding another year's figure (AST SpaceMobile's 2024 = its 2022) is set aside when the other
+    # tags disagree, and the all-in total (Revenues, or the statement's total line) wins when it is larger, so a
+    # partial tag (Berkshire's sales and service revenue only) is not taken for the whole.
+    by_concept_years = {}
+    for (is_annual, key, metric), cs in cands.items():
+        if is_annual and metric == "revenue":
+            for c, (_p, v, _r, _s) in cs.items():
+                by_concept_years.setdefault(c, {})[key] = v
+    for store in (annual, quarterly):
+        for (key, metric), chosen in list(store.items()):
+            if metric != "revenue":
+                continue
+            cs = dict(cands.get((store is annual, key, metric), {}))
+            if store is annual:
+                for c, (_p, v, _r, _s) in list(cs.items()):
+                    copied = v and any(k2 != key and v2 == v for k2, v2 in by_concept_years.get(c, {}).items())
+                    others = [x[1] for c2, x in cs.items() if c2 != c and x[1] and abs(x[1] / v - 1) > 0.01] if v else []
+                    if copied and others:
+                        del cs[c]
+            if not cs:
+                continue
+            best = min(cs.values(), key=lambda x: x[0])
+            for c in ("Revenues", "RevenuesNetOfInterestExpense", "rendered:Revenues"):   # SoFi: total net revenue
+                if c in cs and cs[c][1] is not None and best[1] is not None and cs[c][1] > best[1] * 1.001:
+                    best = cs[c]
+            if "rendered:OperatingRevenue" in cs and cs["rendered:OperatingRevenue"][1]:
+                best = cs["rendered:OperatingRevenue"]
+            store[(key, metric)] = best
+
+    # Capital spending: the cash flow statement's lines, when they add up to more than the tag (Caterpillar also spends on
+    # equipment it leases to customers, on a line of its own)
+    for store in (annual, quarterly):
+        for (key, metric), chosen in list(store.items()):
+            if metric == "capex":
+                r = cands.get((store is annual, key, metric), {}).get("rendered:Capex")
+                if r and r[1] is not None and chosen[1] is not None and abs(r[1]) > abs(chosen[1]) * 1.01:
+                    store[(key, metric)] = r
 
     # Balance-sheet items: the value on each year-end and quarter-end date.
     q_keys = {k for (k, _m) in quarterly}
     annual_ends = {k for (k, _m) in annual}
     q_end_dates = {e: k for k, e in q_ends.items() if k in q_keys}
-    for metric, names in INSTANT_METRICS.items():
+    for metric, names in inst_map.items():
         for prio, concept in enumerate(names):
             for e, r in instants.get(concept, {}).items():
                 if e in annual_ends and r["form"] in ANNUAL_FORMS + QUARTER_FORMS:
                     put(annual, e, metric, prio, r["value"], r)
                 if e in q_end_dates:
                     put(quarterly, q_end_dates[e], metric, prio, r["value"], r)
+
+    # Shareholders' equity: when only the total including minority interest is filed (AT&T, AST SpaceMobile), the
+    # shareholders' own part is that total less the minority interest
+    for store in (annual, quarterly):
+        for (key, metric), (p, val, row, st) in list(store.items()):
+            if metric == "equity" and val is not None and str(row["concept"]).startswith("StockholdersEquityIncludingPortion"):
+                mi = store.get((key, "minority_interest"))
+                if mi and mi[1]:
+                    store[(key, metric)] = (p, val - mi[1], dict(row, concept="equity less minority interest"), st)
+
+    # Debt and short-term investments: every line that carries part of them, from the statement as presented when it
+    # was read, otherwise from all the tags (largest of each family, families added up)
+    for e in annual_ends | set(q_end_dates):
+        v = {c: instants[c][e]["value"] for c in FAMILY_TAGS if e in instants.get(c, {}) and instants[c][e]["value"] is not None}
+        newest = max((instants[c][e] for c in FAMILY_TAGS if e in instants.get(c, {})), key=lambda r: r["filed"] or "", default=None)
+        got = {}
+        rd, rs = instants.get("rendered:TotalDebt", {}).get(e), instants.get("rendered:ShortDebt", {}).get(e)
+        if rd:
+            short = rs["value"] if rs else 0
+            got.update(total_debt=(rd["value"], rd), short_term_debt=(short, rd), long_term_debt=(rd["value"] - short, rd))
+        else:
+            t = debt_from_tags(v, gaap)
+            if t and newest:
+                row = dict(newest, concept="debt from all tags")
+                got.update(short_term_debt=(t[0], row), long_term_debt=(t[1], row), total_debt=(t[2], row))
+        # finance leases are borrowing in substance: added unless the debt lines already hold them (ExxonMobil's and
+        # Delta's do); operating leases are not debt here
+        if "total_debt" in got:
+            fl = v.get("FinanceLeaseLiability")
+            if fl is None and (v.get("FinanceLeaseLiabilityCurrent") is not None or v.get("FinanceLeaseLiabilityNoncurrent") is not None):
+                fl = (v.get("FinanceLeaseLiabilityCurrent") or 0) + (v.get("FinanceLeaseLiabilityNoncurrent") or 0)
+            already = (e in instants.get("rendered:DebtHasLeases", {}) if rd else
+                       any(c in v for c in ("LongTermDebtAndCapitalLeaseObligations", "LongTermDebtAndCapitalLeaseObligationsCurrent",
+                                            "DebtAndCapitalLeaseObligations", "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities")))
+            if fl and not already:
+                val, row = got["total_debt"]
+                got["total_debt"] = (val + fl, dict(row, concept=str(row["concept"]) + " + finance leases"))
+                cur = v.get("FinanceLeaseLiabilityCurrent") or 0
+                got["short_term_debt"] = (got.get("short_term_debt", (0, row))[0] + cur, row)
+                got["long_term_debt"] = (got.get("long_term_debt", (0, row))[0] + fl - cur, row)
+        ri = instants.get("rendered:ShortTermInvestments", {}).get(e)
+        if ri:
+            got["short_term_investments"] = (ri["value"], ri)
+        elif e in instants.get("rendered:BalanceSheet", {}):
+            got["short_term_investments"] = (None, None)   # the balance sheet shows none: a tag from the notes is not counted
+        else:
+            sti = sti_from_tags(v, gaap)
+            if sti is not None and newest:
+                got["short_term_investments"] = (sti, dict(newest, concept="investments from all tags"))
+        for metric, (val, row) in got.items():
+            if val is None:
+                annual.pop((e, metric), None)
+                if e in q_end_dates:
+                    quarterly.pop((q_end_dates[e], metric), None)
+                continue
+            if e in annual_ends:
+                annual[(e, metric)] = (-1, val, row, None)
+            if e in q_end_dates:
+                quarterly[(q_end_dates[e], metric)] = (-1, val, row, None)
+
+    # Stock splits: figures filed before a split are put on today's basis (NVIDIA's years before 2024 x 10)
+    events = split_events(db, cik)
+    def factor(filed):
+        f = 1.0
+        for after, ratio in events:
+            if (filed or "") < after:
+                f *= ratio
+        return f
+    for store in (annual, quarterly):
+        for key, (p, val, row, st) in list(store.items()):
+            if key[1] in SHARE_COUNTS | PER_SHARE and val is not None and events:
+                k = factor(row["filed"])
+                if k != 1:
+                    store[key] = (p, val * k if key[1] in SHARE_COUNTS else val / k, row, st)
+
+    # Share classes worth different amounts (Berkshire: one A = 1,500 B): older figures under the standard tags are
+    # per A share; put them on the class the ticker trades
+    ratio = rend["class_ratio"]
+    if ratio and ratio >= 10:
+        ref = {m: [abs(v) for (k, mm), (p, v, r, st) in annual.items() if mm == m and v and str(r["concept"]).startswith("rendered:")]
+               for m in ("eps_diluted", "shares_diluted")}
+        for store in (annual, quarterly):
+            for key, (p, val, row, st) in list(store.items()):
+                m = key[1]
+                if not val or str(row["concept"]).startswith("rendered:"):
+                    continue
+                if m in PER_SHARE and ref["eps_diluted"] and abs(val) > statistics.median(ref["eps_diluted"]) * ratio / 20:
+                    store[key] = (p, val / ratio, row, st)
+                elif m in SHARE_COUNTS and ref["shares_diluted"] and val < statistics.median(ref["shares_diluted"]) / ratio * 20:
+                    store[key] = (p, val * ratio, row, st)
+
+    # Share counts filed in the wrong unit (McDonald's "715.4" shares for 715.4 million): checked against the cover page
+    refs = [v for (k, m), (p, v, r, st) in annual.items() if m in SHARE_COUNTS and v and v > 0]
+    ref = cover_shares_dei(db, cik) or (statistics.median(refs) if refs else None)
+    if ref:
+        for store in (annual, quarterly):
+            for key, (p, val, row, st) in list(store.items()):
+                if key[1] in SHARE_COUNTS and val and 0 < val < ref / 500:
+                    for k in (1e3, 1e6, 1e9):
+                        if 0.2 < val * k / ref < 5:
+                            store[key] = (p, val * k, row, st)
+                            break
 
     rows = []
     for (e, metric), (_p, v, r, s) in annual.items():
@@ -773,7 +1350,7 @@ class _TextExtractor(HTMLParser):
 def html_to_text(raw):
     p = _TextExtractor()
     p.feed(raw)
-    text = "".join(p.parts).replace("\xa0", " ").replace("​", "")
+    text = "".join(p.parts).replace("\xa0", " ").replace("\u200b", "")
     text = re.sub(r"[ \t\r\f\v]+", " ", text)
     text = re.sub(r" *\n *", "\n", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
@@ -969,13 +1546,6 @@ def member_name(member):
     return re.sub(r"\b(And|Of|The|In|For)\b", lambda m: m.group(1).lower(), name).strip()
 
 
-def parse_segment_facts(xml_bytes):
-    """Return [(axis, member, metric, period_end, value)] for 12-month periods."""
-    return [(axis, member, metric, end, v)
-            for axis, member, metric, start, end, v in parse_segment_periods(xml_bytes)
-            if 350 <= (date.fromisoformat(end) - date.fromisoformat(start)).days <= 380]
-
-
 def parse_segment_periods(xml_bytes):
     """Return [(axis, member, metric, period_start, period_end, value)] for a quarter, half, nine months or a year."""
     root = ET.fromstring(xml_bytes)
@@ -1114,6 +1684,192 @@ def fetch_segments(db, client, cik, log=print, quarterly=False, limit=40):
 
 # Companies with a finance arm (Caterpillar, Deere) show debt on the balance sheet only per business
 # line. The company-facts feed drops figures tagged that way, so they are read from the report itself.
+# ---- Statements as presented (the SEC's rendered R pages) --------------------------------------------------------
+#
+# Every XBRL filing comes with FilingSummary.xml and one small HTML page per statement (R2.htm, R4.htm, ...), which
+# show each line as the company presents it: its tag (its own or the standard one), its label, the section it sits
+# in (a business line, a share class, a second registrant) and its value for each period, with the scale.
+
+_MONTHS = {m: i + 1 for i, m in enumerate(("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))}
+STATEMENT_NAMES = {   # kind -> what the statement is called
+    "bs": re.compile(r"balance sheets?|financial condition|financial position|statements? of condition", re.I),
+    "is": re.compile(r"income|operations|earnings|profit or loss", re.I),
+    "cf": re.compile(r"cash flows?", re.I),
+}
+
+
+def statement_reports(summary_xml):
+    """{kind: R file} for the cover page and the three main statements, from a filing's FilingSummary.xml."""
+    root = ET.fromstring(summary_xml)
+    reps = [(r.findtext("HtmlFileName") or "", r.findtext("ShortName") or "", r.findtext("MenuCategory") or "")
+            for r in root.iter("Report")]
+    out = {}
+    cover = next((f for f, n, m in reps if f and (m == "Cover" or re.search(r"cover|document and entity", n, re.I))), None)
+    if cover:
+        out["cover"] = cover
+    for kind, name in STATEMENT_NAMES.items():
+        cands = [(f, n) for f, n, m in reps if f and m == "Statements" and name.search(n)
+                 and not re.search(r"parenthetical|changes in|stockholders|shareholders|equity\b|comprehensive income \(?loss\)?$", n, re.I)
+                 and not (kind == "is" and re.search(r"cash flow|balance|financial (condition|position)", n, re.I))]
+        if kind == "is":   # a statement of operations rather than one that is only comprehensive income
+            cands.sort(key=lambda c: bool(re.search(r"comprehensive", c[1], re.I)))
+        if cands:
+            out[kind] = cands[0][0]
+    return out
+
+
+def _r_date(text):
+    m = re.search(r"([A-Z][a-z]{2})\.? (\d{1,2}), (\d{4})", text)
+    return date(int(m.group(3)), _MONTHS[m.group(1)], int(m.group(2))) if m and m.group(1) in _MONTHS else None
+
+
+def _r_value(text):
+    t = re.sub(r"<[^>]+>|&#160;|\s|\$|€|£|¥", "", html.unescape(text))
+    t = re.sub(r"\[\d+\]$", "", t)
+    neg = t.startswith("(") and t.endswith(")")
+    t = t.strip("()").replace(",", "")
+    try:
+        v = float(t)
+    except ValueError:
+        return None
+    return -v if neg else v
+
+
+def parse_rendered(htm):
+    """One rendered statement: {"currency", "columns": [(start, end)], "rows": [(seq, block, prefix, concept, label,
+    unit, [values])]}. Money and share counts are scaled to units; per-share figures are as shown."""
+    heads = re.findall(r"<tr>\s*(<th.*?)</tr>", htm, re.S)
+    if not heads:
+        return None
+    first = re.findall(r"<th(.*?)>(.*?)</th>", heads[0], re.S)
+    title = " ".join(re.sub(r"<[^>]+>", " ", html.unescape(first[0][1])).split()) if first else ""
+    scale_of = lambda word: {"thousands": 1e3, "millions": 1e6, "billions": 1e9}.get((word or "").lower(), 1)
+    # "$ in Millions", "In Millions, except Per Share data"; "shares in Thousands" is about share counts only
+    m = re.search(r"(?:[$€£¥]|\b[A-Z]{3}\b|\))\s*in (Thousands|Millions|Billions)", title) or \
+        re.search(r"(?<!shares )(?<!Shares )\bIn (Thousands|Millions|Billions)", title)
+    money = scale_of(m.group(1)) if m else 1
+    m = re.search(r"shares in (Thousands|Millions|Billions)", title, re.I)
+    generic = re.search(r"(?<!shares )(?<!Shares )\bIn (Thousands|Millions|Billions)", title)   # one scale for every unit
+    shares = scale_of(m.group(1)) if m else (money if generic and not re.search(r"except (share|shares)\b", title, re.I) else 1)
+    cur = re.search(r"-\s*([A-Z]{3})\b", title)
+    currency = cur.group(1) if cur else "USD"
+    # columns: a second header row gives the dates under "12 Months Ended" style groups; a balance sheet has one row
+    span = lambda attrs: int(re.search(r'colspan="(\d+)"', attrs).group(1)) if 'colspan="' in attrs else 1
+    if len(heads) > 1:
+        # "12 Months Ended" groups span sub-columns; each date below spans one or more of them (Caterpillar's span two)
+        units = []
+        for attrs, text in first[1:]:
+            mo = re.search(r"(\d+)\s+Months? Ended", text, re.I)
+            units += [int(mo.group(1)) if mo else 0] * span(attrs)
+        groups, pos, cells = [], 0, []
+        for attrs, t in re.findall(r"<th(.*?)>(.*?)</th>", heads[1], re.S):
+            groups.append(units[pos] if pos < len(units) else 0)
+            cells.append(t)
+            pos += span(attrs)
+    else:
+        cells = [t for _a, t in first[1:]]
+        groups = [0] * len(cells)
+    ends = [_r_date(t) for t in cells]
+    # a column may name its own currency: TSMC shows each year in NT$ and again in US$ (a convenience translation)
+    col_cur = []
+    for t in cells:
+        m = re.search(r"\b([A-Z]{3})\s*\(", re.sub(r"<[^>]+>", " ", t))
+        col_cur.append(m.group(1) if m else None)
+    columns = []
+    for i, e in enumerate(ends):
+        months = groups[i] if i < len(groups) else 0
+        if e is None:
+            columns.append(None)
+        elif months:
+            y, mth = e.year, e.month - months
+            while mth <= 0:
+                mth, y = mth + 12, y - 1
+            start = date(y, mth, min(e.day, 28)) + timedelta(days=1)
+            if e.day >= 28:   # a month end: the period starts on the first of the next month
+                start = date(y, mth, 1) + timedelta(days=32)
+                start = start.replace(day=1)
+            columns.append((start.isoformat(), e.isoformat()))
+        else:
+            columns.append((None, e.isoformat()))
+    rows, block, seq = [], "", 0
+    for cls, body in re.findall(r'<tr class="(r[a-z]*)">(.*?)</tr>', htm, re.S):
+        if cls == "rh":
+            block = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", body)).split())
+            continue
+        ref = re.search(r"defref_([A-Za-z0-9-]+)_([A-Za-z0-9_]+)'", body)
+        if not ref:
+            continue
+        label = re.search(r"<a [^>]*>(.*?)</a>", body, re.S)
+        label = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", label.group(1))).split()) if label else ""
+        cells = [_r_value(x) for x in re.findall(r'<td class="(?:nump|num|text)"[^>]*>(.*?)</td>', body, re.S)]
+        concept = ref.group(2)
+        per_share = "PerShare" in concept or re.search(r"per (common |average |equivalent )*share", label, re.I)
+        is_shares = not per_share and (re.search(r"Shares|NumberOf", concept) and not re.search(r"Value|Amount|Cost|Payment|Proceeds|Repurchase", concept))
+        unit = (currency + "/shares") if per_share else "shares" if is_shares else currency
+        scale = 1 if per_share else shares if is_shares else money
+        seq += 1
+        rows.append((seq, block, ref.group(1), concept, label, unit,
+                     [None if v is None else v * scale for v in cells]))
+    return {"currency": currency, "columns": columns, "rows": rows, "column_currency": col_cur}
+
+
+def fetch_statement_lines(db, client, cik, annual=12, quarterly=8, log=print):
+    """Read the presented statements of the newest annual and quarterly reports not read yet."""
+    done = {r[0] for r in db.execute("SELECT accession FROM statement_read WHERE cik=?", (cik,))}
+    todo = []
+    old = predecessor_of(cik)
+    for forms, n in ((("10-K", "20-F", "40-F", "10-KT"), annual), (("10-Q",), quarterly)):
+        marks = ",".join("?" * len(forms))
+        mine = [dict(f, filer=cik) for f in db.execute(f"SELECT * FROM filings WHERE cik=? AND form IN ({marks}) AND is_xbrl=1 "
+                                                       "ORDER BY filing_date DESC LIMIT ?", (cik, *forms, n))]
+        if old and len(mine) < n:   # reports filed under the company's previous registration (ExxonMobil before 2026)
+            have = {f["accession"] for f in mine}
+            mine += [{"accession": r["accession"], "form": r["form"], "filing_date": r["filed"], "filer": old}
+                     for r in db.execute(f"SELECT accession, form, MAX(filed) filed FROM facts WHERE cik=? AND form IN ({marks}) "
+                                         "GROUP BY accession ORDER BY filed DESC LIMIT ?", (cik, *forms, n))
+                     if r["accession"] not in have and r["accession"].startswith(f"{old:010d}")][:n - len(mine)]
+        todo += [f for f in mine if f["accession"] not in done]
+    for f in todo:
+        accn, pages, filer = f["accession"].replace("-", ""), [], f.get("filer", cik)
+        try:
+            summary = client.get(ARCHIVE_URL.format(cik=filer, accn=accn, doc="FilingSummary.xml"), as_json=False)
+            reports = statement_reports(summary.encode("utf-8")) if summary else {}
+            for kind, doc in reports.items():
+                page = client.get(ARCHIVE_URL.format(cik=filer, accn=accn, doc=doc), as_json=False)
+                if page:
+                    pages.append((cik, f["accession"], f["form"], f["filing_date"], kind, doc, gzip.compress(page.encode("utf-8"))))
+        except (ET.ParseError, ValueError) as e:
+            log(f"  could not read the statements of {f['accession']}: {e}")
+        with db:
+            db.executemany("INSERT OR REPLACE INTO statement_pages VALUES (?,?,?,?,?,?,?)", pages)
+            db.execute("INSERT OR IGNORE INTO statement_read VALUES (?,?)", (cik, f["accession"]))
+            _lines_from_pages(db, cik, f["accession"])
+    return len(todo)
+
+
+def _lines_from_pages(db, cik, accession=None):
+    """(Re)build statement_lines from the stored pages: after a fetch, or when the reading rules change."""
+    where, args = ("cik=? AND accession=?", (cik, accession)) if accession else ("cik=?", (cik,))
+    db.execute(f"DELETE FROM statement_lines WHERE {where}", args)
+    main = None
+    for pg in db.execute(f"SELECT * FROM statement_pages WHERE {where}", args).fetchall():
+        try:
+            got = parse_rendered(gzip.decompress(pg["body"]).decode("utf-8"))
+        except (ValueError, OSError):
+            got = None
+        if not got:
+            continue
+        if main is None:
+            main = main_currency(db, cik)
+        curs = got.get("column_currency") or []
+        keep = [not (i < len(curs) and curs[i] and main and curs[i] != main) for i in range(len(got["columns"]))]
+        lines = [(cik, pg["accession"], pg["form"], pg["filed"], pg["kind"], seq, block, prefix, concept, label,
+                  (unit.replace(got["currency"], curs[i]) if i < len(curs) and curs[i] else unit), col[0], col[1], v)
+                 for seq, block, prefix, concept, label, unit, values in got["rows"]
+                 for i, (col, v) in enumerate(zip(got["columns"], values)) if col and v is not None and keep[i]]
+        db.executemany("INSERT OR REPLACE INTO statement_lines VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", lines)
+
+
 DEBT_PARTS = {   # part of total debt -> the concepts that carry it, best first
     "borrowings": ["ShortTermBorrowings", "CommercialPaper"],
     "current": ["LongTermDebtAndCapitalLeaseObligationsCurrent", "LongTermDebtCurrent"],
@@ -1548,45 +2304,67 @@ def cmd_show(db, args):
 
 
 def cmd_list(db, args):
-    for r in db.execute("SELECT c.ticker, c.name, c.industry, c.fetched_at, "
+    rows = db.execute("SELECT c.ticker, c.name, c.industry, c.fetched_at, "
                         "(SELECT COUNT(*) FROM filings f WHERE f.cik=c.cik) AS n "
-                        "FROM companies c ORDER BY c.ticker"):
-        print(f"{r['ticker'] or '':8} {r['name'][:40]:40} {r['n']:>6} filings  updated {r['fetched_at']}")
+                        "FROM companies c ORDER BY c.ticker").fetchall()
+    if not rows:
+        print("No companies saved yet. Add one with: python3 sec_db.py fetch AAPL")
+    for r in rows:
+        print(f"{r['ticker'] or '':8} {(r['name'] or '')[:40]:40} {r['n']:>6} filings  updated {r['fetched_at'] or '-'}")
+
+
+def _fts_phrases(query):
+    """Each word as a quoted phrase, so R&D, AT&T, 10-K and supply-chain are searched as written rather than
+    read as search syntax. Words must all appear, as in a plain search."""
+    return " ".join('"' + w.replace('"', '""') + '"' for w in query.split())
 
 
 def search_docs(db, query, ticker=None, limit=20):
+    query = (query or "").strip()
+    if not query:
+        return []
     cik = lookup_cik(db, ticker) if ticker else None
+    if ticker and cik is None:
+        raise LookupError(f"{ticker} is not in the database yet. Run: python sec_db.py fetch {ticker}")
+    rows = None
     if has_fts(db):
         sql = ("SELECT f.cik, c.ticker, f.accession, f.section, "
                "snippet(documents_fts, 0, '[', ']', ' ... ', 24) AS snippet "
-               "FROM documents_fts f JOIN companies c ON c.cik=f.cik WHERE documents_fts MATCH ?")
-        params = [query]
-        if cik:
-            sql += " AND f.cik=?"
-            params.append(cik)
-        sql += " ORDER BY rank LIMIT ?"
-    else:
+               "FROM documents_fts f JOIN companies c ON c.cik=f.cik WHERE documents_fts MATCH ?"
+               + (" AND f.cik=?" if cik else "") + " ORDER BY rank LIMIT ?")
+        # the text as typed first, so OR, NEAR and "quoted phrases" still work; if it is not valid search
+        # syntax, the same words quoted; failing that, the plain search below
+        for q in dict.fromkeys((query, _fts_phrases(query))):
+            try:
+                rows = db.execute(sql, [q] + ([cik] if cik else []) + [limit]).fetchall()
+                break
+            except sqlite3.OperationalError:
+                continue
+    if rows is None:
         sql = ("SELECT d.cik, c.ticker, d.accession, d.section, substr(d.text, "
                "max(1, instr(lower(d.text), lower(?)) - 120), 300) AS snippet "
                "FROM documents d JOIN companies c ON c.cik=d.cik "
-               "WHERE d.section != 'full' AND lower(d.text) LIKE lower(?)")
-        params = [query, f"%{query}%"]
-        if cik:
-            sql += " AND d.cik=?"
-            params.append(cik)
-        sql += " LIMIT ?"
-    params.append(limit)
+               "WHERE (d.section != 'full' OR NOT EXISTS (SELECT 1 FROM documents s WHERE s.cik=d.cik AND "
+               "s.accession=d.accession AND s.section != 'full')) "
+               "AND lower(d.text) LIKE lower(?)" + (" AND d.cik=?" if cik else "") + " LIMIT ?")
+        rows = db.execute(sql, [query, f"%{query}%"] + ([cik] if cik else []) + [limit]).fetchall()
     out = []
-    for r in db.execute(sql, params):
+    for r in rows:
         d = dict(r)
         d["section_title"] = SECTION_TITLES_10K.get(d["section"], d["section"])
-        d["snippet"] = " ".join(d["snippet"].split())
+        d["snippet"] = " ".join((d["snippet"] or "").split())
         out.append(d)
     return out
 
 
 def cmd_search(db, args):
-    for r in search_docs(db, args.query, args.ticker):
+    try:
+        found = search_docs(db, args.query, args.ticker)
+    except LookupError as e:
+        sys.exit(str(e))
+    if not found:
+        print("No matches.")
+    for r in found:
         print(f"{r['ticker']} {r['accession']} {r['section_title']}:\n  {r['snippet']}\n")
 
 
@@ -1595,14 +2373,18 @@ def cmd_export(db, args):
     if cik is None:
         sys.exit(f"{args.ticker} is not in the database yet. Run: python sec_db.py fetch {args.ticker}")
     p = company_payload(db, cik)
-    path = args.out or os.path.join(HERE, f"{p['company']['ticker'] or cik}.json")
+    if args.out:
+        path = args.out
+    else:
+        os.makedirs(os.path.join(HERE, "exports"), exist_ok=True)
+        path = os.path.join(HERE, "exports", f"{p['company']['ticker'] or cik}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(p, f, indent=1)
     print(f"Wrote {path}")
 
 
 # --------------------------------------------------------------------------
-# Stock Research Desk feed: the same shapes the page gets from paid APIs
+# Diligence desk feed: the same shapes the page gets from paid APIs
 # (amounts in USD millions, like the page's other sources)
 # --------------------------------------------------------------------------
 
@@ -1610,54 +2392,288 @@ def _period_rows(db, cik, ptype):
     out = {}
     for r in db.execute("SELECT * FROM metrics WHERE cik=? AND period_type=? ORDER BY period_end",
                         (cik, ptype)):
-        p = out.setdefault(r["period_end"], {"y": r["fiscal_year"], "q": r["fiscal_quarter"], "m": {}})
+        p = out.setdefault(r["period_end"], {"y": r["fiscal_year"], "q": r["fiscal_quarter"], "m": {}, "start": None})
         p["m"][r["metric"]] = (r["value"], r["concept"])
+        p["start"] = p["start"] or r["period_start"]
     for end, (st, lt) in debt_from_split(db, cik).items():
         m = out.get(end, {}).get("m")
         if m is None:
             continue
-        have = sum((m[k][0] or 0) for k in ("short_term_debt", "long_term_debt") if k in m)
+        if m.get("total_debt") and str(m["total_debt"][1]).startswith("rendered:"):
+            continue   # the balance sheet as presented already has every borrowing line
+        have = m["total_debt"][0] if m.get("total_debt") and m["total_debt"][0] is not None else \
+            sum((m[k][0] or 0) for k in ("short_term_debt", "long_term_debt") if k in m)
         st = max(st, m["short_term_debt"][0] or 0) if "short_term_debt" in m else st
         if st + lt > have:   # the company-wide tags miss part of the debt (or all of it)
             m["short_term_debt"], m["long_term_debt"] = (st, "by business line"), (lt, "by business line")
+            m["total_debt"] = (st + lt, "by business line")
     return out
 
 
-def _desk_row(m):
+def is_financial(sic):
+    """Banks, brokers and insurers (SIC 6000-6499): operating income means nothing for them, so none is worked out."""
+    try:
+        return 6000 <= int(sic or 0) < 6500
+    except ValueError:
+        return False
+
+
+def _desk_row(m, financial=False):
     g = lambda k: m[k][0] if k in m and m[k][0] is not None else None
-    lt, st = m.get("long_term_debt"), m.get("short_term_debt")
-    debt = None
-    if lt or st:
-        debt = (lt[0] if lt else 0) or 0
-        if st and not (lt and lt[1] == "LongTermDebt"):  # LongTermDebt already includes the current part
-            debt += st[0] or 0
+    debt = g("total_debt")
+    if debt is None:
+        lt, st = m.get("long_term_debt"), m.get("short_term_debt")
+        if lt or st:
+            debt = (lt[0] if lt else 0) or 0
+            if st and not (lt and lt[1] == "LongTermDebt"):  # LongTermDebt already includes the current part
+                debt += st[0] or 0
     cogs = g("cost_of_revenue")
     if cogs is None and g("revenue") is not None and g("gross_profit") is not None:
         cogs = g("revenue") - g("gross_profit")
     capex = g("capex")
     ebit = g("operating_income")
-    if ebit is None and g("pretax_income") is not None:   # no operating income line (Eli Lilly): work back from pre-tax income
-        if g("nonoperating_income") is not None:
+    if ebit is None and not financial:
+        # No operating income line. Worked out only from operating figures: never from pre-tax income plus interest,
+        # which would count investment and other non-operating income as operating.
+        gp = g("gross_profit")
+        if gp is None and g("revenue") is not None and cogs is not None:
+            gp = g("revenue") - cogs
+        sga = g("sga")
+        if sga is None and (g("selling_marketing") is not None or g("general_admin") is not None):
+            sga = (g("selling_marketing") or 0) + (g("general_admin") or 0)
+        if g("pretax_income") is not None and g("nonoperating_income") is not None:   # Eli Lilly
             ebit = g("pretax_income") - g("nonoperating_income")
-        elif g("interest_expense") is not None:
-            ebit = g("pretax_income") + g("interest_expense")
+        elif gp is not None and g("operating_expenses") is not None:
+            ebit = gp - g("operating_expenses")
+        elif gp is not None and sga is not None:                                       # Nike
+            ebit = gp - sga - (g("research_development") or 0)
+        elif g("sales") is not None and g("costs_and_expenses") is not None and g("revenue") and g("sales") >= 0.9 * g("revenue"):
+            # ExxonMobil: its revenue includes income from affiliates and other income, so start from sales
+            ebit = g("sales") - (g("costs_and_expenses") - (g("interest_expense") or 0))
+        elif g("revenue") is not None and g("costs_and_expenses") is not None:
+            # revenue less costs, before interest (Realty Income); a lender's interest (Deere's finance arm, with loans to
+            # customers over a fifth of its assets) is a cost of its business and stays in
+            lender = (g("finance_receivables") or 0) > 0.2 * (g("total_assets") or float("inf"))
+            ebit = g("revenue") - g("costs_and_expenses") + (0 if lender else (g("interest_expense") or 0))
+    shares = g("shares_diluted") if g("shares_diluted") is not None else g("eps_basic_shares")
+    eps = g("eps_diluted") if g("eps_diluted") is not None else g("eps_basic")
     v = {"revenue": g("revenue"), "cogs": cogs, "ebit": ebit,
          "interest": g("interest_expense"), "netIncome": g("net_income"),
-         "da": g("depreciation_amortization"), "shares": g("shares_diluted"),
+         "da": g("depreciation_amortization"), "shares": shares,
          "assets": g("total_assets"), "curAssets": g("current_assets"), "cash": g("cash"),
+         "sti": g("short_term_investments"),
          "curLiab": g("current_liabilities"), "debt": debt, "equity": g("equity"),
          "cfo": g("operating_cash_flow"), "capex": abs(capex) if capex is not None else None}
-    return {k: round(x / 1e6, 3) for k, x in v.items() if x is not None}
+    v["netIncomeCommon"] = g("net_income_common")
+    v["minority"] = g("minority_interest")
+    v["preferred"] = g("preferred_equity")
+    out = {k: round(x / 1e6, 3) for k, x in v.items() if x is not None}
+    if eps is not None:   # as reported (diluted), so preferred dividends and share classes are right; not in millions
+        out["eps"] = round(eps, 4)
+    return out
+
+
+# ---- Figures in US dollars for companies that report in another currency (TSMC in TWD, Nokia in EUR) ----
+FX_SERIES = {   # currency -> (FRED series, quoted as units per dollar)
+    "TWD": ("DEXTAUS", True), "EUR": ("DEXUSEU", False), "GBP": ("DEXUSUK", False), "JPY": ("DEXJPUS", True),
+    "CAD": ("DEXCAUS", True), "CNY": ("DEXCHUS", True), "KRW": ("DEXKOUS", True), "CHF": ("DEXSZUS", True),
+    "INR": ("DEXINUS", True), "BRL": ("DEXBZUS", True), "MXN": ("DEXMXUS", True), "HKD": ("DEXHKUS", True),
+    "SEK": ("DEXSDUS", True), "DKK": ("DEXDNUS", True), "NOK": ("DEXNOUS", True), "AUD": ("DEXUSAL", False),
+    "SGD": ("DEXSIUS", True), "ZAR": ("DEXSFUS", True), "NZD": ("DEXUSNZ", False),
+}
+_FX = {}
+FLOW_KEYS = {"revenue", "cogs", "ebit", "interest", "netIncome", "netIncomeCommon", "da", "cfo", "capex"}
+INSTANT_KEYS = {"assets", "curAssets", "cash", "sti", "curLiab", "debt", "equity", "minority", "preferred"}
+
+
+def fx_to_usd(db, currency):
+    """{"YYYY-MM": US dollars per unit}, monthly averages from FRED, or None."""
+    if currency in (None, "USD") or currency not in FX_SERIES:
+        return None
+    hit = _FX.get(currency)
+    if hit and time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    sid, inverted = FX_SERIES[currency]
+    try:
+        pts = (macro_series(db, sid) or {}).get("points") or []
+    except Exception:
+        pts = []
+    rates = {d[:7]: (1 / v if inverted else v) for d, v in pts if v}
+    _FX[currency] = (time.time(), rates or None)
+    return rates or None
+
+
+def _fx_rate(rates, start, end):
+    """The average rate over a period's months, or for one date the rate of its month (nearest month on file)."""
+    months, (y, mo) = [], ((int(start[:4]), int(start[5:7])) if start else (int(end[:4]), int(end[5:7])))
+    while (y, mo) <= (int(end[:4]), int(end[5:7])):
+        months.append(f"{y}-{mo:02d}")
+        y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+    vals = [rates[k] for k in months if k in rates]
+    if vals:
+        return sum(vals) / len(vals)
+    near = min(rates, key=lambda k: abs((int(k[:4]) * 12 + int(k[5:])) - (int(end[:4]) * 12 + int(end[5:7]))), default=None)
+    return rates[near] if near else None
+
+
+_ADS = {}
+
+
+def ads_ratio(db, cik):
+    """How many shares one American depositary share stands for (TSMC: 5), read from the newest annual report; 1 if none."""
+    row = db.execute("SELECT accession, text FROM documents WHERE cik=? AND form IN ('20-F','40-F') "
+                     "ORDER BY filing_date DESC, section='full' DESC LIMIT 1", (cik,)).fetchone()
+    if not row:
+        return 1
+    if row["accession"] in _ADS:
+        return _ADS[row["accession"]]
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+             "twelve": 12, "fifteen": 15, "twenty": 20, "twenty-five": 25, "thirty": 30, "forty": 40, "fifty": 50,
+             "one hundred": 100, "hundred": 100, "one-half": 0.5, "one-tenth": 0.1, "one-fifth": 0.2, "one-quarter": 0.25}
+    pats = (r"(?:each|one)\s+(?:American\s+Depositary\s+Shares?|ADSs?)\b[^.]{0,80}?\b(?:represent(?:s|ing)?|equal(?:s)? to|equivalent to)\s+"
+            r"(?:the right to receive\s+)?(\d+(?:\.\d+)?|[a-z]+(?:[- ][a-z]+)?)\b(?:\s*\(\d+\))?\s+(?:of\s+(?:our|the)\s+)?"
+            r"(?:ordinary|common|class\s+[a-z]\s+(?:ordinary|common))?\s*shares?",
+            r"ADSs?,?\s+each\s+(?:of\s+which\s+)?represent(?:s|ing)\s+(\d+|[a-z]+(?:-[a-z]+)?)\s+(?:ordinary|common)?\s*shares?")
+    found = None
+    for p in pats:
+        for m in re.finditer(p, row["text"] or "", re.I):
+            w = m.group(1).lower()
+            found = float(w) if re.fullmatch(r"\d+(\.\d+)?", w) else words.get(w)
+            if found:
+                break
+        if found:
+            break
+    _ADS[row["accession"]] = found or 1
+    return found or 1
+
+
+def _class_eps(db, cik):
+    """{share class: typical EPS} from the presented income statements, for companies with classes worth different
+    amounts (Berkshire A and B)."""
+    out = {}
+    for r in db.execute("SELECT block, value FROM statement_lines WHERE cik=? AND kind='is' AND unit LIKE '%/shares' "
+                        "AND block LIKE '%Class %' AND value > 0", (cik,)):
+        m = re.search(r"Class ([A-Z])\b", r["block"])
+        if m:
+            out.setdefault(m.group(1), []).append(r["value"])
+    return {k: statistics.median(v) for k, v in out.items()}
+
+
+def cover_shares(db, cik, ticker):
+    """{"value", "date"}: the share count on the newest filing's cover page, all classes counted in the ticker's own
+    class (one Berkshire A share counts as 1,500 B shares). None when no filing has one."""
+    newest = db.execute("SELECT accession FROM statement_lines WHERE cik=? AND kind='cover' AND concept='EntityCommonStockSharesOutstanding' "
+                        "AND value > 0 ORDER BY filed DESC LIMIT 1", (cik,)).fetchone()
+    if newest:
+        rows = db.execute("SELECT block, value, period_end FROM statement_lines WHERE cik=? AND accession=? AND kind='cover' "
+                          "AND concept='EntityCommonStockSharesOutstanding' AND value > 0", (cik, newest["accession"])).fetchall()
+        by, when = {}, max(r["period_end"] for r in rows)
+        for r in rows:
+            m = re.search(r"Class ([A-Z])\b", r["block"])
+            k = m.group(1) if m else ""
+            by[k] = by.get(k, 0) + r["value"]
+        cls, eps = ticker_class(ticker), _class_eps(db, cik)
+        if cls in eps and len(by) > 1:
+            total = sum(v * (eps[k] / eps[cls] if k in eps else 1) for k, v in by.items())
+        else:
+            total = sum(by.values())
+        return {"value": total - _trust_shares(db, cik, when), "date": when}
+    v = cover_shares_dei(db, cik)
+    if v:
+        when = db.execute("SELECT MAX(period_end) FROM facts WHERE cik=? AND concept='EntityCommonStockSharesOutstanding'", (cik,)).fetchone()[0]
+        return {"value": v - _trust_shares(db, cik, when), "date": when}
+    return None
+
+
+def _trust_shares(db, cik, when):
+    """Shares a company's own employee benefit trust holds: issued and on the cover page, but not outstanding for
+    earnings per share or market value (Lilly: 50 million). The newest figure within a year of the cover date."""
+    row = db.execute("SELECT value, period_end FROM facts WHERE cik=? AND concept='CommonStockSharesHeldInEmployeeTrustShares' "
+                     "AND period_end <= ? ORDER BY period_end DESC, filed DESC LIMIT 1", (cik, when)).fetchone()
+    if not row or not row["value"] or (date.fromisoformat(when) - date.fromisoformat(row["period_end"])).days > 400:
+        return 0
+    return row["value"]
+
+
+def _ttm(qrows, arows):
+    """The last twelve months from the newest four quarters (Q4 = the year less its first three quarters), or the
+    newest year when there are no quarters (companies filing 20-F)."""
+    keys = ("revenue", "netIncome", "ebit", "cfo", "capex", "da")
+    qs = sorted(qrows, key=lambda x: x["end"])[-4:]
+    newest_year = max(arows, key=lambda x: x["end"]) if arows else None
+    if len(qs) == 4 and (qs[-1]["end"] - qs[0]["end"]).days <= 300 and (not newest_year or qs[-1]["end"] >= newest_year["end"]):
+        out = {"basis": "quarters", "asOf": qs[-1]["end"].isoformat(), "from": f"Q{qs[0]['q']} FY{qs[0]['y']} to Q{qs[-1]['q']} FY{qs[-1]['y']}"}
+        for k in keys:
+            vals = [q["row"].get(k) for q in qs]
+            if all(v is not None for v in vals):
+                out[k] = round(sum(vals), 3)
+        common = [q["row"].get("netIncomeCommon") for q in qs]
+        if all(v is not None for v in common):   # after preferred dividends, as EPS is
+            out["netIncome"] = round(sum(common), 3)
+        eps = []
+        for q in qs:
+            e = q["row"].get("eps")
+            if e is None and q["q"] == 4:   # the 10-K gives the year: the fourth quarter is what the first three leave
+                year = next((a for a in arows if a["y"] == q["y"]), None)
+                firsts = [x["row"].get("eps") for x in qrows if x["y"] == q["y"] and x["q"] in (1, 2, 3)]
+                if year and year["row"].get("eps") is not None and len(firsts) == 3 and None not in firsts:
+                    e = year["row"]["eps"] - sum(firsts)
+            if e is None and q["row"].get("netIncome") is not None and q["row"].get("shares"):
+                e = q["row"]["netIncome"] / q["row"]["shares"]
+            eps.append(e)
+        if None not in eps:
+            out["eps"] = round(sum(eps), 4)
+        return out
+    if newest_year:
+        out = {"basis": "year", "asOf": newest_year["end"].isoformat(), "from": f"FY{newest_year['y']}"}
+        out.update({k: newest_year["row"][k] for k in keys + ("eps",) if newest_year["row"].get(k) is not None})
+        if newest_year["row"].get("netIncomeCommon") is not None:
+            out["netIncome"] = newest_year["row"]["netIncomeCommon"]
+        return out
+    return None
+
+
+def _desk_periods(db, cik, ptype):
+    """[{"y", "q", "end", "row"}] in US dollars (millions; EPS per share or per ADS), with the currency they came in."""
+    co = db.execute("SELECT sic FROM companies WHERE cik=?", (cik,)).fetchone()
+    financial = is_financial(co["sic"] if co else None)
+    currency = main_currency(db, cik) or "USD"
+    rates = fx_to_usd(db, currency) if currency != "USD" else None
+    ads = ads_ratio(db, cik) if currency != "USD" or uses_ifrs(db, cik) else 1
+    out = []
+    for end, p in _period_rows(db, cik, ptype).items():
+        row = _desk_row(p["m"], financial)
+        if not row:
+            continue
+        if rates:
+            start = p["start"] or (date.fromisoformat(end) - timedelta(days=88)).isoformat()
+            flow, inst = _fx_rate(rates, start, end), _fx_rate(rates, None, end)
+            if flow is None or inst is None:
+                continue
+            row = {k: round(v * (flow if k in FLOW_KEYS else inst if k in INSTANT_KEYS else 1), 3) for k, v in row.items()}
+            if "eps" in row:
+                row["eps"] = round(row["eps"] * flow, 4)
+        if ads != 1:   # per depositary share, as the ADS trades
+            if "eps" in row:
+                row["eps"] = round(row["eps"] * ads, 4)
+            if "shares" in row:
+                row["shares"] = round(row["shares"] / ads, 3)
+        out.append({"y": p["y"], "q": p["q"], "end": date.fromisoformat(end), "row": row})
+    return out, {"currency": currency, "converted": bool(rates), "adsRatio": ads, "financial": financial,
+                 "convertFailed": currency != "USD" and not rates}
 
 
 def desk_fundamentals(db, cik):
     c = db.execute("SELECT * FROM companies WHERE cik=?", (cik,)).fetchone()
     t = db.execute("SELECT title FROM tickers WHERE cik=? LIMIT 1", (cik,)).fetchone()
-    by = {}
-    for end, p in _period_rows(db, cik, "annual").items():
-        row = _desk_row(p["m"])
-        if row:
-            by[str(p["y"])] = row
+    years, info = _desk_periods(db, cik, "annual")
+    quarters, _ = _desk_periods(db, cik, "quarterly")
+    by = {str(p["y"]): p["row"] for p in years}
+    errs = [f"Figures are reported in {info['currency']} and could not be converted to US dollars: add a FRED key on the Macro page."] if info["convertFailed"] else []
+    shares = cover_shares(db, cik, c["ticker"])
+    if shares:
+        shares = {"value": round(shares["value"] / 1e6 / info["adsRatio"], 3), "date": shares["date"]}
+    ttm = _ttm([q for q in quarters if q["q"]], years)
     desc = c["description"] or ""
     if not desc:
         d = db.execute("SELECT text FROM documents WHERE cik=? AND section='1' "
@@ -1667,21 +2683,25 @@ def desk_fundamentals(db, cik):
             paras = [x.strip() for x in body.split("\n") if len(x.strip()) > 120]
             desc = " ".join(paras[:2])[:900]
     addr = (c["business_address"] or "").split(", ")
+    # saved before the country was kept: a U.S. address ends in a state code and a ZIP code ("TX, 75039")
+    country = c["country"] or ("United States" if len(addr) >= 2 and re.fullmatch(r"[A-Z]{2}", addr[-2])
+                                                  and re.fullmatch(r"\d{5}(-\d{0,4})?", addr[-1]) else None)
     return {
-        "name": (t["title"] if t else None) or c["name"], "byYear": by, "peers": [], "errs": [],
+        "name": (t["title"] if t else None) or c["name"], "byYear": by, "peers": [], "errs": errs,
+        "ttm": ttm, "sharesOutstanding": shares, "currency": info["currency"], "converted": info["converted"],
+        "adsRatio": info["adsRatio"], "financial": info["financial"],
         "profile": {"desc": desc, "sector": c["industry"], "industry": c["industry"], "sic": c["sic"], "employees": None,
-                    "country": addr[-2] if len(addr) >= 2 else None, "website": c["website"]},
+                    "country": country, "website": c["website"]},
         "fetchedAt": c["fetched_at"],
     }
 
 
 def desk_quarters(db, cik):
     out = []
-    for end, p in _period_rows(db, cik, "quarterly").items():
-        row = _desk_row(p["m"])
-        if row and p["q"]:
-            ms = int(datetime.fromisoformat(end).replace(tzinfo=timezone.utc).timestamp() * 1000)
-            out.append({"y": p["y"], "q": p["q"], "row": row, "end": ms})
+    for p in _desk_periods(db, cik, "quarterly")[0]:
+        if p["q"]:
+            ms = int(datetime(p["end"].year, p["end"].month, p["end"].day, tzinfo=timezone.utc).timestamp() * 1000)
+            out.append({"y": p["y"], "q": p["q"], "row": p["row"], "end": ms})
     return out
 
 
@@ -1718,10 +2738,28 @@ def desk_statements(db, cik):
             if all(p is not None for p in parts):
                 out["sga"] = round(sum(parts) / 1e6, 3)
         return out
-    annual = {str(p["y"]): row(p["m"]) for p in _period_rows(db, cik, "annual").values()}
-    quarterly = [{"y": p["y"], "q": p["q"], "row": row(p["m"])}
-                 for p in _period_rows(db, cik, "quarterly").values() if p["q"]]
-    return {"annual": annual, "quarterly": quarterly, "currency": main_currency(db, cik)}
+    currency = main_currency(db, cik) or "USD"
+    rates = fx_to_usd(db, currency) if currency != "USD" else None
+    ads = ads_ratio(db, cik) if currency != "USD" or uses_ifrs(db, cik) else 1
+    flows = {"rd", "sga", "pretax", "tax", "sbc", "dividends", "buybacks", "cfi", "cff", "acquisitions", "debtIssued", "debtRepaid"}
+
+    def usd(end, p, out):
+        """In US dollars, as the core figures are; per depositary share for an ADS."""
+        if rates:
+            start = p["start"] or (date.fromisoformat(end) - timedelta(days=88)).isoformat()
+            flow, inst = _fx_rate(rates, start, end), _fx_rate(rates, None, end)
+            if flow is None or inst is None:
+                return {}
+            out = {k: round(v * (flow if k in flows or k.startswith("eps") else 1 if k in ("sharesBasic", "sharesOut") else inst), 4 if k.startswith("eps") else 3)
+                   for k, v in out.items()}
+        if ads != 1:
+            out = {k: (round(v * ads, 4) if k.startswith("eps") else round(v / ads, 3) if k in ("sharesBasic", "sharesOut") else v) for k, v in out.items()}
+        return out
+    annual = {str(p["y"]): usd(e, p, row(p["m"])) for e, p in _period_rows(db, cik, "annual").items()}
+    quarterly = [{"y": p["y"], "q": p["q"], "row": usd(e, p, row(p["m"]))}
+                 for e, p in _period_rows(db, cik, "quarterly").items() if p["q"]]
+    return {"annual": annual, "quarterly": quarterly, "currency": "USD" if rates or currency == "USD" else currency,
+            "reportedIn": currency}
 
 
 def _segment_sources(db, cik, table):
@@ -2119,6 +3157,57 @@ OPEND_ADDR = ("127.0.0.1", 11111)
 OPEND_HEAD = struct.Struct("<2sIBBII20s8s")   # "FT", protocol number, 1 = JSON body, version, serial, body length, SHA-1 of body, reserved
 OPEND_OFFLINE = "moomoo OpenD is not running on this computer. Open the moomoo OpenD app, log in, and try again."
 # market prefix -> (moomoo's market number, the exchange's time zone, minute of the day at which each session starts)
+class _RuleZone(tzinfo):
+    """A market's time zone worked out from its rules, for computers without a time zone database (Windows without
+    the tzdata package). Exact for the zones below from 2007 on, which is all the chart needs."""
+    def __init__(self, name, hours, rule):
+        self.name, self.std, self.rule = name, timedelta(hours=hours), rule
+
+    @staticmethod
+    def _sunday(year, month, n):          # the n-th Sunday of a month
+        d = date(year, month, 1)
+        return d + timedelta(days=(6 - d.weekday()) % 7 + 7 * (n - 1))
+
+    def _summer(self, utc):               # is daylight time in force at this UTC moment?
+        y = utc.year
+        if self.rule == "us":             # 2:00 local on the second Sunday of March to the first Sunday of November
+            start = datetime.combine(self._sunday(y, 3, 2), datetime.min.time()) + timedelta(hours=2) - self.std
+            end = datetime.combine(self._sunday(y, 11, 1), datetime.min.time()) + timedelta(hours=1) - self.std
+            return start <= utc < end
+        if self.rule == "au":             # 2:00 local on the first Sunday of October to 3:00 on the first Sunday of April
+            end = datetime.combine(self._sunday(y, 4, 1), datetime.min.time()) + timedelta(hours=2) - self.std
+            start = datetime.combine(self._sunday(y, 10, 1), datetime.min.time()) + timedelta(hours=2) - self.std
+            return not (end <= utc < start)
+        return False
+
+    def fromutc(self, dt):
+        u = dt.replace(tzinfo=None)
+        return (u + self.std + (timedelta(hours=1) if self._summer(u) else timedelta(0))).replace(tzinfo=self)
+
+    def utcoffset(self, dt):
+        return self.std + self.dst(dt)
+
+    def dst(self, dt):
+        return timedelta(hours=1) if dt is not None and self._summer(dt.replace(tzinfo=None) - self.std) else timedelta(0)
+
+    def tzname(self, dt):
+        return self.name
+
+
+_RULE_ZONES = {"America/New_York": (-5, "us"), "America/Toronto": (-5, "us"), "Australia/Sydney": (10, "au"),
+               "Asia/Hong_Kong": (8, None), "Asia/Shanghai": (8, None), "Asia/Singapore": (8, None),
+               "Asia/Kuala_Lumpur": (8, None), "Asia/Tokyo": (9, None)}
+
+
+def market_zone(name):
+    """The time zone of a market: from the computer's database, or worked out from its rules when there is none."""
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError:
+        hours, rule = _RULE_ZONES[name]
+        return _RuleZone(name, hours, rule)
+
+
 MOOMOO_MARKETS = {
     "US": (11, "America/New_York", (240, 570, 960, 1200)),   # pre-market 04:00, regular 09:30, after-hours 16:00, overnight 20:00
     "HK": (1, "Asia/Hong_Kong", (570, 780)),
@@ -2157,7 +3246,7 @@ class OpenD:
         except OSError:
             raise OpenDError(OPEND_OFFLINE, 503)
         self.serial = 0
-        self.call(1001, {"clientVer": 300, "clientID": "sec-database", "recvNotify": False,
+        self.call(1001, {"clientVer": 300, "clientID": "diligence", "recvNotify": False,
                          "packetEncAlgo": -1, "pushProtoFmt": 1, "programmingLanguage": "Python"})
 
     def __enter__(self):
@@ -2208,7 +3297,7 @@ class OpenD:
 
 
 # moomoo refuses some kinds of request when there are too many in 30 seconds: wait for a turn instead
-OPEND_LIMITS = {3227: 28, 3215: 9, 3203: 55}    # financial statements 30, stock filter 10, snapshots 60
+OPEND_LIMITS = {3227: 28, 3203: 55, 3213: 9, 3214: 9, 3222: 9}   # statements 30, snapshots 60, watchlists 10 per 30 seconds
 _OPEND_SENT, _OPEND_SENT_LOCK = {}, threading.Lock()
 
 
@@ -2299,7 +3388,7 @@ def moomoo_candles(symbol, interval="D", ext=False, before=None, tail=False, eve
         raise OpenDError(f"{interval!r} is not an interval the chart uses.", 400)
     kl, minutes, fold = MOOMOO_KL[interval]
     number, tz, sessions = MOOMOO_MARKETS[market]
-    zone = ZoneInfo(tz)
+    zone = market_zone(tz)
     today = datetime.now(zone).date()
     ext = bool(ext) and minutes > 0 and market == "US"
     if minutes:        # moomoo keeps 8 years of candles of an hour or less
@@ -2488,200 +3577,13 @@ def moomoo_peg(symbol):
     return out
 
 
-# ---- The screener: many stocks side by side. Prices and valuation come from one moomoo snapshot for the lot; growth
-# and margins come from each company's income statements, which moomoo hands out 30 every 30 seconds, so they are
-# read in the background, kept in sec.db for a day, and filled in as they arrive.
-SCREEN_KEEP = 24 * 3600
-_SCREEN_QUEUE, _SCREEN_LOCK, _SCREEN_WORKER = {}, threading.Lock(), {"thread": None, "doing": None}
-
-
-def _screen_income(od, symbol):
-    """Growth and margins of the last twelve months (or the last full year, when the quarters are not all there)."""
-    market, code = moomoo_security(symbol)
-    income = od.call(3227, {"security": {"market": MOOMOO_MARKETS[market][0], "code": code},
-                            "statementType": 1, "financialType": 10, "num": 24})
-    names = {x.get("fieldId"): x.get("displayName") or "" for x in income.get("structureList") or []}
-    quarters, years, currency = {}, {}, None
-    for rep in income.get("reportList") or []:
-        vals = {}
-        for it in rep.get("itemList") or []:
-            vals.setdefault(names.get(it.get("fieldId")) or it.get("displayName") or "", it.get("data"))
-        pick = lambda *wanted: next((vals[n] for n in wanted if vals.get(n) is not None), None)
-        row = {"revenue": pick("Total Operating Revenue", "Operating Revenue", "Total Revenue", "Total Revenue as Reported"),
-               "gross": pick("Gross Profit"), "operating": pick("Operating Profit"),
-               "net": pick("Net Income to Common Stockholders", "Net Income to Parent Company", "Net Profit"),
-               "eps": pick("Diluted EPS", "Basic EPS")}
-        m = re.fullmatch(r"(\d{4})/(Q[1-4]|FY)", rep.get("periodText") or "")
-        if not m:
-            continue
-        currency = currency or rep.get("currencyCode")
-        if m.group(2) == "FY":
-            years[int(m.group(1))] = row
-        else:
-            quarters[(int(m.group(1)), int(m.group(2)[1]))] = row
-    # a fourth quarter that is only inside the full year: the year less its first three quarters
-    for y, fy in years.items():
-        if (y, 4) not in quarters and all((y, q) in quarters for q in (1, 2, 3)):
-            quarters[(y, 4)] = {k: None if fy[k] is None or any(quarters[(y, q)][k] is None for q in (1, 2, 3))
-                                else fy[k] - sum(quarters[(y, q)][k] for q in (1, 2, 3)) for k in fy}
-
-    def total(rows, k):
-        vals = [r[k] for r in rows]
-        return None if not rows or None in vals else sum(vals)
-    out = {"currency": currency}
-    keys = sorted(quarters, reverse=True)
-    run = [keys[0]] if keys else []
-    for k in keys[1:8]:                 # the newest quarters, as long as none is missing in between
-        prev = run[-1]
-        if k != ((prev[0], prev[1] - 1) if prev[1] > 1 else (prev[0] - 1, 4)):
-            break
-        run.append(k)
-    if len(run) == 8:
-        now, before = [quarters[k] for k in run[:4]], [quarters[k] for k in run[4:]]
-        out["period"] = "12 months to %d/Q%d" % run[0]
-    elif years:
-        y = max(years)
-        now, before = [years[y]], [years[y - 1]] if y - 1 in years else []
-        out["period"] = "year %d" % y
-    else:
-        return dict(out, period=None)
-    pct = lambda a, b: round((a / b - 1) * 100, 2) if a is not None and b is not None and b > 0 else None
-    share = lambda a, b: round(a / b * 100, 2) if a is not None and b else None
-    rev, eps = total(now, "revenue"), total(now, "eps")
-    out.update(revenue=rev, revGrowth=pct(rev, total(before, "revenue")), netIncome=total(now, "net"),
-               eps=None if eps is None else round(eps, 4), epsGrowth=pct(eps, total(before, "eps")),
-               grossMargin=share(total(now, "gross"), rev), opMargin=share(total(now, "operating"), rev),
-               netMargin=share(total(now, "net"), rev))
-    y = max(years) if years else None
-    if y and (y - 3) in years and years[y]["revenue"] and years[y - 3]["revenue"] and years[y - 3]["revenue"] > 0 and years[y]["revenue"] > 0:
-        out["revCagr3"] = round(((years[y]["revenue"] / years[y - 3]["revenue"]) ** (1 / 3) - 1) * 100, 2)
-    return out
-
-
-def _screen_work():
-    """The background reader: works through the queue, newest request first, one company at a time."""
-    db = connect()
-    while True:
-        with _SCREEN_LOCK:
-            if not _SCREEN_QUEUE:
-                _SCREEN_WORKER["thread"] = _SCREEN_WORKER["doing"] = None
-                return
-            symbol = max(_SCREEN_QUEUE, key=_SCREEN_QUEUE.get)
-            _SCREEN_WORKER["doing"] = symbol
-        try:
-            with OpenD() as od:
-                data = _screen_income(od, symbol)
-        except OpenDError as e:
-            if "frequency" in str(e):  # someone else used up moomoo's allowance: try again shortly
-                time.sleep(10)
-                continue
-            data = {"error": str(e)}
-        except Exception as e:         # one odd company must not stop the rest
-            data = {"error": repr(e)}
-        db.execute("INSERT OR REPLACE INTO screen_financials VALUES (?, ?, ?)", (symbol, time.time(), json.dumps(data)))
-        db.commit()
-        with _SCREEN_LOCK:
-            _SCREEN_QUEUE.pop(symbol, None)
-
-
-def screener_rows(db, symbols):
-    """One row per symbol: price, change, market value, P/E, PEG, P/B, dividend yield, ROE, distance from the 52-week
-    high, and growth and margins once read. `waiting` is how many companies' statements are still to be read."""
-    symbols = list(dict.fromkeys(s.strip().upper() for s in symbols if s.strip()))[:600]
-    wanted = {}
-    for sym in symbols:
-        try:
-            market, code = moomoo_security(sym)
-        except OpenDError:
-            continue
-        wanted[(MOOMOO_MARKETS[market][0], code)] = (sym, market)
-    snaps, refused = [], {}
-    if wanted:
-        with OpenD() as od:
-            # one market at a time: moomoo turns down the whole request when the account may not see one market's quotes
-            for number in dict.fromkeys(m for m, _ in wanted):
-                keys = [k for k in wanted if k[0] == number]
-                try:
-                    for i in range(0, len(keys), 200):
-                        snaps += od.call(3203, {"securityList": [{"market": m, "code": c} for m, c in keys[i:i + 200]]}).get("snapshotList") or []
-                except OpenDError as e:
-                    if "permission" not in str(e).lower():
-                        raise
-                    for k in keys:
-                        refused[wanted[k][0]] = "Your moomoo account has no quotes for %s shares" % wanted[k][1]
-    by = {}
-    for x in snaps:
-        b, e = x.get("basic") or {}, x.get("equityExData") or {}
-        sec = b.get("security") or {}
-        sym, market = wanted.get((sec.get("market"), sec.get("code")), (None, None))
-        if not sym or not b.get("curPrice"):     # moomoo answers for a code it does not know with an empty quote
-            continue
-        price, prev, high = b.get("curPrice"), b.get("lastClosePrice"), b.get("highest52WeeksPrice")
-        by[sym] = {"symbol": sym, "market": market, "name": b.get("name"), "price": price,
-                   "chg": round((price / prev - 1) * 100, 2) if price and prev else None,
-                   "cap": e.get("issuedMarketVal") or None, "pe": e.get("peTTMRate"), "pb": e.get("pbRate"),
-                   "dy": e.get("dividendRatioTTM"), "book": e.get("netAsset"),
-                   "roe": round(e["netProfit"] / e["netAsset"] * 100, 2) if e.get("netProfit") is not None and e.get("netAsset") and e["netAsset"] > 0 else None,
-                   "offHigh": round((price / high - 1) * 100, 2) if price and high else None}
-    now, rows, stale = time.time(), [], []
-    have = {}
-    for i in range(0, len(symbols), 500):
-        part = symbols[i:i + 500]
-        for r in db.execute("SELECT symbol, fetched_at, data FROM screen_financials WHERE symbol IN (%s)" % ",".join("?" * len(part)), part):
-            have[r["symbol"]] = (r["fetched_at"], json.loads(r["data"]))
-    for sym in symbols:
-        row = by.get(sym) or {"symbol": sym, "missing": True, "why": refused.get(sym) or "moomoo does not know this symbol"}
-        when, fin = have.get(sym, (0, None))
-        if fin is not None:
-            row.update({k: v for k, v in fin.items() if k != "error"})
-            row["finError"] = fin.get("error")
-        if now - when > SCREEN_KEEP and sym in by:
-            stale.append(sym)
-        # ROE on the last twelve months' profit when the statements are in the currency of the quote; else the
-        # snapshot's own, which is the last full year's profit over today's book value
-        book = row.pop("book", None)
-        if row.get("netIncome") is not None and book and book > 0 and row.get("currency") == {"US": "USD", "HK": "HKD"}.get(row.get("market")):
-            row["roe"] = round(row["netIncome"] / book * 100, 2)
-        pe, g = row.get("pe"), row.get("epsGrowth")
-        row["peg"] = round(pe / g, 2) if pe and pe > 0 and g and g > 0 else None
-        rows.append(row)
-    with _SCREEN_LOCK:
-        for sym in stale:
-            _SCREEN_QUEUE[sym] = now
-        if _SCREEN_QUEUE and not _SCREEN_WORKER["thread"]:
-            _SCREEN_WORKER["thread"] = threading.Thread(target=_screen_work, daemon=True)
-            _SCREEN_WORKER["thread"].start()
-        waiting = sum(1 for s in symbols if s in _SCREEN_QUEUE)
-    return {"rows": rows, "waiting": waiting, "keep_hours": SCREEN_KEEP // 3600}
-
-
-def screener_market(market="US", min_cap=1e10, limit=300):
-    """The largest companies of a whole market, by market value: {"symbols": [...], "total": how many pass}."""
-    if market not in ("US", "HK"):
-        raise OpenDError("The whole-market list covers US and HK.", 400)
-    number, symbols, total = MOOMOO_MARKETS[market][0], [], 0
-    with OpenD() as od:
-        while len(symbols) < limit:
-            r = od.call(3215, {"begin": len(symbols), "num": 200, "market": number,
-                               "baseFilterList": [{"fieldName": 11, "filterMin": float(min_cap), "isNoFilter": False, "sortDir": 2}]})
-            total = r.get("allCount") or 0
-            got = r.get("dataList") or []
-            for x in got:
-                sec = x.get("security") or {}
-                sym = moomoo_symbol(sec.get("market"), sec.get("code"))
-                if sym and sym not in symbols:
-                    symbols.append(sym)
-            if r.get("lastPage") or not got:
-                break
-    return {"market": market, "min_cap": min_cap, "total": total, "symbols": symbols[:limit]}
-
-
 def moomoo_symbol(market_no, code):
-    """moomoo's market number and code back to the page's symbol: (11, 'BRK.B') -> BRK-B, (1, '00700') -> 0700.HK."""
+    """moomoo's market number and code back to the page's symbol: (11, 'BRK.B') -> BRK-B, (1, '00700') -> 0700.HK,
+    (1, '09988') -> 9988.HK, (1, '89988') -> 89988.HK."""
     if market_no == 11 and re.fullmatch(r"[A-Z]{1,6}(\.[A-Z]{1,2})?", code or ""):
         return code.replace(".", "-")
     if market_no == 1 and re.fullmatch(r"\d{5}", code or ""):
-        return code[1:] + ".HK"
+        return (code.lstrip("0") or "0").zfill(4) + ".HK"
     return None        # options, futures, funds and other markets are left out
 
 
@@ -2731,7 +3633,7 @@ def _moomoo_earnings(od):
     with _MOOMOO_LOCK:
         if _EARNINGS["by"] and now - _EARNINGS["at"] < 6 * 3600:
             return _EARNINGS["by"]
-    by, today = {}, datetime.now(ZoneInfo("America/New_York")).date()
+    by, today = {}, datetime.now(market_zone("America/New_York")).date()
     for w in range(14):
         b = today + timedelta(days=7 * w)
         r = od.call(3401, {"market": 11, "sortType": 2, "beginDate": b.isoformat(), "endDate": (b + timedelta(days=6)).isoformat()})
@@ -2855,8 +3757,10 @@ def moomoo_lists():
             accounts = [a for a in od.call(2001, {"userID": 0, "needGeneralSecAccount": True}).get("accList") or [] if a.get("trdEnv") == 1]
         except OpenDError:
             accounts = []
-    skip = {"All", "Options", "US Options", "HK options", "Futures", "Crypto", "Index", "Bonds", "Notes", "CN", "JP", "AU", "SG", "MY", "CA", "Korea Stocks"}
-    return {"groups": [{"name": g["groupName"], "own": g.get("groupType") == 1} for g in groups if g.get("groupName") not in skip],
+    # your own lists, and Favorites (moomoo's list that you fill yourself); moomoo's other built-in groups (All, US, HK,
+    # Options...) are automatic filters of All by market or kind, not lists
+    return {"groups": [{"name": g["groupName"], "own": g.get("groupType") == 1} for g in groups
+                       if g.get("groupType") == 1 or g.get("groupName") == "Favorites"],
             "positions": bool(accounts)}
 
 
@@ -2872,6 +3776,27 @@ def moomoo_list(name):
         if sym and sym not in out:
             out.append(sym)
     return {"name": name, "symbols": out}
+
+
+def moomoo_list_change(name, add=(), remove=()):
+    """Add stocks to, or take them out of, one of the user's own moomoo watchlist groups, as the moomoo app does:
+    taking a stock out of a group leaves it in All. moomoo's built-in groups (All, US, Favorites...) can only be changed
+    in the moomoo app. Returns the group as it is afterwards. Only the watchlist is touched: nothing is traded."""
+    def secs(symbols):
+        out = []
+        for sym in symbols:
+            market, code = moomoo_security(sym)
+            out.append({"market": MOOMOO_MARKETS[market][0], "code": code})
+        return out
+    with OpenD() as od:
+        own = {g["groupName"] for g in od.call(3222, {"groupType": 1}).get("groupList") or []}
+        if name not in own:
+            raise OpenDError(f"\u201c{name}\u201d is one of moomoo's built-in lists, which only the moomoo app can change.", 400)
+        if add:
+            od.call(3214, {"groupName": name, "op": 1, "securityList": secs(add)})
+        if remove:
+            od.call(3214, {"groupName": name, "op": 3, "securityList": secs(remove)})   # 3: out of this group only
+    return moomoo_list(name)
 
 
 def moomoo_positions():
@@ -2906,7 +3831,7 @@ def moomoo_status():
 
 
 # --------------------------------------------------------------------------
-# Local web server: the Stock Research Desk page plus a JSON API
+# Local web server: the Diligence desk page plus a JSON API
 # --------------------------------------------------------------------------
 
 LOCAL_NAMES = {"localhost", "127.0.0.1", "::1"}
@@ -2924,8 +3849,37 @@ def _is_local(value, schemes=None):
 def make_handler(client, max_age_hours=12):
     locks, locks_guard = {}, threading.Lock()
 
+    jobs, jobs_guard = {}, threading.Lock()
+
+    def background(key, work):
+        """Run work(db) on its own thread and database connection, once per key at a time. Returns the thread."""
+        with jobs_guard:
+            t = jobs.get(key)
+            if t and t.is_alive():
+                return t
+            def run():
+                bdb = connect()
+                try:
+                    work(bdb)
+                except Exception as e:    # a failed refresh leaves the saved copy in place
+                    sys.stderr.write(f"  background {key}: {e!r}\n")
+                finally:
+                    bdb.close()
+            t = jobs[key] = threading.Thread(target=run, daemon=True)
+            t.start()
+            return t
+
+    def refresh(bdb, key):
+        """Download a company again, while the page keeps showing the saved copy."""
+        with locks_guard:
+            lock = locks.setdefault(key, threading.Lock())
+        with lock:
+            cik = fetch_company(bdb, client, key, docs=1, insiders=40, log=lambda *_: None)
+            fetch_debt_split(bdb, client, cik)
+
     def ensure(db, ticker, force=False, segments=False, insiders=0):
-        """Return the CIK, fetching from the SEC if the company is missing or stale."""
+        """Return the CIK, fetching from the SEC if the company is missing. A saved company that is out of
+        date is answered from what is saved and downloaded again in the background."""
         key = ticker.strip().upper()
         quiet = lambda *_: None
         with locks_guard:
@@ -2937,10 +3891,18 @@ def make_handler(client, max_age_hours=12):
                 row = db.execute("SELECT fetched_at FROM companies WHERE cik=?", (cik,)).fetchone()
                 age = datetime.now(timezone.utc) - datetime.fromisoformat(row["fetched_at"])
                 fresh = client is None or age < timedelta(hours=max_age_hours)
+                if not fresh:
+                    background("refresh:" + key, lambda bdb: refresh(bdb, key))
+                    return cik
             if not fresh:
                 if client is None:
                     raise SystemExit(f"{ticker} is not in the database.")
-                cik = fetch_company(db, client, key, docs=1, insiders=40, log=quiet)
+                cik = fetch_company(db, client, key, docs=1, insiders=40, log=quiet, statements=(2, 4))
+                def more_statements(bdb, cik=cik):
+                    if fetch_statement_lines(bdb, client, cik, log=quiet):
+                        with bdb:
+                            build_metrics(bdb, cik)
+                background(f"statements:{cik}", more_statements)
             if client is not None:
                 fetch_debt_split(db, client, cik)  # only for companies with no debt total in quarterly reports
             if insiders and client is not None:
@@ -2994,7 +3956,7 @@ def make_handler(client, max_age_hours=12):
             """Pass a request on to EODHD. Its replies lack the header browsers need, so the page asks through here."""
             if not re.fullmatch(r"(real-time|eod)/[A-Za-z0-9._-]+|news", path):
                 return self._send(404, {"error": "not an EODHD address the page uses"})
-            req = urllib.request.Request(f"https://eodhd.com/api/{path}?{query}", headers={"User-Agent": "sec-database"})
+            req = urllib.request.Request(f"https://eodhd.com/api/{path}?{query}", headers={"User-Agent": "Diligence"})
             try:
                 with urllib.request.urlopen(req, timeout=25) as r:
                     status, body = r.status, r.read()
@@ -3049,6 +4011,11 @@ def make_handler(client, max_age_hours=12):
                 return self._send(500, {"error": repr(e)})
 
         def _static(self, rel):
+            if unquote(rel) in OLD_DESK_PAGES:   # an old bookmark
+                self.send_response(301)
+                self.send_header("Location", "/desk/" + quote(DESK_PAGE) + ("?" + urlparse(self.path).query if urlparse(self.path).query else ""))
+                self.end_headers()
+                return
             base = os.path.realpath(DESK_DIR)
             path = os.path.realpath(os.path.join(base, unquote(rel)))
             if not path.startswith(base + os.sep) or not os.path.isfile(path):
@@ -3118,10 +4085,21 @@ def make_handler(client, max_age_hours=12):
                         return self._send(200, desk_insiders(db, cik))
                     if kind == "holders":
                         cik = ensure(db, ticker, force)
+                        out_of_date = False
                         if client is not None:
-                            fetch_holders(db, client, cik, log=lambda *_: None)
-                            fetch_major_holders(db, client, cik, log=lambda *_: None)
-                        return self._send(200, desk_holders(db, cik))
+                            # the first time this downloads the SEC's 13F data sets (about 200 MB): never inside
+                            # the request. Wait a few seconds, then answer with what is known and let the page ask again.
+                            def holders_work(bdb, cik=cik):
+                                fetch_holders(bdb, client, cik, log=lambda *_: None)
+                                fetch_major_holders(bdb, client, cik, log=lambda *_: None)
+                            job = background(f"holders:{cik}", holders_work)
+                            job.join(8)
+                            out_of_date = job.is_alive()
+                        out = desk_holders(db, cik)
+                        out["updating"] = out_of_date
+                        have = [f for f in os.listdir(F13_DIR) if f.endswith(".zip")] if os.path.isdir(F13_DIR) else []
+                        out["downloading13f"] = out_of_date and len(have) < F13_KEEP
+                        return self._send(200, out)
                     if kind == "statements":
                         return self._send(200, desk_statements(db, ensure(db, ticker, force)))
                     if kind == "segments":
@@ -3164,21 +4142,25 @@ def make_handler(client, max_age_hours=12):
                         return self._send(200, theme_get((qs.get("where") or [""])[0], (qs.get("name") or [""])[0]))
                     except ValueError as e:
                         return self._send(404, {"error": str(e)})
-                if parts == ["api", "screener"]:
-                    return self._send(200, screener_rows(db, (qs.get("symbols") or [""])[0].split(",")))
-                if parts == ["api", "screener", "market"]:
-                    arg = lambda k, d: (qs.get(k) or [d])[0]
-                    return self._send(200, screener_market(arg("market", "US").upper(), float(arg("min_cap", "1e10")),
-                                                           min(int(arg("limit", "300")), 600)))
                 if parts == ["api", "reports"]:
                     return self._send(200, reports_for(db, (qs.get("ticker") or [""])[0]))
                 if parts == ["api", "reports", "file"]:
                     doc = report_text((qs.get("path") or [""])[0])
                     return self._send(200 if doc else 404, doc or {"error": "report not found"})
+                if parts == ["api", "desk", "notes"]:
+                    return self._send(200, notes_get())
+                if parts == ["api", "desk", "footprint"]:
+                    arg = lambda k: [x for x in (qs.get(k) or [""])[0].split(",") if x]
+                    return self._send(200, stock_footprint(db, arg("tickers")[:200], arg("keep")))
+                if parts == ["api", "settings", "sources"]:
+                    return self._send(200, data_sources(client))
                 if parts == ["api", "search"]:
                     q = (qs.get("q") or [""])[0]
                     t = (qs.get("ticker") or [None])[0]
-                    return self._send(200, search_docs(db, q, t))
+                    try:
+                        return self._send(200, search_docs(db, q, t))
+                    except LookupError as e:
+                        return self._send(404, {"error": str(e)})
                 self._send(404, {"error": "unknown path", "try": [
                     "/", "/api/health", "/api/companies", "/api/company/MSFT",
                     "/api/company/MSFT?refresh=1", "/api/desk/fundamentals/MSFT",
@@ -3191,7 +4173,7 @@ def make_handler(client, max_age_hours=12):
                 pass
             except SystemExit as e:
                 self._send(404, {"error": str(e)})
-            except OpenDError as e:  # the screener, when moomoo OpenD is not running
+            except OpenDError as e:  # moomoo OpenD is not running
                 self._send(e.status, {"error": str(e)})
             except Exception as e:  # keep the server alive
                 self._send(500, {"error": repr(e)})
@@ -3213,7 +4195,10 @@ def make_handler(client, max_age_hours=12):
             if "application/json" not in (self.headers.get("Content-Type") or ""):
                 return self._send(415, {"error": "send JSON"})
             try:
-                body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 2_000_000)) or b"{}")
+                cap = 50_000_000 if parts == ["api", "desk", "notes"] else 2_000_000   # notes carry cached figures too
+                body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), cap)) or b"{}")
+                if parts == ["api", "desk", "notes"]:
+                    return self._send(200, notes_put(body))
                 if parts == ["api", "themes", "create"]:
                     return self._send(200, theme_create(body.get("name"), body.get("brief", ""), body.get("language", "en")))
                 if parts == ["api", "themes", "change"]:
@@ -3222,8 +4207,26 @@ def make_handler(client, max_age_hours=12):
                     return self._send(200, theme_suggest(body.get("where"), body.get("name")))
                 if parts == ["api", "macro", "key"]:
                     return self._send(200, macro_set_key(body.get("key")))
+                if parts == ["api", "desk", "forget"]:
+                    db = connect()
+                    try:
+                        return self._send(200, forget_stocks(db, [str(x) for x in body.get("tickers") or []][:200], [str(x) for x in body.get("keep") or []]))
+                    finally:
+                        db.close()
+                if parts == ["api", "settings", "sec"]:
+                    return self._send(200, set_sec_identity(client, body.get("name"), body.get("email")))
+                if parts == ["api", "settings", "reports"]:
+                    return self._send(200, set_reports_dir(body.get("dir")))
+                if parts == ["api", "moomoo", "list", "change"]:
+                    try:
+                        return self._send(200, moomoo_list_change(str(body.get("name") or ""), [str(x) for x in body.get("add") or []][:50],
+                                                                  [str(x) for x in body.get("remove") or []][:50]))
+                    except OpenDError as e:
+                        return self._send(e.status, {"error": str(e)})
                 if parts == ["api", "macro", "explain"]:
                     return self._send(200, macro_explain(body))
+                if parts == ["api", "reports", "diagram"]:
+                    return self._send(200, report_diagram(body.get("text")))
                 return self._send(404, {"error": "unknown path"})
             except (ValueError, subprocess.TimeoutExpired) as e:
                 return self._send(400, {"error": str(e) or "Claude took too long to answer."})
@@ -3233,7 +4236,7 @@ def make_handler(client, max_age_hours=12):
                 return self._send(500, {"error": repr(e)})
 
         def log_message(self, fmt, *a):
-            if "/desk/" not in (a[0] if a else ""):
+            if "/desk/" not in (str(a[0]) if a else ""):
                 sys.stderr.write("  " + fmt % a + "\n")
     return Handler
 
@@ -3241,6 +4244,91 @@ def make_handler(client, max_age_hours=12):
 # ---- Research reports: the markdown files written by the report skills ----
 # The Reports tab reads them straight from their folder, so a report shows up as soon as it is saved.
 REPORTS_DIR_DEFAULT = os.path.join(HERE, "reports")
+NOTES_PATH = os.path.join(HERE, "notes", "desk.json")   # a copy of the page's research notes (git-ignored)
+
+
+def notes_get():
+    """The copy of the page's notes kept on disk: {"store": ..., "saved_at": ms} or {"store": None}."""
+    try:
+        with open(NOTES_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"store": None}
+
+
+def _write_settings(**changes):
+    """Change some keys in settings.json, keeping the rest."""
+    with _MACRO_LOCK:
+        try:
+            with open(SETTINGS_PATH, encoding="utf-8") as f:
+                settings = json.load(f)
+        except (OSError, ValueError):
+            settings = {}
+        settings.update(changes)
+        tmp = SETTINGS_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+        os.replace(tmp, SETTINGS_PATH)
+
+
+def data_sources(client):
+    """Every source the desk reads, and whether it works: the Settings page's list."""
+    try:
+        with open(SETTINGS_PATH, encoding="utf-8") as f:
+            settings = json.load(f)
+    except (OSError, ValueError):
+        settings = {}
+    try:
+        mm = moomoo_status()
+    except Exception as e:     # not running, or not logged in
+        mm = {"ok": False, "error": str(e) or "OpenD is not running"}
+    mm["address"] = "%s:%d" % OPEND_ADDR
+    d = reports_dir()
+    count = sum(1 for _r, _d, fs in os.walk(d) for f in fs if f.endswith((".md", ".html"))) if os.path.isdir(d) else 0
+    db = connect()
+    try:
+        companies = db.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+    finally:
+        db.close()
+    return {"sec": {"name": settings.get("name") or "", "email": settings.get("email") or "", "ok": client is not None,
+                    "companies": companies},
+            "moomoo": mm, "fred": macro_status(),
+            "reports": {"dir": d, "setting": settings.get("reports_dir") or "", "exists": os.path.isdir(d), "count": count},
+            "notes": {"path": NOTES_PATH, "saved_at": (notes_get() or {}).get("saved_at")}}
+
+
+def set_sec_identity(client, name, email):
+    """The contact the SEC asks every request to carry. Takes effect at once."""
+    name, email = (name or "").strip(), (email or "").strip()
+    if not name or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) or email == "you@example.com":
+        raise ValueError("Give your name and a real email address: the SEC asks every request to say who is asking.")
+    _write_settings(name=name, email=email)
+    if client is not None:
+        client.user_agent = f"{name} {email}"
+    return {"ok": True}
+
+
+def set_reports_dir(path):
+    """Where the Reports tab reads from. Empty goes back to the reports folder next to this file."""
+    path = (path or "").strip()
+    if path and not os.path.isdir(os.path.join(HERE, os.path.expanduser(path))):
+        raise ValueError("That folder does not exist: " + path)
+    _write_settings(reports_dir=path)
+    return {"ok": True, "dir": reports_dir()}
+
+
+def notes_put(body):
+    """Keep the page's notes on disk, so a cleared browser loses nothing. Written to a temporary file first, so a
+    half-written copy never replaces a good one."""
+    store = body.get("store")
+    if not isinstance(store, dict) or not isinstance(store.get("data"), dict):
+        raise ValueError("not a Diligence notes file")
+    os.makedirs(os.path.dirname(NOTES_PATH), exist_ok=True)
+    tmp = NOTES_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"store": store, "saved_at": store.get("savedAt") or int(time.time() * 1000)}, f)
+    os.replace(tmp, NOTES_PATH)
+    return {"ok": True, "saved_at": store.get("savedAt")}
 REPORT_KINDS = [("《看懂", "Series"), ("bottleneck-map", "Bottleneck scan"), ("-how-it-works-", "How it works"),
                 ("-tech-stack-", "Tech stack"), ("-supply-chain-", "Supply chain"), ("-overview-", "Theme overview"), ("-industry-", "Industry"), ("-funnel-", "Funnel"),
                 ("-earnings-", "Earnings"), ("財報", "Earnings"), ("-checklist", "Checklist"), ("-management-", "Management"),
@@ -3272,7 +4360,10 @@ def reports_dir():
             d = (json.load(f).get("reports_dir") or "").strip()
     except (OSError, ValueError):
         d = ""
-    return os.path.realpath(os.path.join(HERE, os.path.expanduser(d)) if d else REPORTS_DIR_DEFAULT)
+    if d:
+        return os.path.realpath(os.path.join(HERE, os.path.expanduser(d)))
+    os.makedirs(REPORTS_DIR_DEFAULT, exist_ok=True)   # a fresh copy has none yet; a folder you set is never made up
+    return REPORTS_DIR_DEFAULT
 
 
 REPORT_CATEGORY_DIRS = {"Company": "Company", "Industry-theme": "Industry & theme", "Screens-pools": "Screens & pools",
@@ -3373,6 +4464,46 @@ def reports_scan():
             items.sort(key=lambda e: (e["date"], e["modified"]), reverse=True)
             _reports_cache.update(sig=sig, list=items, hits={})
         return root, _reports_cache["list"]
+
+
+# ---- Forgetting a stock: when it is in none of the page's groups, the data kept about it can go.
+# Its reports never do: they are the user's research, kept whatever happens to the stock.
+PER_COMPANY_TABLES = [t for t in (   # tables, not views (annual_financials is a view of metrics)
+    "facts", "filings", "metrics", "statement_lines", "statement_pages",
+    "statement_read", "segment_facts", "segment_q_facts", "segment_filings_read", "debt_split", "debt_split_read",
+    "holders_13f", "holders_5pct", "holders_5pct_read", "insider_trades", "insider_filings_read", "documents",
+    "documents_fts", "ir_exhibits", "ir_read", "companies")]
+
+
+def stock_footprint(db, tickers, keep=()):
+    """What sec.db keeps about each stock. A filer shared with a ticker still in use (GOOG and GOOGL are one
+    company) is marked, and its rows are not counted as going."""
+    keep_ciks = {lookup_cik(db, k) for k in keep if k} - {None}
+    out = []
+    for t in tickers:
+        t = t.strip().upper()
+        cik = lookup_cik(db, t)   # GOOG finds the company saved under GOOGL
+        rows = 0
+        if cik and cik not in keep_ciks:
+            rows = sum(db.execute(f"SELECT COUNT(*) FROM {tb} WHERE cik=?", (cik,)).fetchone()[0] for tb in PER_COMPANY_TABLES if tb != "documents_fts")
+        out.append({"ticker": t, "cik": cik, "secRows": rows, "shared": bool(cik and cik in keep_ciks)})
+    return out
+
+
+def forget_stocks(db, tickers, keep=()):
+    """Delete what sec.db keeps about these stocks. Reports are not touched. A filer shared with a ticker in `keep`
+    keeps its rows."""
+    feet = stock_footprint(db, tickers, keep)
+    done = []
+    for f in feet:
+        t = f["ticker"]
+        if f["cik"] and not f["shared"]:
+            for tb in PER_COMPANY_TABLES:
+                db.execute(f"DELETE FROM {tb} WHERE cik=?", (f["cik"],))
+        db.execute("DELETE FROM transcripts WHERE upper(ticker)=?", (t,))
+        db.commit()
+        done.append({"ticker": t, "secRows": f["secRows"], "shared": f["shared"]})
+    return {"done": done}
 
 
 def reports_for(db, ticker):
@@ -3485,8 +4616,8 @@ How to write it:
   code block (flowchart LR or TD, sequenceDiagram for a step-by-step exchange between parties). Keep node labels short,
   put amounts on the arrows where they matter, and do not add colours or styling. Never draw diagrams with text art.
 - When figures compare companies, years or parts of a whole, add a chart as a ```chart code block holding only JSON,
-  for example {"type": "bar", "title": "...", "unit": "$B", "x": "year", "series": ["A", "B"], "data": [{"year": "2025",
-  "A": 1.2, "B": 3.4}]}. type is bar, line, area or pie (pie data is [{"name": "...", "value": 12}]); add "stacked": true
+  for example {{"type": "bar", "title": "...", "unit": "$B", "x": "year", "series": ["A", "B"], "data": [{{"year": "2025",
+  "A": 1.2, "B": 3.4}}]}}. type is bar, line, area or pie (pie data is [{{"name": "...", "value": 12}}]); add "stacked": true
   to stack bars. Use only figures you found, and give the same figures with their sources in the text or a table.
 - If listed companies matter to the topic, end the body with a section "## Listed companies": a table with the
   columns Ticker | Company | Role in this topic, with tickers written like NVDA, 0700.HK, 600519.SH, 2330.TW.
@@ -3748,13 +4879,26 @@ def _research_pump():
             _research_start(folder, tid)
 
 
+def _topic_update(folder, tid, **fields):
+    """Change one topic's fields; False when it has been removed meanwhile."""
+    found = []
+    def change(d):
+        t = next((t for t in d.get("topics") or [] if t["id"] == tid), None)
+        if t is not None:
+            t.update(fields)
+            found.append(t)
+    _theme_edit(folder, change)
+    return bool(found)
+
+
 def _research_start(folder, tid):
     data = _theme_read(folder)
     topic = next((t for t in data.get("topics") or [] if t["id"] == tid), None)
+    if topic is None:          # removed while it waited its turn
+        return
     claude = _claude_bin()
     if not claude:
-        _theme_edit(folder, lambda d: next(t for t in d["topics"] if t["id"] == tid).update(
-            status="failed", error="Claude Code (the claude command) was not found on this computer."))
+        _topic_update(folder, tid, status="failed", error="Claude Code (the claude command) was not found on this computer.")
         return
     prompt = _research_prompt(folder, data, topic)
     jobs = os.path.join(folder, ".jobs")
@@ -3773,9 +4917,11 @@ def _research_start(folder, tid):
         except OSError:
             pass
     threading.Thread(target=feed, daemon=True).start()
+    if not _topic_update(folder, tid, status="running", pid=proc.pid, started=time.time(), searches=0, pages=0,
+                         activity="Starting", error=None):
+        proc.kill()            # removed while the run was starting
+        return
     _THEME_JOBS[(folder, tid)] = proc
-    _theme_edit(folder, lambda d: next(t for t in d["topics"] if t["id"] == tid).update(
-        status="running", pid=proc.pid, started=time.time(), searches=0, pages=0, activity="Starting", error=None))
     threading.Thread(target=_research_watch, args=(folder, tid, proc, proc.pid), daemon=True).start()
 
 
@@ -4018,7 +5164,7 @@ def _fred(path, **params):
     if not key:
         raise OSError("no FRED API key set")
     params.update(api_key=key, file_type="json")
-    d = _get_json("https://api.stlouisfed.org/fred/%s?%s" % (path, urllib.parse.urlencode(params)))
+    d = _get_json("https://api.stlouisfed.org/fred/%s?%s" % (path, urlencode(params)))
     if d.get("error_message"):
         raise OSError(d["error_message"])
     return d
@@ -4211,6 +5357,58 @@ Do not invent figures that are not in the data above.""")
     return _EXPLAIN_CACHE[key]
 
 
+DIAGRAMS_DIR = os.path.join(HERE, "diagrams")   # text diagrams redrawn as Mermaid, one file each (git-ignored)
+_DIAGRAM_SLOTS = threading.Semaphore(2)          # Claude runs at most two at once, however many a report has
+MERMAID_START = re.compile(r"^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?|classDiagram|erDiagram|journey|gantt|mindmap|timeline|block-beta|quadrantChart)\b")
+
+
+def report_diagram(text):
+    """A diagram drawn in plain text (boxes and arrows in a code block) redrawn as Mermaid by Claude, kept on disk so
+    each one is drawn once. {"mermaid": code}."""
+    text = (text or "").strip("\n")
+    if not text.strip() or len(text) > 8000:
+        raise ValueError("send the text of one diagram (at most 8,000 characters)")
+    key = hashlib.sha1(text.encode("utf-8")).hexdigest()
+    path = os.path.join(DIAGRAMS_DIR, key + ".mmd")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return {"mermaid": f.read(), "cached": True}
+    claude = _claude_bin()
+    if not claude:
+        raise ValueError("Claude Code (the claude command) was not found on this computer, so text diagrams stay as text.")
+    prompt = ("Redraw this plain-text diagram from a research report as a Mermaid diagram.\n\n" + text + """
+
+Rules:
+- Keep every box, actor, step number, label, amount and arrow it shows, and what each arrow means. Add nothing.
+- Keep the labels in the diagram's own language.
+- Pick the Mermaid type that fits. When parties pass messages or money to each other in numbered or timed steps, use
+  sequenceDiagram (participants across the top, one arrow per step, longer detail in "Note over" lines). Use flowchart TD
+  for structures, hierarchies and chains, and flowchart LR only for a short chain of at most five boxes.
+- Keep arrow labels short (at most about eight words); put the rest of the detail in node labels or notes.
+- Put every node label in double quotes, write a double quote inside a label as #quot;, and break long labels with <br/>.
+- Never use a semicolon inside any text; use a comma.
+- Group related nodes in subgraphs when the text groups them.
+- Answer with the Mermaid code only: no code fence, no explanation.""")
+    with _DIAGRAM_SLOTS:
+        if os.path.exists(path):   # drawn while this one waited
+            with open(path, encoding="utf-8") as f:
+                return {"mermaid": f.read(), "cached": True}
+        r = subprocess.run([claude, "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config", "--no-session-persistence"],
+                           input=prompt, capture_output=True, text=True, timeout=240)
+    try:
+        code = (json.loads(r.stdout).get("result") or "").strip()
+    except ValueError:
+        code = ""
+    code = re.sub(r"^```(?:mermaid)?\s*|\s*```$", "", code).strip()
+    if not MERMAID_START.match(code):
+        raise ValueError("Claude did not answer with a diagram" + (": " + (r.stderr or "")[-200:] if r.stderr else ""))
+    os.makedirs(DIAGRAMS_DIR, exist_ok=True)
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        f.write(code)
+    os.replace(path + ".tmp", path)
+    return {"mermaid": code, "cached": False}
+
+
 def restart_when_changed(path=os.path.abspath(__file__), every=2.0):
     """Restart the server by itself when this file is edited, so a new version is never left unloaded."""
     started = os.path.getmtime(path)
@@ -4236,10 +5434,17 @@ def cmd_serve(db, args):
     s = load_settings()
     client = SecClient(s["name"], s["email"])
     ThreadingHTTPServer.allow_reuse_address = True
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(client))
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(client))
+    except OSError as e:
+        if e.errno in (errno.EADDRINUSE, getattr(errno, "WSAEADDRINUSE", -1)):
+            sys.exit(f"Port {args.port} is already in use, probably by Diligence running in another window: "
+                     f"open http://localhost:{args.port}/ or stop the other one first. "
+                     f"To use another port: python3 sec_db.py serve --port {args.port + 1}")
+        raise
     restart_when_changed()
     threading.Thread(target=research_resume, daemon=True).start()
-    print(f"Stock Research Desk: http://localhost:{args.port}/")
+    print(f"Diligence desk: http://localhost:{args.port}/")
     print(f"JSON API example:    http://localhost:{args.port}/api/desk/fundamentals/MSFT")
     print("Leave this window open while you use the page. Ctrl+C stops it.")
     print("It restarts by itself whenever sec_db.py is updated.")
@@ -4253,7 +5458,8 @@ def cmd_fetch(db, args):
     s = load_settings()
     client = SecClient(s["name"], s["email"])
     for t in args.tickers:
-        fetch_company(db, client, t, docs=args.docs, insiders=args.insiders)
+        cik = fetch_company(db, client, t, docs=args.docs, insiders=args.insiders)
+        fetch_debt_split(db, client, cik)  # only for companies with no debt total in quarterly reports (Caterpillar)
     if len(args.tickers) == 1:
         args.ticker, args.years = args.tickers[0], 6
         print()
@@ -4283,7 +5489,7 @@ def main(argv=None):
     p.add_argument("ticker")
     p.add_argument("--out")
     p.set_defaults(fn=cmd_export)
-    p = sub.add_parser("serve", help="run the Stock Research Desk and JSON API")
+    p = sub.add_parser("serve", help="run the Diligence desk and JSON API")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_serve)
     args = ap.parse_args(argv)

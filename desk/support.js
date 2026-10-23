@@ -1,4 +1,6 @@
-// GENERATED from dc-runtime/src/*.ts — do not edit. Rebuild with `cd dc-runtime && bun run build`.
+// The page runtime: turns a .dc.html page (a template plus a `class Component extends DCLogic`) into React.
+// It came built from a design tool and its TypeScript source is not part of Diligence, so this file is the
+// source now: edit it here. React, ReactDOM and Babel load from desk/vendor/ (same files and hashes as unpkg).
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -28,8 +30,11 @@
     const { props, preview } = parseDataProps(
       scriptEl?.getAttribute("data-props") ?? null
     );
+    // A page may keep its template inside <template>, so the browser leaves it inert: it does not fetch
+    // iframe src="{{ ... }}" placeholders or check {{ ... }} values in SVG and date attributes.
+    const inert = dc.querySelector(":scope > template");
     return {
-      template: dc.innerHTML,
+      template: inert ? inert.innerHTML : dc.innerHTML,
       js: scriptEl ? scriptEl.textContent || "" : "",
       props,
       preview
@@ -40,7 +45,9 @@
     if (!openMatch) return null;
     const close = src.lastIndexOf("</x-dc>");
     if (close === -1 || close < openMatch.index) return null;
-    const template = src.slice(openMatch.index + openMatch[0].length, close);
+    let template = src.slice(openMatch.index + openMatch[0].length, close);
+    const wrapped = /^\s*<template>([\s\S]*)<\/template>\s*$/.exec(template);
+    if (wrapped) template = wrapped[1];
     const doc = new DOMParser().parseFromString(src, "text/html");
     const scriptEl = doc.querySelector("script[data-dc-script]");
     const { props, preview } = parseDataProps(
@@ -115,7 +122,7 @@
       padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
       border-radius:4px;white-space:pre-wrap;pointer-events:none}
     /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts \u2014 keep both
-       in sync until dc-runtime regains a build step. */
+       in sync with the design tool's export CSS. */
     @media print {
       @page { margin: 0.5cm; }
       figure, table { break-inside: avoid; }
@@ -1140,11 +1147,11 @@
   }
 
   // src/cdn.ts
-  var REACT_URL = "https://unpkg.com/react@18.3.1/umd/react.production.min.js";
+  var REACT_URL = "/desk/vendor/react-18.3.1.min.js";
   var REACT_SRI = "sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z";
-  var REACT_DOM_URL = "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js";
+  var REACT_DOM_URL = "/desk/vendor/react-dom-18.3.1.min.js";
   var REACT_DOM_SRI = "sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1";
-  var BABEL_URL = "https://unpkg.com/@babel/standalone@7.29.0/babel.min.js";
+  var BABEL_URL = "/desk/vendor/babel-standalone-7.29.0.min.js";
   var BABEL_SRI = "sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y";
   function cdnScriptFor(url, sri) {
     const res = window.__resources;

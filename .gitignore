@@ -7,11 +7,19 @@ sec.db-*
 settings.json
 desk/keys.local.js
 
-# Old copies (they hold the keys) and Python/macOS clutter
-_backup_before_reports_tab/
+# Python and macOS clutter
 __pycache__/
 *.pyc
 .DS_Store
 
 # Your research reports (the default reports folder)
 reports/
+
+# What `python3 sec_db.py export` writes
+exports/
+
+# The copy of your research notes that the page keeps on disk
+notes/
+
+# text diagrams from reports, redrawn as Mermaid (a cache)
+diagrams/

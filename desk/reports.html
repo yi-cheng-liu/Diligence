@@ -80,6 +80,12 @@ article{min-width:0}
 .eyebrow{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--accent);display:flex;gap:10px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
 .head h1{font:900 clamp(26px,3.3vw,40px)/1.25 var(--serif);margin:12px 0 10px;text-wrap:balance;letter-spacing:.015em}
 .head .path{font:12px var(--mono);color:var(--ink3);overflow-wrap:anywhere}
+.head .tools{display:flex;align-items:center;gap:12px;margin-top:14px}
+.autobtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:3px 11px 3px 9px;font-size:12px;color:var(--ink2)}
+.autobtn:hover{color:var(--ink);border-color:var(--accent)}
+.autobtn i{width:24px;height:14px;border-radius:999px;background:var(--line);position:relative;transition:background .15s}
+.autobtn i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--ink2);transition:transform .15s}
+.autobtn[aria-pressed="true"] i{background:var(--accent)}.autobtn[aria-pressed="true"] i::after{transform:translateX(10px);background:var(--bg)}
 .md{font-size:16.5px;line-height:1.9;color:var(--ink2)}
 .md>*{max-width:62em}
 .md>.tw,.md>pre{max-width:none}
@@ -274,6 +280,8 @@ article{min-width:0}
             if (open) html += '<div class="kids">' + g.items.map(itemHtml).join('') + '</div>';
           });
         });
+      } else if (!all.length) {
+        html += '<p class="note">No reports yet. Reports you research in Themes appear here, and so does any markdown (<code>.md</code>) file you save in<br><code>' + esc(state.dir) + '</code><br><br>A company\'s own reports go in <code>Company/&lt;TICKER&gt;/</code> there.</p>';
       } else {
         html += '<div class="sec"><span>Newest</span><span></span></div>' + rows.slice(0, 8).map(itemHtml).join('');
         var groups = {}, order = [];
@@ -316,6 +324,9 @@ article{min-width:0}
     return parts.join('/');
   }
 
+  var AUTO = 'diligence.reports.autoviz';
+  function autoViz() { return store.get(AUTO) !== 'off'; }
+
   function show(path, keepScroll) {
     var r = state.reports.find(function (x) { return x.path === path; });
     state.current = path; store.set(LAST, path); drawList();
@@ -347,10 +358,11 @@ article{min-width:0}
       var pn = (prev || next) ? '<div class="pn">' +
         (prev ? '<button data-path="' + esc(prev.path) + '"><span>Previous in this folder</span><b>' + esc(prev.title) + '</b></button>' : '') +
         (next ? '<button class="next" data-path="' + esc(next.path) + '"><span>Next in this folder</span><b>' + esc(next.title) + '</b></button>' : '') + '</div>' : '';
-      $('view').innerHTML = '<div class="page"><article><header class="head"><div class="eyebrow"><span>' + esc(r ? r.kind : 'Report') + '</span><span>' + (r && guessed(r) ? '~' : '') + esc(r ? r.date : '') + '</span><span>' + mins + ' min read</span></div><h1>' + esc(title) + '</h1><div class="path">' + esc(path) + '</div></header><div id="body"></div>' + pn + '</article>' +
+      $('view').innerHTML = '<div class="page"><article><header class="head"><div class="eyebrow"><span>' + esc(r ? r.kind : 'Report') + '</span><span>' + (r && guessed(r) ? '~' : '') + esc(r ? r.date : '') + '</span><span>' + mins + ' min read</span></div><h1>' + esc(title) + '</h1><div class="path">' + esc(path) + '</div><div class="tools"><button class="autobtn" id="autoviz" aria-pressed="' + autoViz() + '" title="Draw charts from the tables and steps from the A → B → C chains in this report"><i></i>Charts and diagrams</button></div></header><div id="body"></div>' + pn + '</article>' +
         (toc.length > 2 ? '<nav id="toc" aria-label="Sections"><span>In this report</span>' + toc.map(function (t) { return '<a href="#' + t[0] + '">' + esc(t[1]) + '</a>'; }).join('') + '</nav>' : '') + '</div>';
       $('body').appendChild(body);
-      if (window.enhanceMarkdown) window.enhanceMarkdown(body);   // Mermaid diagrams and charts
+      if (window.enhanceMarkdown) window.enhanceMarkdown(body, { auto: autoViz(), diagrams: '/api/reports/diagram' });   // Mermaid diagrams and charts, and charts drawn from the tables
+      $('autoviz').onclick = function () { store.set(AUTO, autoViz() ? 'off' : 'on'); show(path, true); };
       if (!keepScroll) $('reader').scrollTop = 0;
       onScroll();
     }).catch(function (err) {

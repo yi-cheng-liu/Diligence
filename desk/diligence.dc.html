@@ -11,11 +11,11 @@
 <script src="./support.js"></script>
 </head>
 <body>
-<x-dc>
+<x-dc><template>
 <helmet>
   <link rel="stylesheet" href="_ds/nocturne-e1ee5842-13e2-4a15-8f5e-73e39018410f/styles.css">
   <script src="_ds/nocturne-e1ee5842-13e2-4a15-8f5e-73e39018410f/_ds_bundle.js"></script>
-  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+  <link rel="stylesheet" href="vendor/phosphor-2.1.1/regular/style.css"><link rel="stylesheet" href="vendor/phosphor-2.1.1/fill/style.css">
   <style>
     :root{color-scheme:dark}
     html,body{height:100%;margin:0;background:var(--color-bg)}
@@ -39,6 +39,9 @@
     .hint:hover, .hint:focus-visible { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
     .hint-pop { display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: min(460px, 80vw); gap: 10px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-divider); box-shadow: 0 12px 32px rgba(0,0,0,0.45); cursor: default; font-weight: 400; text-align: left; }
     .hint:hover .hint-pop, .hint:focus-visible .hint-pop, .hint:focus-within .hint-pop { display: grid; }
+    .grp-row .grp-act { display: none; }
+    .grp-row:hover .grp-act, .grp-row:focus-within .grp-act { display: flex; }
+    .grp-row:hover .grp-count, .grp-row:focus-within .grp-count { display: none; }
     .hint-pop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
     .sel { width: 100%; min-width: 0; min-height: 32px; padding: 4px 26px 4px 10px; background-color: var(--color-bg); border: 1px solid var(--color-divider); border-radius: var(--radius-md); color: var(--color-text); font: inherit; font-size: 13px; outline: none; appearance: none; -webkit-appearance: none; box-sizing: border-box; }
     select.sel { background-image: linear-gradient(45deg, transparent 50%, var(--color-neutral-400) 50%), linear-gradient(135deg, var(--color-neutral-400) 50%, transparent 50%); background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
@@ -57,26 +60,16 @@
 
   <nav aria-label="Workspaces" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0;background:var(--color-bg);border-right:1px solid var(--color-divider)">
     <sc-for list="{{ workspaces }}" as="ws" hint-placeholder-count="2">
-      <button onClick="{{ ws.go }}" title="{{ ws.tip }}" style="width:58px;padding:8px 0 6px;display:grid;justify-items:center;gap:2px;border:0;border-radius:var(--radius-md);background:{{ ws.bg }};color:{{ ws.color }};font:inherit;font-size:10.5px;cursor:pointer" style-hover="color:var(--color-text)"><i class="{{ ws.icon }}" style="font-size:20px"></i>{{ ws.label }}</button>
+      <button onClick="{{ ws.go }}" title="{{ ws.tip }}" draggable="true" onDragStart="{{ ws.dragStart }}" onDragOver="{{ ws.dragOver }}" onDrop="{{ ws.drop }}" onDragEnd="{{ ws.dragEnd }}" style="position:relative;width:58px;padding:8px 0 6px;display:grid;justify-items:center;gap:2px;border:0;border-radius:var(--radius-md);background:{{ ws.bg }};opacity:{{ ws.op }};color:{{ ws.color }};font:inherit;font-size:10.5px;cursor:pointer" style-hover="color:var(--color-text)"><span aria-hidden="true" style="position:absolute;left:6px;right:6px;height:2px;border-radius:1px;background:var(--color-accent);pointer-events:none;z-index:1;display:{{ ws.lineDisp }};top:{{ ws.lineTop }};bottom:{{ ws.lineBot }}"></span><i class="{{ ws.icon }}" style="font-size:20px"></i>{{ ws.label }}</button>
     </sc-for>
+    <button onClick="{{ setGo }}" title="Settings: every data source, its key and whether it works" style="margin-top:auto;width:58px;padding:8px 0 6px;display:grid;justify-items:center;gap:2px;border:0;border-radius:var(--radius-md);background:{{ setRailBg }};color:{{ setRailColor }};font:inherit;font-size:10.5px;cursor:pointer;position:relative" style-hover="color:var(--color-text)"><i class="ph ph-gear-six" style="font-size:20px"></i>Settings<span style="position:absolute;top:6px;right:14px;width:7px;height:7px;border-radius:50%;background:{{ setRailDot }}"></span></button>
   </nav>
 
   <aside style="display:flex;flex-direction:column;min-height:0;overflow:hidden;background:linear-gradient(180deg, var(--color-surface), var(--color-bg) 75%)">
     <div style="display:flex;align-items:center;gap:8px;padding:16px 12px 12px 18px">
       <i class="ph ph-binoculars" style="font-size:20px;color:var(--color-accent)"></i>
       <span style="font-size:16px;font-weight:500;letter-spacing:-0.01em">Diligence</span>
-      <span style="margin-left:auto;display:flex;gap:2px">
-        <button class="btn btn-ghost btn-icon" onClick="{{ refreshQuotes }}" title="Refresh prices" style="width:30px;height:30px;color:var(--color-neutral-300)"><i class="{{ refreshIcon }}"></i></button>
-      </span>
     </div>
-    <button onClick="{{ openSettings }}" title="Live data connection" style="display:flex;align-items:center;gap:8px;margin:0 12px 12px;padding:7px 10px;border-radius:var(--radius-md);border:1px solid {{ connBorder }};background:transparent;color:var(--color-neutral-300);font:inherit;font-size:12.5px;text-align:left;cursor:pointer" style-hover="background:color-mix(in srgb, var(--color-text) 5%, transparent)">
-      <span style="width:8px;height:8px;border-radius:50%;flex:none;background:{{ connColor }}"></span>
-      <span style="display:grid;min-width:0;flex:1">
-        <span style="color:var(--color-text)">{{ connTitle }}</span>
-        <span style="font-size:11.5px;color:var(--color-neutral-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ connDetail }}</span>
-      </span>
-      <i class="ph ph-caret-right" style="font-size:12px;color:var(--color-neutral-500)"></i>
-    </button>
     <div style="position:relative;display:flex;align-items:center;gap:6px;padding:0 10px 12px 14px">
       <div ref="{{ chipsRef }}" style="display:flex;gap:{{ chipGap }};flex:1;min-width:0;overflow:hidden">
         <sc-for list="{{ groupChips }}" as="g" hint-placeholder-count="3">
@@ -89,18 +82,26 @@
       </sc-if>
       <sc-if value="{{ groupMenuOpen }}" hint-placeholder-val="{{ false }}">
         <div class="elev-md" style="position:absolute;top:100%;left:12px;right:10px;z-index:20;display:grid;gap:2px;padding:8px;border-radius:var(--radius-md);background:var(--color-surface)">
-          <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);padding:2px 8px 6px">Groups</span>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:2px 8px 6px">
+            <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500)">Groups</span>
+            <span style="font-size:11px;color:var(--color-neutral-600)">{{ groupsNote }}</span>
+          </div>
           <sc-for list="{{ groupList }}" as="g" hint-placeholder-count="3">
-            <div onClick="{{ g.pick }}" draggable="{{ g.drag }}" onDragStart="{{ g.dragStart }}" onDragOver="{{ g.dragOver }}" onDrop="{{ g.drop }}" onDragEnd="{{ g.dragEnd }}" style="display:flex;align-items:center;gap:8px;padding:6px 6px 6px 8px;border-radius:var(--radius-sm);cursor:pointer;background:{{ g.bg }};box-shadow:{{ g.mark }};opacity:{{ g.op }}" style-hover="background:color-mix(in srgb, var(--color-text) 6%, transparent)">
+            <div class="grp-row" onClick="{{ g.pick }}" draggable="{{ g.drag }}" onDragStart="{{ g.dragStart }}" onDragOver="{{ g.dragOver }}" onDrop="{{ g.drop }}" onDragEnd="{{ g.dragEnd }}" style="position:relative;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 8px;border-radius:var(--radius-sm);cursor:pointer;background:{{ g.bg }};opacity:{{ g.op }}" style-hover="background:color-mix(in srgb, var(--color-text) 6%, transparent)">
+              <span aria-hidden="true" style="position:absolute;left:6px;right:6px;height:2px;border-radius:1px;background:var(--color-accent);pointer-events:none;z-index:1;display:{{ g.lineDisp }};top:{{ g.lineTop }};bottom:{{ g.lineBot }}"></span>
               <sc-if value="{{ g.editing }}" hint-placeholder-val="{{ false }}">
                 <input id="grp-rename" class="input" value="{{ g.editName }}" onChange="{{ g.onEdit }}" onKeyDown="{{ g.onEditKey }}" onBlur="{{ g.saveEdit }}" onClick="{{ g.stop }}" aria-label="Group name" style="flex:1;min-width:0;min-height:26px;font-size:13px;padding:2px 8px;background:var(--color-bg)">
               </sc-if>
               <sc-if value="{{ g.showName }}" hint-placeholder-val="{{ true }}">
                 <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.name }}</span>
               </sc-if>
-              <span style="font-size:11.5px;color:var(--color-neutral-500)">{{ g.count }}</span>
-              <button onClick="{{ g.startEdit }}" title="Rename group" aria-label="Rename group" style="width:22px;height:22px;display:grid;place-items:center;background:transparent;border:0;border-radius:var(--radius-sm);color:var(--color-neutral-600);cursor:pointer" style-hover="color:var(--color-text)"><i class="ph ph-pencil-simple" style="font-size:12px"></i></button>
-              <button onClick="{{ g.remove }}" title="Delete group" style="width:22px;height:22px;display:grid;place-items:center;background:transparent;border:0;border-radius:var(--radius-sm);color:var(--color-neutral-600);cursor:pointer" style-hover="color:var(--color-text)"><i class="ph ph-x" style="font-size:12px"></i></button>
+              <span class="grp-count" style="min-width:22px;text-align:right;font-size:11.5px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ g.count }}</span>
+              <span class="grp-act" style="align-items:center;gap:2px">
+                <sc-if value="{{ g.canRename }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ g.startEdit }}" title="Rename group" aria-label="Rename group" style="width:22px;height:22px;display:grid;place-items:center;background:transparent;border:0;border-radius:var(--radius-sm);color:var(--color-neutral-500);cursor:pointer" style-hover="color:var(--color-text)"><i class="ph ph-pencil-simple" style="font-size:12px"></i></button>
+                </sc-if>
+                <button onClick="{{ g.remove }}" title="{{ g.removeTip }}" aria-label="{{ g.removeTip }}" style="width:22px;height:22px;display:grid;place-items:center;background:transparent;border:0;border-radius:var(--radius-sm);color:var(--color-neutral-500);cursor:pointer" style-hover="color:var(--color-text)"><i class="ph ph-x" style="font-size:12px"></i></button>
+              </span>
             </div>
           </sc-for>
           <input class="input" placeholder="New group, press Enter" value="{{ newGroup }}" onChange="{{ onNewGroup }}" onKeyDown="{{ onNewGroupKey }}" style="min-height:30px;font-size:13px;margin-top:4px;background:var(--color-bg)">
@@ -119,7 +120,8 @@
     </div>
     <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 6px">
       <sc-for list="{{ watch }}" as="w" hint-placeholder-count="6">
-        <div onClick="{{ w.open }}" draggable="true" onDragStart="{{ w.dragStart }}" onDragOver="{{ w.dragOver }}" onDrop="{{ w.drop }}" onDragEnd="{{ w.dragEnd }}" style="display:grid;grid-template-columns:minmax(0,1fr) 46px 62px 14px;align-items:center;gap:6px;padding:9px 4px 9px 14px;border-radius:var(--radius-md);cursor:pointer;background:{{ w.bg }};box-shadow:{{ w.mark }};opacity:{{ w.op }}" style-hover="background:color-mix(in srgb, var(--color-text) 5%, transparent)">
+        <div onClick="{{ w.open }}" draggable="true" onDragStart="{{ w.dragStart }}" onDragOver="{{ w.dragOver }}" onDrop="{{ w.drop }}" onDragEnd="{{ w.dragEnd }}" style="position:relative;display:grid;grid-template-columns:minmax(0,1fr) 46px 62px 14px;align-items:center;gap:6px;padding:9px 4px 9px 14px;border-radius:var(--radius-md);cursor:pointer;background:{{ w.bg }};opacity:{{ w.op }}" style-hover="background:color-mix(in srgb, var(--color-text) 5%, transparent)">
+          <span aria-hidden="true" style="position:absolute;left:8px;right:8px;height:2px;border-radius:1px;background:var(--color-accent);pointer-events:none;z-index:1;display:{{ w.lineDisp }};top:{{ w.lineTop }};bottom:{{ w.lineBot }}"></span>
           <div style="display:grid;min-width:0">
             <span style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.title }}</span>
             <span style="display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--color-neutral-500)">{{ w.sub }}<sc-if value="{{ w.hasVerdict }}" hint-placeholder-val="{{ false }}"><span class="tag tag-neutral" style="padding:0 6px;font-size:10px">{{ w.verdict }}</span></sc-if></span>
@@ -143,6 +145,7 @@
       </sc-if>
     </div>
     <div style="padding:10px 12px 14px;position:relative">
+      <sc-if value="{{ syncNote }}" hint-placeholder-val="{{ false }}"><p style="margin:0 2px 8px;font-size:11.5px;line-height:1.4;color:{{ syncNoteColor }}">{{ syncNote }}</p></sc-if>
       <input class="input" placeholder="Search name or symbol to add to {{ groupName }}" value="{{ newSymbol }}" onChange="{{ onNewSymbol }}" onKeyDown="{{ onNewSymbolKey }}" onBlur="{{ onSearchBlur }}" autoComplete="off" style="min-height:32px;font-size:13px">
       <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
         <div style="position:absolute;left:12px;right:12px;bottom:calc(100% - 8px);z-index:20;display:grid;padding:4px;border-radius:var(--radius-md);border:1px solid var(--color-divider);background:var(--color-surface);box-shadow:var(--shadow-lg);max-height:320px;overflow-y:auto">
@@ -417,7 +420,9 @@
           </sc-if>
 
           <sc-if value="{{ is.finances }}" hint-placeholder-val="{{ false }}">
-            
+            <sc-if value="{{ noAnnualNote }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px 14px;border-radius:var(--radius-md);border:1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);background:color-mix(in srgb, var(--color-accent) 8%, transparent);font-size:13px;line-height:1.55;color:var(--color-neutral-200)"><i class="ph ph-info" style="font-size:17px;color:var(--color-accent-300);margin-top:1px"></i><span style="text-wrap:pretty">{{ noAnnualNote }}</span></div>
+            </sc-if>
 
             <section id="sub-position" style="display:grid;gap:14px;padding-top:12px">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h4 style="margin:0;font-size:18px">Financial position</h4><span class="hint" tabindex="0" aria-label="What the labels mean"><i class="ph ph-info" style="font-size:17px"></i>
@@ -1286,68 +1291,184 @@
       <iframe src="{{ thmSrc }}" title="Themes" style="width:100%;height:100%;border:0;display:block"></iframe>
     </div>
   </sc-if>
-  <sc-if value="{{ scrMounted }}" hint-placeholder-val="{{ false }}">
-    <div style="position:fixed;top:0;bottom:0;left:64px;right:0;z-index:30;display:{{ scrDisp }};background:var(--color-bg)">
-      <iframe src="{{ scrSrc }}" title="Screener" style="width:100%;height:100%;border:0;display:block"></iframe>
+  <sc-if value="{{ setOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;top:0;bottom:0;left:64px;right:0;z-index:30;display:grid;grid-template-columns:300px minmax(0,1fr);background:var(--color-bg)">
+      <aside style="display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:16px 10px 20px 12px;background:linear-gradient(180deg, var(--color-surface), var(--color-bg) 75%);border-right:1px solid var(--color-divider)">
+        <div style="display:flex;align-items:center;gap:8px;padding:0 4px 14px 6px">
+          <i class="ph ph-gear-six" style="font-size:20px;color:var(--color-accent)"></i>
+          <span style="font-size:16px;font-weight:500;letter-spacing:-0.01em">Settings</span>
+          <button class="btn btn-ghost btn-icon" onClick="{{ setRecheck }}" title="Check every source again" style="margin-left:auto;width:30px;height:30px;color:var(--color-neutral-300)"><i class="{{ setRecheckIcon }}"></i></button>
+        </div>
+        <sc-for list="{{ setGroups }}" as="sg" hint-placeholder-count="4">
+          <div style="display:grid;gap:1px;margin-bottom:14px">
+            <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);padding:2px 8px 6px">{{ sg.title }}</span>
+            <sc-for list="{{ sg.items }}" as="it" hint-placeholder-count="3">
+              <button onClick="{{ it.pick }}" style="display:flex;align-items:center;gap:10px;padding:7px 10px 7px 8px;border:0;border-radius:var(--radius-sm);background:{{ it.bg }};box-shadow:{{ it.mark }};color:var(--color-text);font:inherit;text-align:left;cursor:pointer" style-hover="background:color-mix(in srgb, var(--color-text) 6%, transparent)">
+                <i class="{{ it.icon }}" style="font-size:16px;color:{{ it.iconColor }};flex:none"></i>
+                <span style="display:grid;min-width:0;flex:1"><span style="font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.label }}</span><span style="font-size:11.5px;color:var(--color-neutral-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.sub }}</span></span>
+                <span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ it.dot }}"></span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </aside>
+      <main style="min-height:0;overflow-y:auto;padding:32px 40px 56px">
+        <div style="max-width:720px;display:grid;gap:18px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-accent) 14%, transparent);color:var(--color-accent-300)"><i class="{{ setIcon }}" style="font-size:22px"></i></span>
+            <span style="display:grid;gap:3px;min-width:0">
+              <span style="font-size:21px;font-weight:500;letter-spacing:-0.01em">{{ setTitle }}</span>
+              <span style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--color-neutral-400)"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ setDot }}"></span>{{ setStatus }}</span>
+            </span>
+            <sc-if value="{{ setHasLink }}" hint-placeholder-val="{{ false }}"><a href="{{ setLink }}" target="_blank" rel="noopener" style="margin-left:auto;font-size:12.5px;white-space:nowrap">{{ setLinkText }}</a></sc-if>
+          </div>
+          <p style="margin:0;font-size:13.5px;line-height:1.55;color:var(--color-neutral-300);text-wrap:pretty;max-width:66ch">{{ setDesc }}</p>
+          <sc-if value="{{ setHasUses }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:var(--color-neutral-500);margin-right:2px">Supplies</span>
+              <sc-for list="{{ setUses }}" as="u" hint-placeholder-count="3"><span class="tag tag-neutral" style="padding:1px 8px;font-size:11px">{{ u.t }}</span></sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ setHasFacts }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:9px 24px;padding:14px 18px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid var(--color-divider);font-size:13px">
+              <sc-for list="{{ setFacts }}" as="f" hint-placeholder-count="3"><span style="color:var(--color-neutral-500)">{{ f.k }}</span><span style="color:var(--color-text);overflow-wrap:anywhere">{{ f.v }}</span></sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setIsMoomoo }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ setRecheck }}"><i class="ph ph-arrows-clockwise"></i>Check again</button></div>
+          </sc-if>
+
+          <sc-if value="{{ setIsSec }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;gap:12px;padding:16px 18px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid var(--color-divider)">
+              <h6 style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);font-weight:500">Who is asking</h6>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <label style="display:grid;gap:6px;font-size:12.5px;color:var(--color-neutral-400)">Name<input class="input" value="{{ secName }}" onChange="{{ onSecName }}" autoComplete="off" style="min-height:32px;font-size:13px"></label>
+                <label style="display:grid;gap:6px;font-size:12.5px;color:var(--color-neutral-400)">Email<input class="input" value="{{ secEmail }}" onChange="{{ onSecEmail }}" autoComplete="off" style="min-height:32px;font-size:13px"></label>
+              </div>
+              <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" onClick="{{ saveSec }}">Save</button></div>
+            </div>
+            <div style="display:grid;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <h6 style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);font-weight:500">Saved companies · {{ coCount }}</h6>
+                <input class="input" type="search" value="{{ coQuery }}" onChange="{{ onCoQuery }}" placeholder="Filter by ticker, name or industry" autoComplete="off" style="margin-left:auto;max-width:260px;min-height:30px;font-size:12.5px">
+              </div>
+              <div style="max-height:460px;overflow:auto;border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+                <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:13px;font-variant-numeric:tabular-nums">
+                  <thead><tr>
+                    <sc-for list="{{ coHead }}" as="h" hint-placeholder-count="4"><th onClick="{{ h.sort }}" title="Sort" style="position:sticky;top:0;z-index:1;background:var(--color-surface);text-align:left;padding:9px 12px;border-bottom:1px solid var(--color-divider);font-size:11.5px;font-weight:500;color:var(--color-neutral-400);white-space:nowrap;cursor:pointer;user-select:none">{{ h.t }}<span style="margin-left:4px;color:var(--color-accent-300)">{{ h.arrow }}</span></th></sc-for>
+                  </tr></thead>
+                  <tbody>
+                    <sc-for list="{{ coRows }}" as="r" hint-placeholder-count="5">
+                      <tr onClick="{{ r.open }}" title="Open {{ r.ticker }}" style="cursor:pointer" style-hover="background:color-mix(in srgb, var(--color-text) 5%, transparent)">
+                        <td style="padding:8px 12px;border-bottom:1px solid var(--color-divider);font-weight:600;color:var(--color-accent-300);white-space:nowrap">{{ r.ticker }}</td>
+                        <td style="padding:8px 12px;border-bottom:1px solid var(--color-divider);color:var(--color-text)">{{ r.name }}</td>
+                        <td style="padding:8px 12px;border-bottom:1px solid var(--color-divider);color:var(--color-neutral-400)">{{ r.industry }}</td>
+                        <td style="padding:8px 12px;border-bottom:1px solid var(--color-divider);color:var(--color-neutral-400);white-space:nowrap" title="{{ r.whenFull }}">{{ r.when }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+                <sc-if value="{{ coEmpty }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:14px 12px;font-size:12.5px;color:var(--color-neutral-500)">{{ coEmptyMsg }}</p></sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setIsFred }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;gap:12px;padding:16px 18px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid var(--color-divider)">
+              <h6 style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);font-weight:500">API key</h6>
+              <input class="input" type="password" value="{{ fredDraft }}" onChange="{{ onFredDraft }}" placeholder="{{ fredPlaceholder }}" autoComplete="off" style="min-height:32px;font-size:13px;font-family:ui-monospace,monospace">
+              <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost" onClick="{{ removeFred }}" style="color:var(--color-neutral-300)">Remove key</button><button class="btn btn-primary" onClick="{{ saveFred }}">Save key</button></div>
+            </div>
+          </sc-if>
+
+          <sc-for list="{{ setProv }}" as="p" hint-placeholder-count="0">
+            <div style="display:grid;gap:12px;padding:16px 18px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid var(--color-divider)">
+              <h6 style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);font-weight:500">{{ p.keyHead }}</h6>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input class="input" type="{{ p.inputType }}" value="{{ p.draft }}" onChange="{{ p.onDraft }}" placeholder="{{ p.placeholder }}" autoComplete="off" style="min-height:32px;font-size:13px">
+                <button class="btn btn-ghost btn-icon" onClick="{{ p.toggleShow }}" title="Show or hide key" style="width:32px;height:32px;flex:none;color:var(--color-neutral-300)"><i class="{{ p.eye }}"></i></button>
+                <button class="btn btn-secondary" onClick="{{ p.test }}" style="flex:none">Test</button>
+                <sc-if value="{{ p.hasDraft }}" hint-placeholder-val="{{ false }}"><button class="btn btn-ghost" onClick="{{ p.clear }}" style="flex:none;color:var(--color-neutral-300)">Clear</button></sc-if>
+              </div>
+              <sc-if value="{{ p.hasTest }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--color-neutral-300)"><span style="width:7px;height:7px;border-radius:50%;flex:none;margin-top:6px;background:{{ p.testColor }}"></span><span style="text-wrap:pretty">{{ p.testMsg }}</span></div>
+              </sc-if>
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--color-neutral-500)">Kept in this browser only, never in the Diligence folder.</span><button class="btn btn-primary" onClick="{{ p.save }}" style="margin-left:auto">Save</button></div>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{ setIsRoles }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;gap:0;padding:4px 18px 16px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid var(--color-divider)">
+              <sc-for list="{{ roleRows }}" as="r" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:14px;align-items:start;padding:12px 0;border-top:{{ r.line }}">
+                  <span style="display:grid;padding-top:3px"><span style="font-size:13.5px;color:var(--color-text)">{{ r.label }}</span><span style="font-size:11.5px;color:var(--color-neutral-500)">{{ r.using }}</span></span>
+                  <div role="radiogroup" aria-label="{{ r.label }}" style="display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ r.options }}" as="o" hint-placeholder-count="3"><button role="radio" aria-checked="{{ o.on }}" onClick="{{ o.pick }}" style="padding:4px 12px;border-radius:999px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.color }};font:inherit;font-size:12.5px;line-height:1.5;cursor:pointer;white-space:nowrap" style-hover="border-color:var(--color-accent)">{{ o.t }}</button></sc-for>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" onClick="{{ saveRoles }}">Save</button></div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setIsReports }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;gap:12px;padding:16px 18px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid var(--color-divider)">
+              <h6 style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500);font-weight:500">Folder</h6>
+              <input class="input" value="{{ repDraft }}" onChange="{{ onRepDraft }}" placeholder="reports  (the folder next to sec_db.py)" autoComplete="off" style="min-height:32px;font-size:13px;font-family:ui-monospace,monospace">
+              <div style="display:flex;gap:8px;align-items:center"><span style="font-size:12px;color:var(--color-neutral-500)">A full path, or one relative to the Diligence folder.</span><button class="btn btn-ghost" onClick="{{ resetReports }}" style="margin-left:auto;color:var(--color-neutral-300)">Use the default</button><button class="btn btn-primary" onClick="{{ saveReports }}">Save</button></div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setIsOrphans }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ forgetOrphans }}" disabled="{{ noOrphans }}"><i class="ph ph-trash"></i>Delete the data of all {{ orphanCount }}</button></div>
+          </sc-if>
+          <sc-if value="{{ setIsNotes }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-secondary" onClick="{{ exportNotes }}"><i class="ph ph-download-simple"></i>Export notes</button>
+              <label class="btn btn-secondary" style="cursor:pointer"><i class="ph ph-upload-simple"></i>Import notes<input type="file" accept=".json,application/json" onChange="{{ importNotes }}" style="display:none"></label>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setHasMsg }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--color-neutral-300)"><span style="width:7px;height:7px;border-radius:50%;flex:none;margin-top:6px;background:{{ setMsgColor }}"></span><span style="text-wrap:pretty">{{ setMsgText }}</span></div>
+          </sc-if>
+          <sc-if value="{{ setHasFoot }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--color-neutral-500);text-wrap:pretty;max-width:66ch">{{ setFoot }}</p>
+          </sc-if>
+        </div>
+      </main>
     </div>
   </sc-if>
-  <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ false }}">
-    <div class="dialog-backdrop" onClick="{{ closeSettings }}" style="z-index:50">
-      <div class="dialog" onClick="{{ stop }}" style="width:min(680px,100%);max-height:calc(100vh - 32px);overflow-y:auto">
-        <div class="dialog-title">Data sources</div>
-        <div class="dialog-body" style="display:grid;gap:18px">
-          <p style="margin:0">Add a key for each service you use and change them any time. Keys are stored only in this browser. Below the keys, choose which service supplies each kind of data.</p>
-          <div style="display:grid;gap:8px">
-            <sc-for list="{{ providers }}" as="p" hint-placeholder-count="5">
-              <div style="display:grid;gap:8px;padding:12px 14px;border-radius:var(--radius-md);background:var(--color-bg)">
-                <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
-                  <span style="font-size:14.5px;font-weight:500;color:var(--color-text)">{{ p.name }}</span>
-                  <a href="{{ p.signup }}" target="_blank" rel="noopener" style="font-size:12px">{{ p.linkText }}</a>
-                  <span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-neutral-400)"><span style="width:7px;height:7px;border-radius:50%;background:{{ p.dot }}"></span>{{ p.state }}</span>
-                </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                  <sc-for list="{{ p.covers }}" as="cv" hint-placeholder-count="2"><span class="tag tag-neutral" style="padding:1px 8px;font-size:10.5px">{{ cv.t }}</span></sc-for>
-                </div>
-                <span style="font-size:12px;color:var(--color-neutral-500);text-wrap:pretty">{{ p.note }}</span>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <input class="input" type="{{ p.inputType }}" value="{{ p.draft }}" onChange="{{ p.onDraft }}" placeholder="{{ p.placeholder }}" autoComplete="off" style="min-height:32px;font-size:13px">
-                  <button class="btn btn-ghost btn-icon" onClick="{{ p.toggleShow }}" title="Show or hide key" style="width:32px;height:32px;flex:none;color:var(--color-neutral-300)"><i class="{{ p.eye }}"></i></button>
-                  <button class="btn btn-secondary" onClick="{{ p.test }}" style="flex:none">Test</button>
-                  <sc-if value="{{ p.hasDraft }}" hint-placeholder-val="{{ false }}"><button class="btn btn-ghost" onClick="{{ p.clear }}" style="flex:none;color:var(--color-neutral-300)">Clear</button></sc-if>
-                </div>
-                <sc-if value="{{ p.hasTest }}" hint-placeholder-val="{{ false }}">
-                  <div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--color-neutral-300)"><span style="width:7px;height:7px;border-radius:50%;flex:none;margin-top:6px;background:{{ p.testColor }}"></span><span style="text-wrap:pretty">{{ p.testMsg }}</span></div>
-                </sc-if>
-              </div>
-            </sc-for>
-          </div>
-          <div style="display:grid;gap:10px">
-            <h6 style="margin:0;color:var(--color-neutral-400)">Use for</h6>
-            <sc-for list="{{ roleRows }}" as="r" hint-placeholder-count="4">
-              <div style="display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;align-items:center">
-                <span style="display:grid"><span style="font-size:13.5px;color:var(--color-text)">{{ r.label }}</span><span style="font-size:11.5px;color:var(--color-neutral-500)">{{ r.using }}</span></span>
-                <div class="seg" style="flex-wrap:wrap;justify-self:start">
-                  <sc-for list="{{ r.options }}" as="o" hint-placeholder-count="3"><label class="seg-opt"><input type="radio" name="{{ r.name }}" checked="{{ o.on }}" onChange="{{ o.pick }}">{{ o.t }}</label></sc-for>
-                </div>
-              </div>
-            </sc-for>
-          </div>
-          <p style="margin:0;font-size:12.5px;color:var(--color-neutral-400);text-wrap:pretty">Free plans have daily or per-minute limits and shorter statement history; give each kind of data its own service to spread the load. Not listed because they block requests from a web page or have no free key: Tiingo, Yahoo Finance, SEC EDGAR, Nasdaq Data Link and IEX Cloud (closed in 2024). EDGAR filings still open as links in the Sources panel.</p>
+  <sc-if value="{{ forgetOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="dialog-backdrop" onClick="{{ forgetCancel }}" style="z-index:60">
+      <div class="dialog" role="alertdialog" aria-label="{{ forgetTitle }}" onClick="{{ stop }}" style="width:min(560px,100%);max-height:calc(100vh - 32px);overflow-y:auto">
+        <div class="dialog-title">{{ forgetTitle }}</div>
+        <div class="dialog-body" style="display:grid;gap:12px">
+          <p style="margin:0">{{ forgetLead }}</p>
+          <ul style="margin:0;padding-left:1.2em;display:grid;gap:6px;font-size:13.5px">
+            <sc-for list="{{ forgetPoints }}" as="pt" hint-placeholder-count="3"><li style="text-wrap:pretty">{{ pt.t }}</li></sc-for>
+          </ul>
+          <sc-if value="{{ forgetMany }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px;padding:10px 12px;border-radius:var(--radius-md);background:var(--color-bg);font-size:12.5px;max-height:220px;overflow-y:auto">
+              <sc-for list="{{ forgetRows }}" as="r" hint-placeholder-count="3"><b style="font-weight:600;color:var(--color-accent-300)">{{ r.t }}</b><span style="color:var(--color-neutral-400)">{{ r.what }}</span></sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ forgetHasMsg }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:12.5px;color:var(--color-neutral-300)">{{ forgetMsg }}</p></sc-if>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" onClick="{{ closeSettings }}">Cancel</button>
-          <button class="btn btn-primary" onClick="{{ saveSettings }}">Save and load</button>
+          <button class="btn btn-secondary" onClick="{{ forgetCancel }}">{{ forgetKeepLabel }}</button>
+          <button class="btn btn-primary" onClick="{{ forgetGo }}" disabled="{{ forgetBusy }}" style="background:oklch(0.62 0.17 25);border-color:transparent;color:#fff"><i class="ph ph-trash"></i>{{ forgetGoLabel }}</button>
         </div>
       </div>
     </div>
   </sc-if>
 </div>
-</x-dc>
+</template></x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;showSourcesRail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;showGuides&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
 const LS_KEY = 'diligence.research.v1';
 const Q_KEY = 'diligence.quotes.v1';
 const UP = 'oklch(0.78 0.14 155)', DOWN = 'oklch(0.72 0.16 25)';
-const WORKSPACES = ['macro', 'themes', 'screener', 'companies'];
+const WORKSPACES = ['macro', 'themes', 'companies', 'settings'];
 const clone = o => JSON.parse(JSON.stringify(o));
 const yearsOf = R => { const e = R.endYear || 2025, n = Math.max(N, ((R.fin || {}).revenue || []).length); return Array.from({ length: n }, (_, i) => e - n + 1 + i); };
 const sparkPts = a => { const v = (a || []).filter(x => typeof x === 'number' && isFinite(x)); if (v.length < 2) return { line: '', area: '' }; const mn = Math.min(...v), mx = Math.max(...v), r = mx - mn || 1; const pts = v.map((x, i) => (i / (v.length - 1) * 64).toFixed(1) + ',' + (24 - (x - mn) / r * 22).toFixed(1)).join(' '); return { line: pts, area: pts + ' 64,26 0,26' }; };
@@ -1359,11 +1480,12 @@ const N = 16, MAX_N = 60;
 const shortName = n => { let s = String(n || '').trim(), prev; do { prev = s; s = s.replace(/[\s,]+(\/[A-Z]{2,3}\/?|inc\.?|incorporated|corp\.?|corporation|co\.?|company|ltd\.?|limited|plc|llc|l\.?p\.?|n\.?v\.?|s\.?a\.?|ag|se|holdings?|group|class [a-c]|common stock)$/i, '').trim(); } while (s !== prev && s.split(' ').length > 1); s = s.replace(/\s+(&|and)$/i, '') || n;
   // names the SEC stores in capitals take a third more room: JPMORGAN CHASE -> Jpmorgan Chase
   return /[a-z]/.test(s) || !s.includes(' ') ? s : s.toLowerCase().replace(/(^|[\s\-&.])([a-z])/g, (m, a, b) => a + b.toUpperCase()); };
-const Q_VER = 11, FIN_VER = 8;   // raise these when the server starts supplying figures it did not before, so saved copies are refreshed
+const Q_VER = 13, FIN_VER = 10;   // raise these when the server starts supplying figures it did not before, so saved copies are refreshed
 // How many years of Form 4 filings the insider chart and tables go back over.
 const INSIDER_YEARS = 5;
 const INSIDER_TYPES = { P: 'Purchase', S: 'Sale', A: 'Award', M: 'Exercise', F: 'Tax withholding', G: 'Gift', D: 'Returned to company', C: 'Conversion', X: 'Exercise', J: 'Other', W: 'Inheritance', I: 'Discretionary', L: 'Small acquisition' };
-const FIN_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'shares', 'assets', 'curAssets', 'cash', 'curLiab', 'debt', 'equity', 'cfo', 'capex'];
+// sti: short-term investments; eps: earnings per share as reported (diluted), which nets out preferred dividends
+const FIN_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'shares', 'assets', 'curAssets', 'cash', 'sti', 'curLiab', 'debt', 'equity', 'cfo', 'capex', 'eps', 'minority', 'preferred'];
 
 const num = v => { if (v === null || v === undefined || v === '') return NaN; const x = typeof v === 'number' ? v : parseFloat(String(v).replace(/[,$%\s]/g, '')); return isFinite(x) ? x : NaN; };
 const ok = x => typeof x === 'number' && isFinite(x);
@@ -1393,22 +1515,24 @@ function calc(fin, tax) {
   const cols = Array.from({ length: Math.max(N, ...FIN_KEYS.map(k => (fin[k] || []).length)) });
   FIN_KEYS.forEach(k => { c[k] = cols.map((_, i) => num((fin[k] || [])[i])); });
   const z = f => cols.map((_, i) => { const v = f(i); return ok(v) ? v : NaN; });
-  const { revenue: rev, cogs, ebit, interest, netIncome: ni, da, assets: as, curAssets: ca, cash, curLiab: cl, debt, equity: eq, cfo, capex, shares: sh } = c;
+  const { revenue: rev, cogs, ebit, interest, netIncome: ni, da, assets: as, curAssets: ca, cash, sti, curLiab: cl, debt, equity: eq, cfo, capex, shares: sh, eps } = c;
+  // cash and short-term investments together: what net debt, enterprise value and returns on capital set against debt
+  c.liquid = z(i => cash[i] + (ok(sti[i]) ? sti[i] : 0));
   c.grossProfit = z(i => rev[i] - cogs[i]);
   c.ebitda = z(i => ebit[i] + da[i]);
   c.fcf = z(i => cfo[i] - capex[i]);
   c.liab = z(i => as[i] - eq[i]);
-  c.netDebt = z(i => debt[i] - cash[i]);
+  c.netDebt = z(i => debt[i] - c.liquid[i]);
   c.costs = z(i => rev[i] - ebit[i]);
   c.opex = z(i => c.grossProfit[i] - ebit[i]);
   c.otherLiab = z(i => c.liab[i] - debt[i] - cl[i]);
-  c.eps = z(i => div(ni[i], sh[i]));
+  c.eps = z(i => ok(eps[i]) ? eps[i] : div(ni[i], sh[i]));
   c.roe = z(i => div(ni[i], eq[i]));
   c.roa = z(i => div(ni[i], as[i]));
-  c.roic = z(i => div(ebit[i] * (1 - tax), debt[i] + eq[i] - cash[i]));
+  c.roic = z(i => div(ebit[i] * (1 - tax), debt[i] + eq[i] - c.liquid[i]));
   c.roce = z(i => div(ebit[i], as[i] - cl[i]));
   c.curRatio = z(i => div(ca[i], cl[i]));
-  c.cashRatio = z(i => div(cash[i], cl[i]));
+  c.cashRatio = z(i => div(c.liquid[i], cl[i]));
   c.wc = z(i => ca[i] - cl[i]);
   c.intCov = z(i => div(ebit[i], interest[i]));
   c.de = z(i => div(debt[i], eq[i]));
@@ -1641,7 +1765,7 @@ const SECTIONS = [
   { id: 'reports', label: 'Reports', subs: [] },
 ];
 // Statement layout: headings that open and close, and under each the lines it holds.
-// I = a core figure you can type over, X = an extra line read from the SEC database, C = calculated,
+// I = a core figure you can type over, X = an extra line read from the company's SEC filings, C = calculated,
 // V = a core figure shown again, R = whatever is left of a total once the named lines are taken out.
 const sG = (id, label, kids) => ({ g: true, id, label, kids });
 const sI = (k, label, total) => ({ t: 'in', k, label, total: !!total });
@@ -1697,7 +1821,7 @@ const STMT = {
         sX('deferredRevNC', 'Deferred revenue, long-term'), sX('deferredTax', 'Deferred tax liabilities'),
         sX('otherNCLr', 'Other non-current liabilities'), sRest('ncl', 'Not itemised in the filing data'),
         sR('totalNCL', 'Total non-current liabilities', (g, i) => g('liabT', i) - g('curLiab', i), 1)]),
-      sG('bs.d', 'Total debt', [sC('netDebt', 'Net debt (debt less cash)'), sI('debt', 'Total debt, excluding leases', 1)]),
+      sG('bs.d', 'Total debt', [sC('netDebt', 'Net debt (debt less cash and short-term investments)'), sI('debt', 'Total debt, excluding leases', 1)]),
       sR('liabT', 'Total liabilities', (g, i) => g('liabT', i), 1)]),
     sG('bs.e', "Shareholders' equity", [sX('paidIn', 'Common stock & paid-in capital'), sX('retained', 'Retained earnings'), sX('aoci', 'Accumulated other comprehensive income'),
       sR('treasuryNeg', 'Treasury stock', (g, i) => ok(g('treasury', i)) ? -g('treasury', i) : NaN),
@@ -1774,17 +1898,14 @@ function blankResearch(T, ex) {
     verdict: 'Undecided', thesis: '', wrong: '', buyBelow: '',
   };
 }
-// A group of companies from very different industries, for seeing how the page copes outside technology.
-// Added once; if you delete the group it stays deleted.
-const INDUSTRY_TEST = ['JPM', 'BRK-B', 'PGR', 'O', 'NEE', 'XOM', 'WMT', 'MCD', 'BA', 'UNH', 'LLY', 'CAT', 'DAL', 'T', 'PLTR', 'SHOP'];
+// Lists added to existing saved desks once. There are none at present; new desks start with DEFAULT_GROUPS.
 function seedGroups(s) {
   s.seeded = s.seeded || {};
-  if (!s.seeded.industry) { s.seeded.industry = true; if (!s.groups.find(g => g.id === 'industry')) s.groups.push({ id: 'industry', name: 'Industry test', symbols: INDUSTRY_TEST.slice() }); }
   return s;
 }
-function loadStore() {
-  try {
-    const s = JSON.parse(localStorage.getItem(LS_KEY));
+// A saved desk (from this browser, the copy on disk or an imported file) made ready to use; null when it is not one.
+function normalizeStore(s) {
+  {
     if (s && s.data && s.data[s.current]) {
       s.prefs = Object.assign({ starred: {}, custom: {}, keys: {}, roles: {} }, s.prefs);
       s.prefs.keys = withSavedKeys(s.prefs.keys);
@@ -1795,23 +1916,27 @@ function loadStore() {
       if (!s.groups.find(g => g.id === s.activeGroup)) s.activeGroup = s.groups[0].id;
       return seedGroups(s);
     }
-  } catch (e) {}
+  }
+  return null;
+}
+function loadStore() {
+  try { const s = normalizeStore(JSON.parse(localStorage.getItem(LS_KEY))); if (s) return s; } catch (e) {}
   const R = blankResearch('COST', false); R.name = 'Costco Wholesale';
   return seedGroups({ current: 'COST', data: { COST: R }, groups: DEFAULT_GROUPS(), activeGroup: 'us', prefs: { starred: {}, custom: {}, keys: withSavedKeys({}), roles: {} } });
 }
-// Your own SEC database (sec_db.py serve). When this page is served by it, use the same address.
+// The Diligence server (python3 sec_db.py serve). When this page is served by it, use the same address.
 const LOCAL_DB = /^https?:$/.test(location.protocol) && location.pathname.indexOf('/desk/') === 0 ? location.origin : 'http://localhost:8765';
 // Keys from desk/keys.local.js (kept out of git), used unless another is typed in Settings
 const SAVED_KEYS = Object.assign({}, window.DILIGENCE_KEYS || {}, { local: LOCAL_DB });
 const withSavedKeys = k => { const o = Object.assign({}, k); Object.keys(SAVED_KEYS).forEach(p => { if (!(o[p] || '').trim()) o[p] = SAVED_KEYS[p]; }); return o; };
 const PROVIDERS = [
-  { id: 'local', name: 'Local SEC database', short: 'Local SEC', signup: LOCAL_DB + '/api/companies', covers: ['fundamentals', 'insiders'], note: 'Free. Your own database of SEC filings: statements and quarters for every year on file, revenue by segment, company profile and Form 4 insider trades. Run python sec_db.py serve; the box holds its address.' },
+  { id: 'local', name: 'Diligence server (SEC filings)', short: 'Diligence', signup: LOCAL_DB + '/api/companies', covers: ['fundamentals', 'insiders'], note: 'Free. Your own database of SEC filings: statements and quarters for every year on file, revenue by segment, company profile and Form 4 insider trades. Run python3 sec_db.py serve; the box holds its address.' },
   { id: 'fmp', name: 'Financial Modeling Prep', short: 'FMP', signup: 'https://site.financialmodelingprep.com/developer/docs', covers: ['prices', 'fundamentals', 'news', 'insiders'], note: 'The most complete single key: statements, peers, news, insiders.' },
   { id: 'finnhub', name: 'Finnhub', short: 'Finnhub', signup: 'https://finnhub.io/register', covers: ['prices', 'fundamentals', 'news', 'insiders'], note: 'Generous free limits. Statements come straight from SEC filings, often 15+ years. No price charts on the free plan.' },
   { id: 'alphavantage', name: 'Alpha Vantage', short: 'Alpha Vantage', signup: 'https://www.alphavantage.co/support/#api-key', covers: ['prices', 'fundamentals', 'news', 'insiders'], note: 'Covers everything, but the free plan allows about 25 requests a day.' },
   { id: 'polygon', name: 'Polygon.io (Massive)', short: 'Polygon', signup: 'https://polygon.io/dashboard/signup', covers: ['prices', 'fundamentals', 'news'], note: 'Free plan gives end-of-day prices, news and statements from filings (no capex line), 5 requests a minute.' },
   { id: 'twelvedata', name: 'Twelve Data', short: 'Twelve Data', signup: 'https://twelvedata.com/pricing', covers: ['prices'], note: 'Prices and daily history, about 800 requests a day free, delayed.' },
-  { id: 'eodhd', name: 'EODHD', short: 'EODHD', signup: 'https://eodhd.com/register', covers: ['prices', 'news'], note: 'End-of-day prices and news worldwide. Free plan allows about 20 requests a day. Works only while the page is opened from your local SEC database, which passes the requests on.' },
+  { id: 'eodhd', name: 'EODHD', short: 'EODHD', signup: 'https://eodhd.com/register', covers: ['prices', 'news'], note: 'End-of-day prices and news worldwide. Free plan allows about 20 requests a day. Works only while the page is opened from the Diligence server, which passes the requests on.' },
   { id: 'marketstack', name: 'Marketstack', short: 'Marketstack', signup: 'https://marketstack.com/signup/free', covers: ['prices'], note: 'End-of-day prices on 70+ exchanges. Free plan is about 100 requests a month, so use it as a backup.' },
   { id: 'marketaux', name: 'Marketaux', short: 'Marketaux', signup: 'https://www.marketaux.com/register', covers: ['news'], note: 'Financial news tagged by ticker. Free plan allows about 100 requests a day.' },
 ];
@@ -1844,7 +1969,7 @@ const tdU = (k, p, q) => 'https://api.twelvedata.com/' + p + '?' + new URLSearch
 const pgCache = {}, msCache = {};
 const sym2eod = s => s.indexOf('.') > 0 ? s : s + '.US';
 // EODHD's replies carry no cross-origin header, so a browser refuses to read them directly.
-// When the page is served by the local SEC database, the request goes through it instead.
+// When the page is served by the Diligence server, the request goes through it instead.
 const eodU = (k, path, q) => (/^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin + '/api/proxy/eodhd/' : 'https://eodhd.com/api/') + path + '?' + new URLSearchParams(Object.assign({ api_token: k, fmt: 'json' }, q));
 function fhRow(d) {
   const ic = d.report.ic, bs = d.report.bs, cf = d.report.cf;
@@ -1899,7 +2024,7 @@ function deCum(fy, annual, span, endD) {
 async function localJSON(base, path, timeout) {
   const url = String(base || '').trim().replace(/\/+$/, '') + '/api/desk/' + path;
   let res; const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), timeout || 180000);
-  try { res = await fetch(url, { signal: ctl.signal }); } catch (e) { clearTimeout(tm); throw new Error(e.name === 'AbortError' ? 'Timed out' : 'Local database is not running: start it with python sec_db.py serve'); }
+  try { res = await fetch(url, { signal: ctl.signal }); } catch (e) { clearTimeout(tm); throw new Error(e.name === 'AbortError' ? 'Timed out' : 'Local database is not running: start it with python3 sec_db.py serve'); }
   clearTimeout(tm);
   let j = null; try { j = await res.json(); } catch (e) {}
   if (!res.ok && j && j.error === 'unknown path') throw new Error('The local server is running an older version that does not have this feature yet. In its terminal window press Ctrl+C, then run: python3 sec_db.py serve');
@@ -1909,7 +2034,8 @@ async function localJSON(base, path, timeout) {
 const API = {
   local: {
     search: async (k, q) => (await localJSON(k, 'search?' + new URLSearchParams({ q }))) || [],
-    fundamentals: async (k, s) => { const v = await localJSON(k, 'fundamentals/' + encodeURIComponent(s)); if (!v || !Object.keys(v.byYear || {}).length) throw new Error('No SEC statements for ' + s); return v; },
+    // a company that has not filed a 10-K yet (newly listed) still has a name, a share count and quarters
+    fundamentals: async (k, s) => { const v = await localJSON(k, 'fundamentals/' + encodeURIComponent(s)); if (!v || (!Object.keys(v.byYear || {}).length && !v.name)) throw new Error('No SEC statements for ' + s); return v; },
     quarters: async (k, s) => { const v = await localJSON(k, 'quarters/' + encodeURIComponent(s)); if (!v || !v.length) throw new Error('No quarterly statements for ' + s); return v; },
     holders: async (k, s) => localJSON(k, 'holders/' + encodeURIComponent(s), 600000),
     statements: async (k, s) => localJSON(k, 'statements/' + encodeURIComponent(s)),
@@ -2147,7 +2273,7 @@ const mondayOf = t => { if (!ok(t)) return NaN; const d = new Date(t); d.setUTCH
 function loadQuotesCache() { try { return JSON.parse(localStorage.getItem(Q_KEY)) || {}; } catch (e) { return {}; } }
 
 class Component extends DCLogic {
-  state = { store: loadStore(), quotes: loadQuotesCache(), fetchState: {}, quoting: false, page: 'overview', tab: 'is', w: window.innerWidth, railOpen: false, drafts: {}, newSymbol: '', newGroup: '', groupMenu: false, settingsOpen: false, keyDraft: '', keyDrafts: {}, roleDrafts: {}, keyTests: {}, showKey: {}, conn: { status: 'idle' }, keyTest: null, addingSource: false, srcLabel: '', srcUrl: '' };
+  state = { store: loadStore(), quotes: loadQuotesCache(), fetchState: {}, quoting: false, page: 'overview', tab: 'is', w: window.innerWidth, railOpen: false, drafts: {}, newSymbol: '', newGroup: '', groupMenu: false, keyDraft: '', keyDrafts: {}, roleDrafts: {}, keyTests: {}, showKey: {}, conn: { status: 'idle' }, keyTest: null, addingSource: false, srcLabel: '', srcUrl: '' };
   mainRef = React.createRef();
   chipsRef = el => { const first = !this._chipsEl && !!el; this._chipsEl = el; if (first && el.clientWidth && el.clientWidth !== 242) this.forceUpdate(); };   // the row of group buttons, measured to see how many fit
   segScrollRef = el => { if (el) requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; }); };
@@ -2184,17 +2310,56 @@ class Component extends DCLogic {
   async mmLoadLists() { try { this.setState({ mmLists: await kcFetch(LOCAL_DB + '/api/moomoo/lists'), mmListsErr: '' }); } catch (e) { this.setState({ mmLists: null, mmListsErr: e.message }); } }
   // Bring a moomoo watchlist, or the stocks actually held, in as a group that mirrors it. A group made this way is refreshed
   // from moomoo each time the page opens. The Positions group is only taken over while it is empty; otherwise a new group is made.
-  async mmSync(kind, name, open) {
+  async mmSync(kind, name, open, own) {
     const d = await kcFetch(LOCAL_DB + (kind === 'positions' ? '/api/moomoo/positions' : '/api/moomoo/list?name=' + encodeURIComponent(name))), syms = d.symbols || [];
     this.setState(s => { const store = clone(s.store), same = g => g.moomoo && g.moomoo.kind === kind && g.moomoo.name === name;
       let g = store.groups.find(same);
       if (!g && kind === 'positions') { const pos = store.groups.find(x => x.id === 'pos' && !x.symbols.length); if (pos) { pos.moomoo = { kind, name }; g = pos; } }
-      if (!g) { g = { id: 'mm' + Date.now(), name: kind === 'positions' ? (store.groups.some(x => x.name === 'Positions') ? 'moomoo positions' : 'Positions') : name, symbols: [], moomoo: { kind, name } }; store.groups.push(g); }
-      g.symbols = syms; if (open) store.activeGroup = g.id;
+      if (!g && kind === 'list') {
+        // a group here with the same name that is empty or still has only the starter stocks becomes the moomoo list;
+        // one you built yourself is kept, and the moomoo list comes in beside it
+        const starter = Object.fromEntries(DEFAULT_GROUPS().map(x => [x.id, x.symbols.slice().sort().join()]));
+        const twin = store.groups.find(x => !x.moomoo && x.name === name);
+        if (twin && (!twin.symbols.length || starter[twin.id] === twin.symbols.slice().sort().join())) { twin.moomoo = { kind, name }; twin.symbols = []; g = twin; }
+      }
+      if (!g) { g = { id: 'mm' + Date.now() + Math.random().toString(36).slice(2, 5), name: kind === 'positions' ? (store.groups.some(x => x.name === 'Positions') ? 'moomoo positions' : 'Positions') : (store.groups.some(x => x.name === name) ? name + ' (moomoo)' : name), symbols: [], moomoo: { kind, name } }; store.groups.push(g); }
+      if (own != null) g.moomoo.own = own;
+      // moomoo decides what is in the list; the order here is yours (moomoo has no way to set it from outside)
+      g.symbols = g.symbols.filter(x => syms.includes(x)).concat(syms.filter(x => !g.symbols.includes(x))); if (open) store.activeGroup = g.id;
       syms.forEach(x => { if (!store.data[x]) store.data[x] = blankResearch(x, false); });
       return open ? { store, groupMenu: false } : { store }; }, () => { this.save(); this.loadQuotes(); });
   }
-  mmRefreshLinked() { (this.state.store.groups || []).filter(g => g.moomoo).forEach(g => this.mmSync(g.moomoo.kind, g.moomoo.name, false).catch(() => {})); }
+  // Every moomoo watchlist group is a group here too, kept the same both ways: new moomoo lists appear, and adding or
+  // removing a stock in one of your own lists here changes it in moomoo. A list deleted here is not brought back.
+  async mmRefreshLinked() {
+    let L = null;
+    try { L = await kcFetch(LOCAL_DB + '/api/moomoo/lists'); this.setState({ mmLists: L, mmListsErr: '' }); } catch (e) { L = null; }
+    const skip = new Set(((this.state.store.prefs || {}).mmSkip) || []);
+    // a group copied from a moomoo list that moomoo no longer offers as a list (deleted there, or one of its automatic
+    // market filters such as US and HK) goes too
+    if (L && L.groups) {
+      const offered = new Set(L.groups.map(g => g.name));
+      const stale = (this.state.store.groups || []).filter(g => g.moomoo && g.moomoo.kind === 'list' && !offered.has(g.moomoo.name)).map(g => g.id);
+      if (stale.length && stale.length < (this.state.store.groups || []).length) {
+        await new Promise(res => this.setState(s => { const store = clone(s.store); store.groups = store.groups.filter(g => !stale.includes(g.id));
+          if (!store.groups.some(g => g.id === store.activeGroup)) store.activeGroup = store.groups[0].id; return { store }; }, () => { this.save(); res(); }));
+      }
+    }
+    const own = {}; ((L && L.groups) || []).forEach(g => { own[g.name] = g.own; });
+    const linked = new Set((this.state.store.groups || []).filter(g => g.moomoo && g.moomoo.kind === 'list').map(g => g.moomoo.name));
+    const names = [...linked].concat(((L && L.groups) || []).map(g => g.name).filter(n => !linked.has(n) && !skip.has(n)));
+    for (const n of names) { try { await this.mmSync('list', n, false, n in own ? own[n] : null); } catch (e) {} }
+    const holds = (this.state.store.groups || []).some(g => g.moomoo && g.moomoo.kind === 'positions');
+    if (holds || (L && L.positions && !skip.has('__positions'))) this.mmSync('positions', 'Positions', false).catch(() => {});
+  }
+  // a change to one of your own moomoo lists goes to moomoo first; the group then shows what moomoo has
+  async mmChange(g, add, remove) {
+    try {
+      const r = await fetch(LOCAL_DB + '/api/moomoo/list/change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: g.moomoo.name, add, remove }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || 'moomoo did not accept the change');
+      this.setState({ mmNote: '' }); await this.mmSync('list', g.moomoo.name, false, true);
+    } catch (e) { this.setState({ mmNote: 'Not changed in moomoo: ' + e.message }); this.mmSync('list', g.moomoo.name, false).catch(() => {}); }
+  }
 
   // ---- the chart drawn by this page ----
   kcRef = el => { this._kcEl = el; if (el) this.kcSync(); else this.kcDispose(); };
@@ -2388,21 +2553,117 @@ class Component extends DCLogic {
     // embedded frame. A non-passive wheel listener makes it check, each time, what is really under the pointer.
     try { const cs = getComputedStyle(document.body), c = document.createElement('canvas').getContext('2d'); c.fillStyle = cs.backgroundColor; this.setState({ tvBg: c.fillStyle }); } catch (e) {}
     this._prevState = this.state;
-    this.loadQuotes(); this.ensureResearch(); this.scrollEnds(true);
+    this.loadQuotes(); this.ensureResearch(); this.scrollEnds(true); this.restoreNotes();
     this._seRO = () => this.scrollEnds(true); window.addEventListener('resize', this._seRO); setTimeout(() => this.preloadAll(), 3000);
     this.mmQuotes(); setTimeout(() => this.mmRefreshLinked(), 1500);
-    // the screener and themes, each in its own frame, ask the desk to open a company, add stocks to a list or switch workspace
-    this.onScrMsg = e => { const m = e.data || {}; if (e.origin !== location.origin || !['screener', 'themes', 'macro'].includes(m.from)) return;
+    // themes and macro, each in its own frame, ask the desk to open a company, add stocks to a list or switch workspace
+    this.onScrMsg = e => { const m = e.data || {}; if (e.origin !== location.origin || !['themes', 'macro'].includes(m.from)) return;
       if (m.type === 'workspace' && WORKSPACES.includes(m.to)) this.setWorkspace(m.to);
+      if (m.type === 'settings') this.openSettings(String(m.item || ''));
       if (m.type === 'open' && m.symbol) { this.openSymbol(String(m.symbol).toUpperCase()); this.setWorkspace('companies'); }
       if (m.type === 'add' && Array.isArray(m.symbols)) this.patch((r, so) => { const g = so.groups.find(x => x.id === m.group); if (!g) return;
         m.symbols.forEach(S => { S = String(S).toUpperCase(); if (!g.symbols.includes(S)) g.symbols.push(S); if (!so.data[S]) so.data[S] = blankResearch(S, false); }); }); };
     window.addEventListener('message', this.onScrMsg);
-    const open = new URLSearchParams(location.search).get('open');   // the screener opened on its own links here with ?open=NVDA
+    const open = new URLSearchParams(location.search).get('open');   // a link to a company: ?open=NVDA
     if (open) { this.openSymbol(open.toUpperCase()); this.setWorkspace('companies'); history.replaceState(null, '', location.pathname); }
-    else { const w = (this.state.store.prefs || {}).workspace; if (w === 'screener') this.setState({ scrMounted: true }); if (w === 'themes') this.setState({ thmMounted: true }); if (w === 'macro') this.setState({ macMounted: true }); }
+    else { const w = (this.state.store.prefs || {}).workspace; if (w === 'themes') this.setState({ thmMounted: true }); if (w === 'macro') this.setState({ macMounted: true }); if (w === 'settings') this.initSettings(); }
   }
-  setWorkspace(w) { this.setState(s => ({ store: Object.assign({}, s.store, { prefs: Object.assign({}, s.store.prefs, { workspace: w }) }), scrMounted: s.scrMounted || w === 'screener', thmMounted: s.thmMounted || w === 'themes', macMounted: s.macMounted || w === 'macro' }), () => this.save()); }
+  settingsView() {
+    const st = this.state, store = st.store, prefs = store.prefs || {};
+    const open = (WORKSPACES.includes(prefs.workspace) ? prefs.workspace : 'companies') === 'settings';
+    const src = st.setSrc, err = src && src.error, item = st.setItem || 'moomoo';
+    const GRAY = 'var(--color-neutral-700)', ACC = 'var(--color-accent)', NONE = 'transparent';
+    const chk = f => !src ? ['Checking…', GRAY] : err ? ['The Diligence server is not answering', DOWN] : f();
+    const mm = src && !err ? src.moomoo : null, sec = src && !err ? src.sec : null, fr = src && !err ? src.fred : null, rp = src && !err ? src.reports : null;
+    const mmS = chk(() => mm.ok ? (mm.quotes ? ['Running · logged in', UP] : ['Running, quotes not logged in', ACC]) : ['Not running', DOWN]);
+    const secS = chk(() => sec.ok ? [sec.companies + ' companies saved', UP] : ['Not connected', DOWN]);
+    const frS = chk(() => !fr.fred_key ? ['No key · core series only', GRAY] : fr.fred_ok === false ? ['Key saved · not answering', DOWN] : ['Key saved · live', UP]);
+    const rpS = chk(() => rp.exists ? [rp.count + ' report' + (rp.count === 1 ? '' : 's'), UP] : ['Folder not found', DOWN]);
+    const keys = prefs.keys || {}, has = id => !!(keys[id] || '').trim();
+    const useFor = r => { const c = (prefs.roles || {})[r] || 'auto', u = c !== 'auto' && has(c) ? c : (PROVIDERS.find(x => has(x.id) && x.covers.includes(r)) || {}).id; return u ? PROV_BY[u].short : 'none'; };
+    const rows = Object.fromEntries(PROVIDERS.map(x => [x.id, this.provRow(x)]));
+    const keyS = x => [rows[x.id].state, rows[x.id].dot];
+    const nKeys = PROVIDERS.filter(x => x.id !== 'local' && has(x.id)).length;
+    const GROUPS = [
+      ['On this computer', [['moomoo', 'moomoo OpenD', 'ph ph-plugs-connected', mmS], ['sec', 'SEC filings', 'ph ph-files', secS], ['fred', 'FRED economic data', 'ph ph-chart-line-up', frS]]],
+      ['API keys · ' + nKeys + ' of ' + (PROVIDERS.length - 1), PROVIDERS.filter(x => x.id !== 'local').map(x => [x.id, x.name, 'ph ph-key', keyS(x)])],
+      ['How they are used', [['roles', 'Which source for what', 'ph ph-arrows-split', ['Prices ' + (mm && mm.ok ? 'moomoo' : useFor('prices')) + ' · statements ' + useFor('fundamentals'), NONE]]]],
+      ['Your files', [['reports', 'Reports folder', 'ph ph-folder-open', rpS], ['notes', 'Research notes', 'ph ph-notebook', [LOCAL_DB === location.origin ? 'Copied to notes/desk.json' : 'This browser only', NONE]],
+        ['orphans', 'Stocks in no group', 'ph ph-broom', (() => { const o = this.orphans(); return [o.length ? o.length + ' with data still kept' : 'None', o.length ? ACC : NONE]; })()]]],
+    ];
+    const all = Object.fromEntries(GROUPS.flatMap(g => g[1]).map(x => [x[0], x]));
+    const cur = all[item] || all.moomoo, [stTxt, stDot] = cur[3];
+    const fmtN = n => n == null ? '—' : Number(n).toLocaleString();
+    const when = ms => ms ? new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not yet';
+    const D = {
+      moomoo: { desc: 'The moomoo OpenD gateway on this computer. It gives live and extended-hours prices, price history for the charts, your watchlists (kept the same as your groups) and positions. Start the OpenD app and log in; Diligence finds it on its own.',
+        uses: ['Live prices', 'Price charts', 'Watchlists', 'Positions'], link: 'https://www.moomoo.com/download/OpenAPI', linkText: 'Download OpenD ↗',
+        facts: mm ? [['Address', mm.address], ['Gateway version', mm.version || '—'], ['Quotes', mm.ok ? (mm.quotes ? 'logged in' : 'not logged in') : '—'], ['Price history allowance', mm.ok && mm.used != null ? fmtN(mm.used) + ' used, ' + fmtN(mm.remaining) + ' left' : '—']].concat(mm.ok ? [] : [['Error', mm.error || 'not running']]) : [] },
+      sec: { desc: 'Financial statements, filings, insider trades and big holders, read from SEC EDGAR by the Diligence server and kept in its database. The SEC asks every request to carry a name and an email; they are saved in settings.json and sent only to sec.gov.',
+        uses: ['Financial statements', 'Quarters', 'Segments', 'Insider trades', 'Holders', 'Filing text'],
+        facts: sec ? [['Server', LOCAL_DB]] : [] },
+      fred: { desc: 'Economic data for the Macro workspace. FRED has more than 800,000 series and a search, and needs a free key (sign in at fred.stlouisfed.org, then "Request API key"). The key is kept in settings.json and used only by the local server.',
+        uses: ['Macro charts', 'Series search', 'Currency rates for foreign filers'], link: 'https://fred.stlouisfed.org/docs/api/api_key.html', linkText: 'Get a key ↗',
+        facts: fr ? [['Key', fr.fred_key ? 'saved' : 'none'], ['FRED', !fr.fred_key ? '—' : fr.fred_ok === false ? 'not answering: ' + (fr.fred_msg || '') : 'answering'], ['Without a key', (fr.fallback || []).length + ' core series from the Federal Reserve, BEA and BLS']] : [] },
+      roles: { desc: 'Several services can supply the same kind of data. Auto takes the first one with a key, in the order listed under API keys; pick one to spread the load across free plans. Live prices come from moomoo whenever OpenD is running.' },
+      reports: { desc: 'The Reports tab reads the research reports saved in this folder, and shows a new one as soon as it is written.',
+        facts: rp ? [['Reading from', rp.dir], ['Reports', fmtN(rp.count)]] : [] },
+      orphans: { desc: 'Stocks you took out of every group, or that left with a moomoo list, still have their notes, saved figures and SEC data kept. Delete that data here. Their reports are always kept.',
+        facts: this.orphans().length ? [['Stocks', this.orphans().join(', ')]] : [] },
+      notes: { desc: (LOCAL_DB === location.origin ? 'Your theses, checklists, notes and lists are saved in this browser and copied to notes/desk.json in the Diligence folder a few seconds after each change. Export them to keep a copy elsewhere or move them to another computer; API keys are not included.' : 'Your theses, checklists, notes and lists are saved only in this browser. Export them to keep a copy; API keys are not included.'),
+        facts: src && !err ? [['Last copied to disk', when(src.notes.saved_at)]] : [] },
+    };
+    const P = PROV_BY[cur[0]], det = D[cur[0]] || { desc: P.note, uses: P.covers.map(c => ROLE_LABEL[c]), link: P.signup, linkText: 'Get a key ↗' };
+    const msg = st.setMsg && st.setMsg.item === cur[0] ? st.setMsg : null, sd = st.secDraft || { name: '', email: '' };
+    return {
+      setOpen: open, setGo: () => this.openSettings(),
+      setRailBg: open ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', setRailColor: open ? 'var(--color-accent-300)' : 'var(--color-neutral-400)',
+      // a red dot on the rail when a source that was set up stopped working
+      setRailDot: [mmS, secS, frS].some(x => x[1] === DOWN && x[0] !== 'Not running') ? DOWN : 'transparent',
+      setRecheck: () => this.loadSources(), setRecheckIcon: st.setChecking ? 'ph ph-spinner-gap' : 'ph ph-arrows-clockwise',
+      setGroups: GROUPS.map(([title, items]) => ({ title, items: items.map(([id, label, icon, [sub, dot]]) => ({ label, icon, sub, dot,
+        pick: () => this.showSetItem(id), bg: id === cur[0] ? 'color-mix(in srgb, var(--color-text) 7%, transparent)' : 'transparent',
+        mark: id === cur[0] ? 'inset 2px 0 0 var(--color-accent)' : 'none', iconColor: id === cur[0] ? 'var(--color-accent-300)' : 'var(--color-neutral-500)' })) })),
+      setIcon: cur[2], setTitle: cur[1], setStatus: stTxt, setDot: stDot === NONE ? GRAY : stDot, setDesc: det.desc,
+      setHasLink: !!det.link, setLink: det.link || '', setLinkText: det.linkText || '',
+      setHasUses: !!(det.uses && det.uses.length), setUses: (det.uses || []).map(t => ({ t })),
+      setHasFacts: !!(det.facts && det.facts.length), setFacts: (det.facts || []).map(([k, v]) => ({ k, v: String(v) })),
+      noOrphans: !this.orphans().length, setIsOrphans: cur[0] === 'orphans', orphanCount: this.orphans().length, forgetOrphans: () => this.askForget(this.orphans()),
+      setIsMoomoo: cur[0] === 'moomoo', setIsSec: cur[0] === 'sec', setIsFred: cur[0] === 'fred', setIsRoles: cur[0] === 'roles', setIsReports: cur[0] === 'reports', setIsNotes: cur[0] === 'notes',
+      setProv: P ? [rows[P.id]] : cur[0] === 'sec' ? [rows.local] : [],
+      secName: sd.name, secEmail: sd.email,
+      ...(() => {   // the companies saved in the database, as a table
+        const cos = st.setCos, q = (st.coQuery || '').trim().toLowerCase(), [key, dir] = st.coSort || ['ticker', 1];
+        const ago = t => { const d = (Date.now() - Date.parse(t)) / 864e5; return !t ? '—' : d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 30 ? Math.floor(d) + ' days ago' : new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }); };
+        const rows = (cos || []).map(c => ({ c, name: shortName(c.name) }))
+          .filter(x => !q || [x.c.ticker, x.c.name, x.c.industry].some(v => String(v || '').toLowerCase().includes(q)))
+          .sort((a, b) => { const v = x => key === 'name' ? x.name : key === 'fetched_at' ? x.c.fetched_at || '' : x.c[key] || ''; return String(v(a)).localeCompare(String(v(b))) * dir; });
+        return {
+          coCount: cos ? cos.length : '…', coQuery: st.coQuery || '', onCoQuery: e => this.setState({ coQuery: e.target.value }),
+          coHead: [['ticker', 'Ticker'], ['name', 'Company'], ['industry', 'Industry'], ['fetched_at', 'Updated']].map(([k, t]) => ({ t, arrow: k === key ? (dir > 0 ? '↑' : '↓') : '',
+            sort: () => this.setState({ coSort: [k, k === key ? -dir : k === 'fetched_at' ? -1 : 1] }) })),
+          coRows: rows.map(({ c, name }) => ({ ticker: c.ticker, name, industry: c.industry || '—', when: ago(c.fetched_at), whenFull: c.fetched_at ? new Date(c.fetched_at).toLocaleString() : '',
+            open: () => { this.openSymbol(String(c.ticker).toUpperCase()); this.setWorkspace('companies'); } })),
+          coEmpty: !cos || !rows.length, coEmptyMsg: !cos ? 'Loading…' : cos.length ? 'No saved company matches "' + q + '".' : 'No companies saved yet. Open a stock under Companies and its filings are read and saved here.',
+        };
+      })(),
+      onSecName: e => { const v = e.target.value; this.setState(s => ({ secDraft: Object.assign({}, s.secDraft, { name: v }) })); },
+      onSecEmail: e => { const v = e.target.value; this.setState(s => ({ secDraft: Object.assign({}, s.secDraft, { email: v }) })); },
+      saveSec: () => this.setPost('/api/settings/sec', sd, 'sec', 'Saved. Requests to sec.gov use it from now on.'),
+      fredDraft: st.fredDraft || '', fredPlaceholder: fr && fr.fred_key ? 'A key is saved. Paste a new one to replace it' : '32-character FRED API key',
+      onFredDraft: e => this.setState({ fredDraft: e.target.value }),
+      saveFred: () => this.setPost('/api/macro/key', { key: st.fredDraft || '' }, 'fred', 'Key saved. Reopen Macro to load the full catalog.').then(j => j && this.setState({ fredDraft: '' })),
+      removeFred: () => this.setPost('/api/macro/key', { key: '' }, 'fred', 'Key removed. Macro uses the core series only.'),
+      saveRoles: () => this.saveSettings('roles'),
+      repDraft: st.repDraft || '', onRepDraft: e => this.setState({ repDraft: e.target.value }),
+      saveReports: () => this.setPost('/api/settings/reports', { dir: st.repDraft || '' }, 'reports', 'Saved. The Reports tab reads from this folder now.'),
+      resetReports: () => { this.setState({ repDraft: '' }); this.setPost('/api/settings/reports', { dir: '' }, 'reports', 'Back to the reports folder next to sec_db.py.'); },
+      setHasMsg: !!msg, setMsgText: msg ? msg.msg : '', setMsgColor: !msg ? NONE : msg.status === 'ok' ? UP : msg.status === 'error' ? DOWN : 'var(--color-accent)',
+      setHasFoot: !!P || cur[0] === 'roles',
+      setFoot: 'Free plans have daily or per-minute limits and shorter statement history; give each kind of data its own service to spread the load. Not listed because they block requests from a web page or have no free key: Tiingo, Yahoo Finance, Nasdaq Data Link and IEX Cloud (closed in 2024).',
+    };
+  }
+  setWorkspace(w) { if (w === 'settings') this.initSettings(); this.setState(s => ({ store: Object.assign({}, s.store, { prefs: Object.assign({}, s.store.prefs, { workspace: w }) }), thmMounted: s.thmMounted || w === 'themes', macMounted: s.macMounted || w === 'macro' }), () => this.save()); }
   componentDidUpdate(pp, ps) {
     // the page runtime passes only the previous props, so keep the previous state ourselves
     ps = ps || this._prevState || this.state; this._prevState = this.state;
@@ -2493,10 +2754,18 @@ class Component extends DCLogic {
         // merge every statements source with a key: chosen source wins, others fill missing years and lines
         const fetchF = async pid => { try { const v = await API[pid].fundamentals(this.pkey(pid), T); return Object.keys(v.byYear || {}).length ? { pid, v } : (errs.push(ROLE_LABEL[r] + ' (' + PROV_BY[pid].short + '): no data'), null); } catch (e) { errs.push(ROLE_LABEL[r] + ' (' + PROV_BY[pid].short + '): ' + e.message); return null; } };
         const cells = v => Object.values(v.byYear || {}).reduce((a, y) => a + Object.values(y).filter(ok).length, 0);
-        // The local SEC database is the statements source when chosen; other keys are only a fallback if it fails
+        // The Diligence server is the statements source when chosen; other keys are only a fallback if it fails
+        let bare = null;   // the server's answer for a company with no annual report yet: kept for its name and shares
         if (roles[r] === 'local') {
-          const loc = await fetchF('local');
-          if (loc) { const v = Object.assign({}, loc.v, { sources: ['SEC (local)'] }); if (!(v.peers || []).length) v.peers = await this.loadPeersOnly(T); out[r] = v; return; }
+          let lv = null; try { lv = await API.local.fundamentals(this.pkey('local'), T); } catch (e) { errs.push(ROLE_LABEL[r] + ' (Diligence): ' + e.message); }
+          if (lv && Object.keys(lv.byYear || {}).length) { const v = Object.assign({}, lv, { sources: ['SEC (local)'] }); if (!(v.peers || []).length) v.peers = await this.loadPeersOnly(T); out[r] = v; return; }
+          if (lv) {
+            bare = Object.assign({}, lv, { sources: ['SEC (local)'] }); errs.push(ROLE_LABEL[r] + ' (Diligence): no annual report (10-K) filed yet');
+            // show the name, share count and the reason now; the other sources below can take a while
+            this.setState(s => { const store = clone(s.store), r0 = store.data[T]; if (!r0) return null;
+              if (lv.name) r0.name = lv.name; if (lv.profile) r0.profile = lv.profile; r0.sharesOut = lv.sharesOutstanding || null; r0.noAnnual = true;
+              return { store }; }, () => { this.save(); this.loadQuarters(T); });
+          }
         }
         const first = chain.filter(pid => pid === roles[r] || pid !== 'alphavantage');
         let got = await Promise.all(first.map(fetchF));
@@ -2506,11 +2775,14 @@ class Component extends DCLogic {
         const lastY = v => Math.max(0, ...Object.keys(v.byYear || {}).map(Number).filter(y => Object.values(v.byYear[y]).some(ok)));
         // Alpha Vantage is skipped above when others look complete; ask it anyway if their newest year is behind
         if (chain.includes('alphavantage') && !got.some(g => g && g.pid === 'alphavantage') && Math.max(0, ...got.filter(Boolean).map(g => lastY(g.v))) < new Date().getFullYear() - 1) got = got.concat([await fetchF('alphavantage')]);
-        const ok2 = got.filter(Boolean).sort((a, b) => (lastY(b.v) - lastY(a.v)) || (cells(b.v) - cells(a.v))); if (!ok2.length) return;
+        const ok2 = got.filter(Boolean).sort((a, b) => (lastY(b.v) - lastY(a.v)) || (cells(b.v) - cells(a.v)));
+        if (bare) ok2.unshift({ pid: 'local', v: bare });   // its name, profile and share count come first
+        if (!ok2.length) return;
         const merged = { name: null, profile: null, peers: [], byYear: {}, errs: [], sources: ok2.map(g => PROV_BY[g.pid].short) };
         ok2.forEach(({ v }) => {
           merged.name = merged.name || v.name; if (!merged.profile || (!merged.profile.desc && v.profile && v.profile.desc)) merged.profile = v.profile || merged.profile;
           if (!merged.peers.length && v.peers && v.peers.length) merged.peers = v.peers;
+          ['ttm', 'sharesOutstanding', 'currency', 'adsRatio', 'financial'].forEach(k => { if (merged[k] == null && v[k] != null) merged[k] = v[k]; });
           Object.keys(v.byYear).forEach(y => { merged.byYear[y] = merged.byYear[y] || {}; Object.keys(v.byYear[y]).forEach(k => { if (!ok(merged.byYear[y][k])) merged.byYear[y][k] = v.byYear[y][k]; }); });
         });
         out[r] = merged; roles[r] = ok2[0].pid; return;
@@ -2529,7 +2801,9 @@ class Component extends DCLogic {
       if (fd) {
         if (fd.name) r.name = fd.name;
         if (fd.profile) r.profile = fd.profile;
+        r.ttm = fd.ttm || null; r.sharesOut = fd.sharesOutstanding || null; r.adsRatio = fd.adsRatio || 1; r.financial = !!fd.financial;
         const by = fd.byYear || {}, ys = Object.keys(by).map(Number).sort((a, b) => a - b);
+        r.noAnnual = !ys.length;
         if (ys.length) {
           const end = ys[ys.length - 1];
           if (r.example) { r.val = { price: '', fwdEps: '', fwdEbitda: '', fwdFcf: '' }; r.segments = [{ name: '', share: '', growth: '', margin: '' }]; r.peers = []; }
@@ -2681,7 +2955,7 @@ class Component extends DCLogic {
     try { set({ status: 'ok', d: await API.local.segmentsQ(k, T) }); } catch (e) { set({ status: 'error', msg: e.message }); }
   }
   async loadSegments(T) {
-    // Your local SEC database first; FMP only if it has nothing
+    // The Diligence server first; FMP only if it has nothing
     const srcs = [['local', 'SEC filings'], ['fmp', 'FMP']].filter(x => this.pkey(x[0]));
     if (!srcs.length) { this.setState(s => ({ segState: Object.assign({}, s.segState, { [T]: 'nokey' }) })); return; }
     this.setState(s => ({ segState: Object.assign({}, s.segState, { [T]: 'loading' }) }));
@@ -2703,8 +2977,15 @@ class Component extends DCLogic {
   async loadHolders(T) {
     const k = this.pkey('local'); if (!k) return;
     const set = v => this.setState(s => ({ holders: Object.assign({}, s.holders, { [T]: v }) }));
-    set({ status: 'loading' });
-    try { set({ status: 'ok', d: await API.local.holders(k, T) }); } catch (e) { set({ status: 'error', msg: e.message }); }
+    const cur = (this.state.holders || {})[T];
+    if (!cur || cur.status !== 'ok') set({ status: 'loading' });
+    try {
+      const d = await API.local.holders(k, T);
+      set({ status: 'ok', d });
+      // the server is still downloading or searching the 13F data: show what it has and ask again shortly
+      clearTimeout((this._holdT || (this._holdT = {}))[T]);
+      if (d && d.updating) this._holdT[T] = setTimeout(() => { if (this.state.store.current === T) this.loadHolders(T); }, 15000);
+    } catch (e) { set({ status: 'error', msg: e.message }); }
   }
   async loadInsiderHistory(T) {
     const k = this.pkey('local'); if (!k) return;
@@ -2816,7 +3097,25 @@ class Component extends DCLogic {
     try { if ((keys.fmp || '').trim()) { const p = await getJSON(fmpU(this.pkey('fmp'), 'stock-peers', { symbol: T })); if (Array.isArray(p)) return p.map(x => (x && x.symbol) || x).filter(x => typeof x === 'string' && x !== T); } } catch (e) {}
     return [];
   }
-  openSettings() { const p = this.state.store.prefs; this.setState({ settingsOpen: true, keyDrafts: clone(p.keys || {}), roleDrafts: clone(p.roles || {}), keyTests: {}, showKey: {} }); }
+  // Settings is its own workspace: every data source in one list, each with its key and whether it works
+  openSettings(item) { if (item) this.setState({ setItem: item, setMsg: null }); this.setWorkspace('settings'); }
+  initSettings() { const p = this.state.store.prefs; this.setState({ keyDrafts: clone(p.keys || {}), roleDrafts: clone(p.roles || {}), keyTests: {}, showKey: {}, setMsg: null, setReady: true }); this.loadSources(); }
+  async loadSources() {
+    this.setState({ setChecking: true });
+    getJSON(LOCAL_DB + '/api/companies').then(c => this.setState({ setCos: Array.isArray(c) ? c : [] }), () => this.setState({ setCos: [] }));
+    try { const j = await getJSON(LOCAL_DB + '/api/settings/sources');
+      this.setState(s => ({ setSrc: j, setChecking: false, secDraft: s.secDraft || { name: j.sec.name, email: j.sec.email }, repDraft: s.repDraft == null ? j.reports.setting : s.repDraft })); }
+    catch (e) { this.setState({ setSrc: { error: e.message }, setChecking: false }); }
+  }
+  async setPost(path, body, item, okMsg) {
+    this.setState({ setMsg: { item, status: 'testing', msg: 'Saving…' } });
+    try {
+      const r = await fetch(LOCAL_DB + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'The server answered ' + r.status);
+      this.setState({ setMsg: { item, status: 'ok', msg: okMsg } }); this.loadSources(); return j;
+    } catch (e) { this.setState({ setMsg: { item, status: 'error', msg: e.message } }); }
+  }
+  showSetItem(id) { this.setState({ setItem: id, setMsg: null }); }
   async testProvider(id) {
     const k = ((this.state.keyDrafts || {})[id] || '').trim();
     const set = v => this.setState(s => ({ keyTests: Object.assign({}, s.keyTests, { [id]: v }) }));
@@ -2829,11 +3128,27 @@ class Component extends DCLogic {
     }
     catch (e) { set({ status: 'error', msg: 'Not connected: ' + e.message }); }
   }
-  saveSettings() {
+  saveSettings(item) {
+    if (!this.state.setReady) return;   // the drafts were never filled in: saving now would drop every key
     const keys = {}; Object.keys(this.state.keyDrafts || {}).forEach(k => { const v = (this.state.keyDrafts[k] || '').trim(); if (v) keys[k] = v; });
     const roles = clone(this.state.roleDrafts || {});
     this.patch((r, so) => { so.prefs.keys = keys; so.prefs.roles = roles; });
-    this.setState({ settingsOpen: false, conn: { status: Object.keys(keys).length ? 'connecting' : 'idle' } }, () => { this.loadQuotes(true); this.loadResearch(this.state.store.current, true); });
+    this.setState({ setMsg: { item, status: 'ok', msg: 'Saved. Prices and figures are reloading.' }, conn: { status: Object.keys(keys).length ? 'connecting' : 'idle' } }, () => { this.loadQuotes(true); this.loadResearch(this.state.store.current, true); });
+  }
+  provRow(p) {
+    const st = this.state, store = st.store;
+    const d = (st.keyDrafts || {})[p.id] || '', t = (st.keyTests || {})[p.id], saved = !!((store.prefs.keys || {})[p.id] || '').trim(), shown = !!(st.showKey || {})[p.id];
+    const stateTxt = t && t.status === 'ok' ? 'Working' : t && t.status === 'error' ? 'Not working' : saved ? (p.id === 'local' ? 'Address saved' : 'Key saved') : (p.id === 'local' ? 'No address' : 'No key');
+    return {
+      name: p.name, signup: p.signup, note: p.note, linkText: p.id === 'local' ? 'Saved companies ↗' : 'Get a key ↗', placeholder: p.id === 'local' ? 'Server address, e.g. http://localhost:8765' : 'API key', covers: p.covers.map(c => ({ t: ROLE_LABEL[c] })),
+      keyHead: p.id === 'local' ? 'Server address' : 'API key',
+      draft: d, onDraft: e => { const v = e.target.value; this.setState(s => ({ keyDrafts: Object.assign({}, s.keyDrafts, { [p.id]: v }), keyTests: Object.assign({}, s.keyTests, { [p.id]: null }) })); },
+      inputType: shown || p.id === 'local' ? 'text' : 'password', eye: shown ? 'ph ph-eye-slash' : 'ph ph-eye', toggleShow: () => this.setState(s => ({ showKey: Object.assign({}, s.showKey, { [p.id]: !shown }) })),
+      test: () => this.testProvider(p.id), clear: () => this.setState(s => ({ keyDrafts: Object.assign({}, s.keyDrafts, { [p.id]: '' }), keyTests: Object.assign({}, s.keyTests, { [p.id]: null }) })),
+      save: () => this.saveSettings(p.id === 'local' ? 'sec' : p.id),
+      hasDraft: !!d, hasTest: !!t, testMsg: t ? t.msg : '', testColor: !t ? 'transparent' : t.status === 'ok' ? UP : t.status === 'error' ? DOWN : 'var(--color-accent)',
+      state: stateTxt, saved, dot: t && t.status === 'ok' ? UP : t && t.status === 'error' ? DOWN : saved ? 'var(--color-accent)' : 'var(--color-neutral-700)',
+    };
   }
   openSymbol(S) { this.setState(s => { const store = clone(s.store); if (!store.data[S]) store.data[S] = blankResearch(S, false); store.current = S; return { store, railOpen: false }; }, () => this.save()); }
   runSearch(q) {
@@ -2853,6 +3168,12 @@ class Component extends DCLogic {
   }
   addSymbol(sym) {
     const S = String(sym || this.state.newSymbol).trim().toUpperCase().replace(/[^A-Z0-9.\-^]/g, ''); if (!S) return;
+    const cur = this.state.store.groups.find(x => x.id === this.state.store.activeGroup);
+    if (cur && cur.moomoo && (cur.moomoo.kind === 'positions' || cur.moomoo.own === false)) {
+      this.setState({ mmNote: cur.moomoo.kind === 'positions' ? 'This list is what you hold in moomoo; it changes when you trade.' : 'This is one of moomoo\'s built-in lists: change it in the moomoo app.', newSymbol: '', search: null });
+      return;
+    }
+    if (cur && cur.moomoo && cur.moomoo.kind === 'list' && !cur.symbols.includes(S)) this.mmChange(cur, [S], []);
     clearTimeout(this._sT); this.setState({ search: null });
     this.setState(s => { const store = clone(s.store); const g = store.groups.find(x => x.id === store.activeGroup) || store.groups[0]; if (!g.symbols.includes(S)) g.symbols.push(S); if (!store.data[S]) store.data[S] = blankResearch(S, false); store.current = S; return { store, newSymbol: '' }; }, () => { this.save(); this.loadNewSymbol(S); });
   }
@@ -2864,13 +3185,56 @@ class Component extends DCLogic {
     if (R && R.live && R.live.years && R.finVer === FIN_VER) { if (!R.finQ || R.qVer !== Q_VER) this.loadQuarters(S); return; }
     this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [S]: { status: 'loading' } }) }), () => this.loadResearch(S, true).catch(e => this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [S]: { status: 'error', errs: [e.message] } }) }))));
   }
+  moveWorkspace(id, target, after, current) {
+    if (id === target) return;
+    const list = current.filter(x => x !== id); list.splice(list.indexOf(target) + (after ? 1 : 0), 0, id);
+    this.patch((r, so) => { so.prefs.wsOrder = list; });
+  }
   moveSymbol(S, target, after) {
     if (S === target) return;
     this.patch((r, so) => { const g = so.groups.find(x => x.id === so.activeGroup); if (!g || !g.symbols.includes(S) || !g.symbols.includes(target)) return;
       const list = g.symbols.filter(x => x !== S); list.splice(list.indexOf(target) + (after ? 1 : 0), 0, S); g.symbols = list; });
   }
-  removeSymbol(S) { this.patch((r, so) => { const g = so.groups.find(x => x.id === so.activeGroup); if (g) g.symbols = g.symbols.filter(x => x !== S); }); }
-  pickGroup(id) { this.setState(s => ({ store: Object.assign({}, s.store, { activeGroup: id }), groupMenu: false, editGroup: null }), () => this.save()); }
+  // A stock in none of the groups: offer to delete the data kept about it (notes, saved figures, SEC data). Its
+  // reports are never touched. Nothing is deleted without saying yes.
+  inGroups(store) { const set = new Set(); (store || this.state.store).groups.forEach(g => g.symbols.forEach(x => set.add(x))); return set; }
+  orphans() { const st = this.state.store, used = this.inGroups(st); return Object.keys(st.data || {}).filter(S => !used.has(S)).sort(); }
+  async askForget(syms) {
+    syms = [...new Set(syms)].filter(S => !this.inGroups().has(S)); if (!syms.length) return;
+    this.setState({ forget: { syms, foot: null, busy: false, msg: '' } });
+    try {
+      const keep = [...this.inGroups()].join(',');
+      const foot = await getJSON(LOCAL_DB + '/api/desk/footprint?tickers=' + encodeURIComponent(syms.join(',')) + '&keep=' + encodeURIComponent(keep));
+      this.setState(s => s.forget && s.forget.syms.join() === syms.join() ? { forget: Object.assign({}, s.forget, { foot }) } : null);
+    } catch (e) { this.setState(s => s.forget ? { forget: Object.assign({}, s.forget, { foot: [], msg: 'The Diligence server is not answering, so only the notes in this browser can be deleted now.' }) } : null); }
+  }
+  async doForget() {
+    const f = this.state.forget; if (!f || f.busy) return;
+    const syms = f.syms.filter(S => !this.inGroups().has(S));   // put back in a group meanwhile: keep it
+    this.setState({ forget: Object.assign({}, f, { busy: true, msg: 'Deleting…' }) });
+    let res = null;
+    try {
+      const r = await fetch(LOCAL_DB + '/api/desk/forget', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: syms, keep: [...this.inGroups()] }) });
+      res = await r.json(); if (!r.ok) throw new Error(res.error || 'the server answered ' + r.status);
+    } catch (e) { if (f.foot && f.foot.length) { this.setState({ forget: Object.assign({}, f, { busy: false, msg: 'Nothing was deleted: ' + e.message }) }); return; } }
+    this.setState(s => {
+      const store = clone(s.store), quotes = Object.assign({}, s.quotes);
+      syms.forEach(S => { delete store.data[S]; delete quotes[S]; });
+      if (!store.data[store.current]) { const g = store.groups.find(x => x.id === store.activeGroup) || store.groups[0]; store.current = (g && g.symbols[0]) || Object.keys(store.data)[0] || null; }
+      return { store, quotes, forget: null, setMsg: { item: 'orphans', status: 'ok', msg: 'Deleted the data of ' + syms.join(', ') + '. Their reports are kept.' } };
+    }, () => { this.save(); try { localStorage.setItem(Q_KEY, JSON.stringify(this.state.quotes)); } catch (e) {} });
+  }
+  removeSymbol(S) {
+    const cur = this.state.store.groups.find(x => x.id === this.state.store.activeGroup);
+    if (cur && cur.moomoo && (cur.moomoo.kind === 'positions' || cur.moomoo.own === false)) {
+      this.setState({ mmNote: cur.moomoo.kind === 'positions' ? 'This list is what you hold in moomoo; it changes when you trade.' : 'This is one of moomoo\'s built-in lists: change it in the moomoo app.' });
+      return;
+    }
+    if (cur && cur.moomoo && cur.moomoo.kind === 'list') this.mmChange(cur, [], [S]);   // out of this list; it stays in moomoo's All
+    this.patch((r, so) => { const g = so.groups.find(x => x.id === so.activeGroup); if (g) g.symbols = g.symbols.filter(x => x !== S); });
+    setTimeout(() => this.askForget([S]), 0);   // in no group now: offer to delete its data
+  }
+  pickGroup(id) { this.setState(s => ({ store: Object.assign({}, s.store, { activeGroup: id }), groupMenu: false, editGroup: null, mmNote: '' }), () => this.save()); }
   addGroup() { const name = this.state.newGroup.trim(); if (!name) return; const id = 'g' + Date.now(); this.setState(s => { const store = clone(s.store); store.groups.push({ id, name, symbols: [] }); store.activeGroup = id; return { store, newGroup: '', groupMenu: false }; }, () => this.save()); }
   moveGroup(id, target, after) {
     if (id === target) return;
@@ -2882,10 +3246,48 @@ class Component extends DCLogic {
     this.setState(s => { const cur = s.store.groups.find(g => g.id === id); if (!cur || !name || name === cur.name) return { editGroup: null };
       const store = clone(s.store); store.groups.find(g => g.id === id).name = name; return { store, editGroup: null }; }, () => this.save());
   }
-  removeGroup(id) { this.setState(s => { if (s.store.groups.length < 2) return null; const store = clone(s.store); store.groups = store.groups.filter(g => g.id !== id); if (store.activeGroup === id) store.activeGroup = store.groups[0].id; return { store }; }, () => this.save()); }
+  removeGroup(id) { this.setState(s => { if (s.store.groups.length < 2) return null; const store = clone(s.store);
+    const gone = store.groups.find(g => g.id === id); if (gone && gone.moomoo) store.prefs.mmSkip = [...new Set(((store.prefs.mmSkip) || []).concat(gone.moomoo.kind === 'positions' ? '__positions' : gone.moomoo.name))];
+    store.groups = store.groups.filter(g => g.id !== id); if (store.activeGroup === id) store.activeGroup = store.groups[0].id; return { store, goneSyms: gone ? gone.symbols : [] }; },
+    () => { this.save(); const left = (this.state.goneSyms || []).filter(S => !this.inGroups().has(S)); if (left.length) this.askForget(left); }); }
   componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('message', this.onScrMsg); this.kcDispose(); clearTimeout(this._mmTimer); }
 
-  save() { try { localStorage.setItem(LS_KEY, JSON.stringify(this.state.store)); } catch (e) {} }
+  save() { this.state.store.savedAt = Date.now(); try { localStorage.setItem(LS_KEY, JSON.stringify(this.state.store)); } catch (e) {} this.queueNotesCopy(); }
+  // Notes also go to notes/desk.json in the Diligence folder, so a cleared browser or another browser loses nothing.
+  // API keys are left out of that copy and of exports.
+  notesForDisk() { const s = JSON.parse(JSON.stringify(this.state.store)); if (s.prefs) delete s.prefs.keys; return s; }
+  queueNotesCopy() {
+    if (!this._notesReady || LOCAL_DB !== location.origin) return;
+    clearTimeout(this._notesT);
+    this._notesT = setTimeout(() => fetch('/api/desk/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ store: this.notesForDisk() }) }).catch(() => {}), 3000);
+  }
+  // on opening: take the copy on disk when this browser has none, or an older one
+  restoreNotes() {
+    if (LOCAL_DB !== location.origin) { this._notesReady = true; return; }
+    fetch('/api/desk/notes').then(r => r.json()).then(d => {
+      const mine = this.state.store, disk = d && d.store ? normalizeStore(d.store) : null;
+      if (disk && (d.saved_at || 0) > (mine.savedAt || 0)) {
+        disk.prefs.keys = mine.prefs.keys;
+        this.setState({ store: disk }, () => { try { localStorage.setItem(LS_KEY, JSON.stringify(disk)); } catch (e) {} this._notesReady = true; this.ensureResearch(); });
+      } else { this._notesReady = true; if (!d || !d.store) this.queueNotesCopy(); }
+    }).catch(() => { this._notesReady = true; });
+  }
+  exportNotes() {
+    const blob = new Blob([JSON.stringify({ diligenceNotes: 1, exported: new Date().toISOString(), store: this.notesForDisk() }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diligence-notes-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+  importNotes(file) {
+    if (!file) return;
+    file.text().then(t => {
+      const o = JSON.parse(t), s = normalizeStore(o && o.store ? o.store : o);
+      if (!s) throw new Error('This is not a Diligence notes file.');
+      const n = Object.keys(s.data).length;
+      if (!confirm('Replace the notes in this browser with the ' + n + ' compan' + (n === 1 ? 'y' : 'ies') + ' in ' + file.name + '?')) return;
+      s.prefs.keys = this.state.store.prefs.keys;
+      this.setState({ store: s }, () => { this.save(); this.ensureResearch(); });
+    }).catch(e => alert('Could not import: ' + e.message));
+  }
   patch(fn) { this.setState(s => { const store = JSON.parse(JSON.stringify(s.store)); fn(store.data[store.current], store); return { store }; }, () => this.save()); }
 
   goPage(page) { this.setState({ page, railOpen: false, addingSource: false }, () => { const m = this.mainRef.current; if (m) m.scrollTop = 0; }); }
@@ -2926,11 +3328,16 @@ class Component extends DCLogic {
 
     // valuation
     const qT = st.quotes[T] || {}, livePx = num(qT.price);
-    const price = ok(num(R.val.price)) ? num(R.val.price) : livePx, shN = c.shares[L];
-    const mcap = price * shN, ev = mcap + c.debt[L] - c.cash[L];
-    const peTtm = div(price, c.eps[L]), peFwd = div(price, num(R.val.fwdEps));
+    // shares outstanding today (the newest filing's cover page), not the year's average; P/E on the last twelve months
+    const ttm = R.ttm || {}, sharesNow = num((R.sharesOut || {}).value);
+    const price = ok(num(R.val.price)) ? num(R.val.price) : livePx, shN = ok(sharesNow) && sharesNow > 0 ? sharesNow : c.shares[L];
+    // enterprise value: what buying the whole company costs, so minority holders and preferred stock count too
+    const claims = (ok(c.minority[L]) ? c.minority[L] : 0) + (ok(c.preferred[L]) ? c.preferred[L] : 0);
+    const mcap = price * shN, ev = mcap + c.debt[L] + claims - c.liquid[L];
+    const peTtm = div(price, ok(num(ttm.eps)) ? num(ttm.eps) : c.eps[L]), peFwd = div(price, num(R.val.fwdEps));
     const evE = div(ev, c.ebitda[L]), evEFwd = div(ev, num(R.val.fwdEbitda));
-    const fy = div(c.fcf[L], mcap), fyFwd = div(num(R.val.fwdFcf), mcap);
+    const fcfTtm = ok(num(ttm.cfo)) && ok(num(ttm.capex)) ? num(ttm.cfo) - num(ttm.capex) : c.fcf[L];
+    const fy = div(fcfTtm, mcap), fyFwd = div(num(R.val.fwdFcf), mcap);
     const pm = k => median(R.peers.map(p => num(p[k])));
     const med = { pe: pm('pe'), ev: pm('ev'), fy: pm('fy') / 100, roic: pm('roic') / 100, growth: pm('growth') / 100, margin: pm('margin') / 100 };
     const rel = (a, b, y) => { const r = div(a, b) - 1; if (!ok(r)) return '—'; return y ? (r >= 0 ? `${pct(r, 0)} higher yield` : `${pct(-r, 0)} lower yield`) : (r >= 0 ? `${pct(r, 0)} premium` : `${pct(-r, 0)} discount`); };
@@ -2956,11 +3363,14 @@ class Component extends DCLogic {
     const niGt = [L - 4, L - 3, L - 2, L - 1, L].filter(i => ok(c.netIncome[i]) && ok(c.cfo[i]) && c.netIncome[i] > c.cfo[i]).length;
     const sh5 = div(c.shares[L], c.shares[L - 5]) - 1;
     const dGap = cagr(c.debt, 5) - cagr(c.revenue, 5);
-    const conv5 = avgN(c.fcfConv, 5), cov = c.intCov[L];
+    // the latest year that has the figure: some companies (Apple) stopped reporting interest expense on its own line
+    const lv = a => { for (let i = L; i >= 0; i--) if (ok(a[i])) return a[i]; return NaN; };
+    const conv5 = avgN(c.fcfConv, 5), cov = lv(c.intCov);
     const scr = (label, detail, status) => ({ label, detail, status, tagClass: TAG[status][0], tagText: TAG[status][1] });
     const screens = [
       scr('Earnings backed by cash', hasData ? `Net income exceeded operating cash flow in ${niGt} of the last 5 years` : 'Needs net income and operating cash flow', !hasData ? '' : niGt === 0 ? 'ok' : niGt === 1 ? 'watch' : 'flag'),
-      scr('Share dilution', ok(sh5) ? `Diluted share count ${sh5 >= 0 ? 'up' : 'down'} ${pct(Math.abs(sh5))} over 5 years` : 'Needs share counts', ok(sh5) ? (sh5 <= 0 ? 'ok' : sh5 <= 0.02 ? 'watch' : 'flag') : ''),
+      // under half a percent in five years is no change: it shows as 0.0% and should not be flagged
+      scr('Share dilution', ok(sh5) ? (Math.abs(sh5) < 0.005 ? 'Diluted share count about unchanged over 5 years' : `Diluted share count ${sh5 >= 0 ? 'up' : 'down'} ${pct(Math.abs(sh5))} over 5 years`) : 'Needs share counts', ok(sh5) ? (sh5 < 0.005 ? 'ok' : sh5 <= 0.02 ? 'watch' : 'flag') : ''),
       scr('Debt growing faster than sales', ok(dGap) ? `Debt 5-yr CAGR ${pct(cagr(c.debt, 5))} against sales ${pct(cagr(c.revenue, 5))}` : 'Needs debt and revenue', ok(dGap) ? (dGap <= 0 ? 'ok' : dGap <= 0.05 ? 'watch' : 'flag') : ''),
       scr('Cash conversion', ok(conv5) ? `Free cash flow averaged ${pct(conv5, 0)} of net income over 5 years` : 'Needs cash flow and net income', ok(conv5) ? (conv5 >= 0.9 ? 'ok' : conv5 >= 0.7 ? 'watch' : 'flag') : ''),
       scr('Interest burden', ok(cov) ? `Operating income covers interest ${times(cov)}` : 'Needs EBIT and interest', ok(cov) ? (cov >= 8 ? 'ok' : cov >= 4 ? 'watch' : 'flag') : ''),
@@ -3015,7 +3425,7 @@ class Component extends DCLogic {
 
     // statements
     const stmt = STMT[st.tab];
-    const wantQ = st.period === 'q', isQ = wantQ && !!R.finQ;
+    const wantQ = (st.period || (R.noAnnual ? 'q' : 'a')) === 'q', isQ = wantQ && !!R.finQ;
     const FQ = isQ ? R.finQ : R.fin, CQ = isQ ? calc(R.finQ, ok(taxN) ? taxN / 100 : 0.21) : c, lag = isQ && st.cmp === 'qoq' ? 1 : isQ ? 4 : 1;
     const showChg = st.showChg !== false, showHeat = st.heat !== false;
     const INV = { cogs: 1, interest: 1, curLiab: 1, debt: 1, shares: 1, liab: 1, netDebt: 1 };
@@ -3026,7 +3436,7 @@ class Component extends DCLogic {
       const amt = Math.round(Math.min(1, Math.abs(g) / 0.3) * 34 + 4);
       return { hasChg: showChg, chg: (g >= 0 ? '+' : '−') + Math.abs(g * 100).toFixed(1) + '%', chgColor: col, heat: showHeat && Math.abs(good) > 0.0005 ? 'color-mix(in oklch, ' + col + ' ' + amt + '%, transparent)' : 'transparent' };
     };
-    // extra statement lines from the local SEC database, lined up with the columns on screen
+    // extra statement lines from the Diligence server, lined up with the columns on screen
     const sx = (st.stmtX || {})[T];
     if (page === 'finances' && !sx && this.pkey('local')) setTimeout(() => { if (!(this.state.stmtX || {})[T]) this.loadStmtDetail(T); }, 0);
     const xCols = (isQ ? R.qLabels : Y.map(String)).map(l => (sx && sx.status === 'ok' ? (isQ ? sx.q : sx.a)[l] : null) || {});
@@ -3099,7 +3509,7 @@ class Component extends DCLogic {
     const buys = R.insiders.filter(x => x.type !== 'Sell').reduce((s, x) => s + (ok(insVal(x)) ? insVal(x) : 0), 0);
     const sells = R.insiders.filter(x => x.type === 'Sell').reduce((s, x) => s + (ok(insVal(x)) ? insVal(x) : 0), 0);
     const curLabel = SECTIONS.find(s => s.id === page).label;
-    const hasKey = this.anyKey();
+    const hasKey = this.anyKey(), priceSrc = !!this.roleProvider('prices');
     const mmOn = !!(st.mmLive && Date.now() - st.mmLive.at < 90000);
     const grp = store.groups.find(g => g.id === store.activeGroup) || store.groups[0];
     // The buttons above the list: every group that fits in the row, taken in the list's order, and always the group that is open.
@@ -3113,7 +3523,8 @@ class Component extends DCLogic {
       return [[10, 6], [8, 5], [6, 4]].map(([pad, gap]) => tryWith(pad, gap)).reduce((best, x) => x.groups.length > best.groups.length || (x.groups.length === best.groups.length && x.rank < best.rank) ? x : best); })();
     const chipGroups = chipFit.groups;
     const groupChips = chipGroups.map(g => ({ name: g.name, pad: '4px ' + chipFit.pad + 'px', cap: chipFit.cap + 'px', pick: () => this.pickGroup(g.id), border: g.id === grp.id ? 'var(--color-accent)' : 'var(--color-divider)', color: g.id === grp.id ? 'var(--color-accent-200)' : 'var(--color-neutral-300)' }));
-    const groupList = store.groups.map(g => ({ name: g.name, count: g.symbols.length,
+    const groupList = store.groups.map(g => ({ name: g.name, count: g.symbols.length, canRename: !g.moomoo,
+      removeTip: g.moomoo ? 'Hide here (it stays in moomoo)' : 'Delete group',
       // rename in place: the pencil turns the name into a box; Enter or clicking away saves, Esc cancels
       editing: st.editGroup === g.id, showName: st.editGroup !== g.id, editName: st.editGroupName || '', drag: st.editGroup !== g.id, stop: e => e.stopPropagation(),
       startEdit: e => { e.stopPropagation(); this.setState({ editGroup: g.id, editGroupName: g.name }, () => setTimeout(() => { const el = document.getElementById('grp-rename'); if (el) { el.focus(); el.select(); } }, 0)); },
@@ -3125,7 +3536,7 @@ class Component extends DCLogic {
       dragOver: e => { if (!this.state.dragGrp) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2; if (this.state.dragGrpOver !== g.id || this.state.dragAfter !== after) this.setState({ dragGrpOver: g.id, dragAfter: after }); },
       drop: e => { e.preventDefault(); const from = this.state.dragGrp, after = this.state.dragAfter; this.setState({ dragGrp: null, dragGrpOver: null }); if (from) this.moveGroup(from, g.id, after); },
       dragEnd: () => this.setState({ dragGrp: null, dragGrpOver: null }),
-      mark: st.dragGrp && st.dragGrpOver === g.id && st.dragGrp !== g.id ? 'inset 0 ' + (st.dragAfter ? '-2px' : '2px') + ' 0 var(--color-accent)' : 'none', op: st.dragGrp === g.id ? 0.4 : 1 }));
+      ...(st.dragGrp && st.dragGrpOver === g.id && st.dragGrp !== g.id ? { lineDisp: 'block', lineTop: st.dragAfter ? 'auto' : '-2px', lineBot: st.dragAfter ? '-2px' : 'auto' } : { lineDisp: 'none', lineTop: 'auto', lineBot: 'auto' }), op: st.dragGrp === g.id ? 0.4 : 1 }));
     const watch = grp.symbols.map(sym => {
       const q = st.quotes[sym] || {}, d = store.data[sym], nm = q.name || (d && d.name) || '';
       const color = !ok(q.pct) ? 'var(--color-neutral-500)' : q.pct >= 0 ? UP : DOWN;
@@ -3136,12 +3547,16 @@ class Component extends DCLogic {
         dragOver: e => { if (!this.state.dragSym) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2; if (this.state.dragOver !== sym || this.state.dragAfter !== after) this.setState({ dragOver: sym, dragAfter: after }); },
         drop: e => { e.preventDefault(); const from = this.state.dragSym, after = this.state.dragAfter; this.setState({ dragSym: null, dragOver: null }); if (from) this.moveSymbol(from, sym, after); },
         dragEnd: () => this.setState({ dragSym: null, dragOver: null }),
-        mark: st.dragSym && st.dragOver === sym && st.dragSym !== sym ? 'inset 0 ' + (st.dragAfter ? '-2px' : '2px') + ' 0 var(--color-accent)' : 'none', op: st.dragSym === sym ? 0.4 : 1,
+        // a straight line on the gap the row will drop into
+        ...(st.dragSym && st.dragOver === sym && st.dragSym !== sym ? { lineDisp: 'block', lineTop: st.dragAfter ? 'auto' : '-1px', lineBot: st.dragAfter ? '-1px' : 'auto' } : { lineDisp: 'none', lineTop: 'auto', lineBot: 'auto' }), op: st.dragSym === sym ? 0.4 : 1,
         hasVerdict: !!(d && d.verdict && d.verdict !== 'Undecided'), verdict: d ? d.verdict : '' };
     });
     const fs = st.fetchState[T] || {};
     const ago = R.live ? Math.max(0, Math.round((Date.now() - R.live.at) / 60000)) : 0;
-    const dataStatus = !hasKey ? 'Demo mode · add an API key for live data' : fs.status === 'loading' ? 'Loading live data…' : fs.status === 'error' ? 'Not connected: ' + ((fs.errs && fs.errs[0]) || '') : R.live ? 'Live data · updated ' + (ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : Math.round(ago / 60) + ' h ago') + (R.live.years ? ' · ' + R.live.years + ' years of statements' + (R.live.sources ? ' from ' + R.live.sources.join(' + ') : '') : '') + (fs.errs && fs.errs.length ? ' · ' + fs.errs.length + ' feeds unavailable' : '') : 'Live data not loaded · refresh';
+    // what was loaded, and whether there is a price: statements from the SEC are not live prices
+    const hasPrice = ok((st.quotes[T] || {}).price);
+    const priceNote = hasPrice ? '' : ' · no price yet' + (this.roleProvider('prices') || st.mmLive ? '' : ': start moomoo OpenD or add a price key in Settings');
+    const dataStatus = !hasKey ? 'Demo mode · add an API key for live data' : fs.status === 'loading' ? 'Loading company data…' : fs.status === 'error' ? 'Not connected: ' + ((fs.errs && fs.errs[0]) || '') : R.live ? 'Company data updated ' + (ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : Math.round(ago / 60) + ' h ago') + (R.live.years ? ' · ' + R.live.years + ' years of statements' + (R.live.sources ? ' from ' + R.live.sources.join(' + ') : '') : '') + (fs.errs && fs.errs.length ? ' · ' + fs.errs.length + ' feeds unavailable' : '') + priceNote : 'Company data not loaded · refresh';
     const dataIcon = !hasKey ? 'ph ph-plug' : fs.status === 'loading' ? 'ph ph-spinner-gap' : fs.status === 'error' ? 'ph ph-warning' : 'ph ph-arrows-clockwise';
     const dKey = d => { const t = Date.parse(d); return isNaN(t) ? Infinity : t; };
     const newest = arr => arr.slice().sort((a, b) => dKey(b.date) - dKey(a.date));
@@ -3179,7 +3594,7 @@ class Component extends DCLogic {
     if (page === 'events' && !hold && this.pkey('local')) setTimeout(() => { if (!(this.state.holders || {})[T]) this.loadHolders(T); }, 0);
     const holdVals = (() => {
       const d = hold && hold.status === 'ok' ? hold.d : null, list = d ? d.holders || [] : [];
-      const status = !this.pkey('local') ? 'This comes from your local SEC database; start it with python sec_db.py serve.' : !hold || hold.status === 'loading' ? 'Searching the SEC\'s quarterly 13F files and the 13D/13G filings… the first time downloads about 200 MB, after that a few seconds per company.' : hold.status === 'error' ? 'Could not be read: ' + hold.msg : !list.length ? 'No holders were found for ' + T + '.' : '';
+      const status = !this.pkey('local') ? 'This comes from the Diligence server; start it with python3 sec_db.py serve.' : !hold || hold.status === 'loading' ? 'Searching the SEC\'s quarterly 13F files and the 13D/13G filings… the first time downloads about 200 MB, after that a few seconds per company.' : hold.status === 'error' ? 'Could not be read: ' + hold.msg : d && d.downloading13f ? 'Downloading the SEC\'s quarterly 13F data for the first time (about 200 MB). This takes a few minutes; the list fills in by itself.' + (list.length ? ' Shown meanwhile: what was found before.' : '') : d && d.updating ? 'Searching the newest 13F filings… the list fills in by itself.' : !list.length ? 'No holders were found for ' + T + '.' : '';
       const out = { holdStatus: status, hasHolders: list.length > 0, holdFacts: [], holdRows: [], holdLegend: [], holdPie: null, hasTypes: false, typePie: null, typeLegend: [], holdHasMore: false, holdMore: null, holdMoreLabel: '', holdNote: '' };
       if (!list.length) return out;
       const n = st.holdShown || 25, cnt = x => { const a = Math.abs(x); return a >= 1e9 ? (a / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (a / 1e6).toFixed(2) + 'M' : a >= 1e3 ? (a / 1e3).toFixed(2) + 'K' : String(Math.round(a)); };
@@ -3228,13 +3643,23 @@ class Component extends DCLogic {
 
     return {
       T, name: R.name, onName: setR('name'),
-      groupChips, groupList, groupMenuOpen: st.groupMenu, groupMenuClose: () => this.setState({ groupMenu: false, editGroup: null }),
+      groupChips, groupList, groupMenuOpen: st.groupMenu,
+      groupsNote: store.groups.some(g => g.moomoo) ? (store.groups.every(g => g.moomoo) ? 'same as moomoo' : 'moomoo lists kept the same') : '', groupMenuClose: () => this.setState({ groupMenu: false, editGroup: null }),
       ...(() => { const L = st.mmLists, linked = (kind, name) => store.groups.some(g => g.moomoo && g.moomoo.kind === kind && g.moomoo.name === name);
-        const row = (kind, name) => { const on = linked(kind, name); return { name: kind === 'positions' ? 'Positions (what you hold)' : name, icon: on ? 'ph ph-arrows-clockwise' : 'ph ph-plus', note: on ? 'refresh' : 'add',
-          tip: on ? 'Already a group here. Click to refresh it from moomoo.' : 'Add as a group that mirrors moomoo. It is refreshed each time the page opens.', pick: () => this.mmSync(kind, name, true).catch(e => this.setState({ mmListsErr: e.message })) }; };
-        return { mmListsShow: !!(L && st.groupMenu), mmLists: L ? (L.positions ? [row('positions', 'Positions')] : []).concat((L.groups || []).map(g => row('list', g.name))) : [], mmListsMsg: st.groupMenu && !L && st.mmListsErr ? 'moomoo lists: ' + st.mmListsErr : '' }; })(), groupCaret: st.groupMenu ? 'ph ph-caret-up' : 'ph ph-caret-down', toggleGroupMenu: () => { if (!st.groupMenu) this.mmLoadLists(); this.setState(s => ({ groupMenu: !s.groupMenu, editGroup: null })); },
+        // your groups are the moomoo lists; underneath, only the moomoo lists that are not one of your groups yet
+        const own = Object.fromEntries(((L && L.groups) || []).map(g => [g.name, g.own]));
+        const row = (kind, name) => ({ name: kind === 'positions' ? 'Positions (what you hold)' : name, icon: 'ph ph-plus', note: 'add',
+          tip: 'Add as a group, kept the same as moomoo.', pick: () => {
+            this.patch((r, so) => { so.prefs.mmSkip = (so.prefs.mmSkip || []).filter(n => n !== (kind === 'positions' ? '__positions' : name)); });
+            this.mmSync(kind, name, true, kind === 'list' ? own[name] : null).catch(e => this.setState({ mmListsErr: e.message })); } });
+        const missing = L ? (L.positions && !linked('positions', 'Positions') ? [row('positions', 'Positions')] : []).concat((L.groups || []).filter(g => !linked('list', g.name)).map(g => row('list', g.name))) : [];
+        return { mmListsShow: !!(L && st.groupMenu && missing.length), mmLists: missing, mmListsMsg: st.groupMenu && !L && st.mmListsErr ? 'moomoo lists: ' + st.mmListsErr : '' }; })(), groupCaret: st.groupMenu ? 'ph ph-caret-up' : 'ph ph-caret-down', toggleGroupMenu: () => { if (!st.groupMenu) this.mmLoadLists(); this.setState(s => ({ groupMenu: !s.groupMenu, editGroup: null })); },
       newGroup: st.newGroup, onNewGroup: e => this.setState({ newGroup: e.target.value }), onNewGroupKey: e => { if (e.key === 'Enter') this.addGroup(); },
       groupName: grp.name, watch, emptyGroup: watch.length === 0, noKey: !hasKey, hasKey,
+      syncNote: st.mmNote || (!grp.moomoo ? '' : grp.moomoo.kind === 'positions' ? 'What you hold in moomoo, kept up to date.' : grp.moomoo.own === false
+        ? 'moomoo\'s built-in list \u201c' + grp.moomoo.name + '\u201d: shown here, changed only in the moomoo app.'
+        : 'Same as your moomoo list \u201c' + grp.moomoo.name + '\u201d: adding or removing a stock here changes it in moomoo too.'),
+      syncNoteColor: st.mmNote ? 'var(--color-warning, #e0a03a)' : 'var(--color-neutral-500)',
       newSymbol: st.newSymbol, onNewSymbol: e => { const v = e.target.value; this.setState({ newSymbol: v }); this.runSearch(v); },
       onNewSymbolKey: e => {
         const sr = st.search, n = sr ? sr.results.length : 0;
@@ -3248,44 +3673,67 @@ class Component extends DCLogic {
       searchResults: (st.search ? st.search.results : []).map((x, i) => ({ symbol: x.symbol, name: x.name, meta: x.meta, bg: i === st.search.sel ? 'var(--color-neutral-800)' : 'transparent', pick: e => { e.preventDefault(); this.addSymbol(x.symbol); } })),
       stmtScrollRef: this.stmtScrollRef,
       refreshQuotes: () => (hasKey ? this.loadQuotes(true) : this.openSettings()), refreshIcon: st.quoting ? 'ph ph-spinner-gap' : 'ph ph-arrows-clockwise',
-      openSettings: () => this.openSettings(), closeSettings: () => this.setState({ settingsOpen: false }), stop: e => e.stopPropagation(), saveSettings: () => this.saveSettings(),
-      settingsOpen: st.settingsOpen,
+      exportNotes: () => this.exportNotes(), importNotes: e => { this.importNotes(e.target.files && e.target.files[0]); e.target.value = ''; },
+      openSettings: () => this.openSettings(), stop: e => e.stopPropagation(),
+      ...(() => {   // the "delete this stock's data?" box
+        const f = st.forget; if (!f) return { forgetOpen: false };
+        const one = f.syms.length === 1, foot = f.foot, n = k => (foot || []).reduce((a, x) => a + (x[k] || 0), 0);
+        // what the user wrote, as against figures the page saved by itself
+        const wrote = S => { const r = store.data[S]; if (!r) return false; const t = v => String(v || '').trim();
+          return [r.thesis, r.wrong, r.buyBelow].some(t) || (r.verdict && r.verdict !== 'Undecided') || Object.values(r.swot || {}).some(a => (a || []).length)
+            || (r.questions || []).some(q => t(q.a)) || Object.keys(r.checks || {}).length > 0 || Object.keys(r.reviewed || {}).length > 0; };
+        const notes = f.syms.filter(wrote).length;
+        const rows = (foot || f.syms.map(t => ({ ticker: t, secRows: 0 }))).map(x => ({ t: x.ticker,
+          what: [store.data[x.ticker] ? (wrote(x.ticker) ? 'your notes' : 'saved figures') : '', x.secRows ? x.secRows.toLocaleString() + ' SEC rows' : x.shared ? 'SEC data kept (shared with a ticker still in a group)' : ''].filter(Boolean).join(' · ') || 'nothing saved' }));
+        return { forgetOpen: true, forgetTitle: one ? 'Delete the data kept about ' + f.syms[0] + '?' : 'Delete the data kept about ' + f.syms.length + ' stocks?',
+          forgetLead: (one ? f.syms[0] + ' is' : 'These stocks are') + ' in none of your groups now. Deleting removes:',
+          forgetRows: rows, forgetMany: !one,
+          forgetPoints: !foot ? [{ t: 'Checking what is saved…' }] : [
+            { t: notes ? (one ? 'Your thesis, checklist and notes for it' : 'Your theses, checklists and notes for ' + notes + ' of them') + ', and the figures the page saved, in this browser and in notes/desk.json'
+                : 'The figures the page saved for ' + (one ? 'it' : 'them') + ' (you wrote no notes), in this browser and in notes/desk.json' },
+            { t: n('secRows') ? n('secRows').toLocaleString() + ' rows of SEC filings and figures in sec.db. They are read from the SEC again if you add ' + (one ? 'it' : 'one') + ' back.' : 'No SEC data of ' + (one ? 'its' : 'their') + ' own in sec.db' },
+            { t: 'Reports are kept: ' + (one ? 'its' : 'their') + ' company reports and every report that mentions ' + (one ? 'it' : 'them') + ' stay in the reports folder.' }],
+          forgetMsg: f.msg, forgetHasMsg: !!f.msg, forgetBusy: !!f.busy || !foot, forgetGo: () => this.doForget(), forgetCancel: () => this.setState({ forget: null }),
+          forgetGoLabel: f.busy ? 'Deleting…' : 'Delete', forgetKeepLabel: one ? 'Keep its data' : 'Keep their data' };
+      })(),
+      ...this.settingsView(),
       // the workspaces down the left edge, in the order research runs: a subject, then many stocks, then one company
       ...(() => { const cur = WORKSPACES.includes((store.prefs || {}).workspace) ? store.prefs.workspace : 'companies';
-        return { workspaces: [['macro', 'Macro', 'ph ph-chart-line-up', 'The economy: indicators, how they connect, charts'], ['themes', 'Themes', 'ph ph-books', 'Deep research on a subject: how it works, its tech stack, its supply chain'], ['screener', 'Screener', 'ph ph-funnel', 'Screen many stocks at once'], ['companies', 'Companies', 'ph ph-buildings', 'Research one company']].map(([id, label, icon, tip]) => ({
-            label, icon, tip, go: () => this.setWorkspace(id), bg: cur === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: cur === id ? 'var(--color-accent-300)' : 'var(--color-neutral-400)' })),
-          scrMounted: !!st.scrMounted, scrDisp: cur === 'screener' ? 'block' : 'none', scrSrc: LOCAL_DB + '/desk/screener.html',
+        // in the order you dragged them into (hold and drag a button up or down)
+        const WS = [['macro', 'Macro', 'ph ph-chart-line-up', 'The economy: indicators, how they connect, charts'], ['themes', 'Themes', 'ph ph-books', 'Deep research on a subject: how it works, its tech stack, its supply chain'], ['companies', 'Companies', 'ph ph-buildings', 'Research one company']];
+        const order = (store.prefs || {}).wsOrder || [], pos = id => { const i = order.indexOf(id); return i < 0 ? 99 + WS.findIndex(w => w[0] === id) : i; };
+        return { workspaces: WS.slice().sort((a, b) => pos(a[0]) - pos(b[0])).map(([id, label, icon, tip]) => ({
+            label, icon, tip: tip + '. Drag to reorder.', go: () => this.setWorkspace(id),
+            dragStart: e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); this.setState({ dragWs: id }); },
+            dragOver: e => { if (!this.state.dragWs) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2; if (this.state.dragWsOver !== id || this.state.dragAfter !== after) this.setState({ dragWsOver: id, dragAfter: after }); },
+            drop: e => { e.preventDefault(); const from = this.state.dragWs, after = this.state.dragAfter; this.setState({ dragWs: null, dragWsOver: null }); if (from) this.moveWorkspace(from, id, after, WS.slice().sort((a, b) => pos(a[0]) - pos(b[0])).map(w => w[0])); },
+            dragEnd: () => this.setState({ dragWs: null, dragWsOver: null }),
+            ...(st.dragWs && st.dragWsOver === id && st.dragWs !== id ? { lineDisp: 'block', lineTop: st.dragAfter ? 'auto' : '-3px', lineBot: st.dragAfter ? '-3px' : 'auto' } : { lineDisp: 'none', lineTop: 'auto', lineBot: 'auto' }), op: st.dragWs === id ? 0.4 : 1, bg: cur === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: cur === id ? 'var(--color-accent-300)' : 'var(--color-neutral-400)' })),
           thmMounted: !!st.thmMounted, thmDisp: cur === 'themes' ? 'block' : 'none', thmSrc: LOCAL_DB + '/desk/themes.html',
           macMounted: !!st.macMounted, macDisp: cur === 'macro' ? 'block' : 'none', macSrc: LOCAL_DB + '/desk/macro.dc.html' }; })(),
       onStatusClick: () => (hasKey ? this.loadResearch(T, true) : this.openSettings()),
       dataStatus, dataIcon,
       ...(mmOn ? { connTitle: 'Connected', connDetail: 'moomoo · live prices' + ({ pre: ' · pre-market', after: ' · after hours', overnight: ' · overnight', closed: ' · market closed' }[st.mmLive.session] || ''), connColor: UP, connBorder: 'var(--color-divider)' } : {
-      connTitle: !hasKey ? 'Not connected' : st.conn.status === 'connecting' ? 'Connecting…' : st.conn.status === 'error' ? 'Connection failed' : st.conn.status === 'ok' ? 'Connected' : 'Key saved, not tested',
-      connDetail: !hasKey ? 'Demo data · add an API key' : st.conn.status === 'connecting' ? 'Loading prices' : st.conn.status === 'error' ? st.conn.msg : st.conn.status === 'ok' ? (PROV_BY[st.conn.pid] ? PROV_BY[st.conn.pid].short : 'Live data') + (st.conn.at ? ' · prices ' + new Date(st.conn.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '') : 'Refresh to check',
-      connColor: !hasKey ? 'var(--color-neutral-600)' : st.conn.status === 'ok' ? UP : st.conn.status === 'error' ? DOWN : 'var(--color-accent)',
-      connBorder: hasKey && st.conn.status === 'error' ? 'oklch(0.72 0.16 25 / 0.5)' : 'var(--color-divider)', }),
-      providers: PROVIDERS.map(p => {
-        const d = (st.keyDrafts || {})[p.id] || '', t = (st.keyTests || {})[p.id], saved = !!((store.prefs.keys || {})[p.id] || '').trim(), shown = !!(st.showKey || {})[p.id];
-        const stateTxt = t && t.status === 'ok' ? 'Working' : t && t.status === 'error' ? 'Not working' : saved ? 'Key saved' : 'No key';
-        return {
-          name: p.name, signup: p.signup, note: p.note, linkText: p.id === 'local' ? 'Saved companies ↗' : 'Get a key ↗', placeholder: p.id === 'local' ? 'Server address' : 'API key', covers: p.covers.map(c => ({ t: ROLE_LABEL[c] })),
-          draft: d, onDraft: e => { const v = e.target.value; this.setState(s => ({ keyDrafts: Object.assign({}, s.keyDrafts, { [p.id]: v }), keyTests: Object.assign({}, s.keyTests, { [p.id]: null }) })); },
-          inputType: shown ? 'text' : 'password', eye: shown ? 'ph ph-eye-slash' : 'ph ph-eye', toggleShow: () => this.setState(s => ({ showKey: Object.assign({}, s.showKey, { [p.id]: !shown }) })),
-          test: () => this.testProvider(p.id), clear: () => this.setState(s => ({ keyDrafts: Object.assign({}, s.keyDrafts, { [p.id]: '' }), keyTests: Object.assign({}, s.keyTests, { [p.id]: null }) })),
-          hasDraft: !!d, hasTest: !!t, testMsg: t ? t.msg : '', testColor: !t ? 'transparent' : t.status === 'ok' ? UP : t.status === 'error' ? DOWN : 'var(--color-accent)',
-          state: stateTxt, dot: t && t.status === 'ok' ? UP : t && t.status === 'error' ? DOWN : saved ? 'var(--color-accent)' : 'var(--color-neutral-700)',
-        };
-      }),
-      roleRows: ROLES.map(([r, label]) => {
+      // the Diligence server's address counts as a key elsewhere, but it gives no prices: this box is about prices
+      connTitle: !priceSrc ? 'No live prices' : st.conn.status === 'connecting' ? 'Connecting…' : st.conn.status === 'error' ? 'Connection failed' : st.conn.status === 'ok' ? 'Connected' : 'Not checked yet',
+      connDetail: !priceSrc ? 'Start moomoo OpenD or add a price key' : st.conn.status === 'connecting' ? 'Loading prices' : st.conn.status === 'error' ? st.conn.msg : st.conn.status === 'ok' ? (PROV_BY[st.conn.pid] ? PROV_BY[st.conn.pid].short : 'Live data') + (st.conn.at ? ' · prices ' + new Date(st.conn.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '') : 'Refresh to check',
+      connColor: !priceSrc ? 'var(--color-neutral-600)' : st.conn.status === 'ok' ? UP : st.conn.status === 'error' ? DOWN : 'var(--color-accent)',
+      connBorder: priceSrc && st.conn.status === 'error' ? 'oklch(0.72 0.16 25 / 0.5)' : 'var(--color-divider)', }),
+      roleRows: ROLES.map(([r, label], ri) => {
         const kd = st.keyDrafts || {}, cur = (st.roleDrafts || {})[r] || 'auto';
         const has = id => !!(kd[id] || '').trim();
         const use = cur !== 'auto' && has(cur) ? cur : (PROVIDERS.find(p => has(p.id) && p.covers.includes(r)) || {}).id;
         const opts = [{ v: 'auto', t: 'Auto' }].concat(PROVIDERS.filter(p => p.covers.includes(r)).map(p => ({ v: p.id, t: p.short })));
-        return { label, name: 'role-' + r, using: use ? 'Using ' + PROV_BY[use].short + (cur !== 'auto' && !has(cur) ? ' (' + PROV_BY[cur].short + ' has no key)' : '') : 'No source with a key', options: opts.map(o => ({ t: o.t, on: cur === o.v, pick: () => this.setState(s => ({ roleDrafts: Object.assign({}, s.roleDrafts, { [r]: o.v }) })) })) };
+        const mmLive = r === 'prices' && st.setSrc && st.setSrc.moomoo && st.setSrc.moomoo.ok;
+        return { label, name: 'role-' + r, line: ri ? '1px solid var(--color-divider)' : '0',
+          using: mmLive ? 'Using moomoo while OpenD runs' + (use ? ', else ' + PROV_BY[use].short : '') : use ? 'Using ' + PROV_BY[use].short + (cur !== 'auto' && !has(cur) ? ' (' + PROV_BY[cur].short + ' has no key)' : '') : 'No source with a key',
+          options: opts.map(o => ({ t: o.t, on: cur === o.v, border: cur === o.v ? 'var(--color-accent)' : 'var(--color-divider)', bg: cur === o.v ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: cur === o.v ? 'var(--color-text)' : 'var(--color-neutral-300)',
+            pick: () => this.setState(s => ({ roleDrafts: Object.assign({}, s.roleDrafts, { [r]: o.v }) })) })) };
       }),
       liveExt: qT.ext && ok(qT.ext.price) ? qT.ext.label + ' ' + usd(qT.ext.price) + ' (' + (qT.ext.pct >= 0 ? '+' : '−') + Math.abs(qT.ext.pct).toFixed(2) + '%)' : '',
       livePrice: ok(livePx) ? usd(livePx) : '', liveChg: ok(qT.pct) ? (qT.chg >= 0 ? '+' : '−') + Math.abs(qT.chg || 0).toFixed(2) + ' (' + (qT.pct >= 0 ? '+' : '−') + Math.abs(qT.pct).toFixed(2) + '%)' : '', liveColor: ok(qT.pct) ? (qT.pct >= 0 ? UP : DOWN) : 'var(--color-neutral-400)',
       tabs: SECTIONS.map(s => ({ label: s.label, go: () => this.goPage(s.id), color: s.id === page ? 'var(--color-text)' : 'var(--color-neutral-400)', line: s.id === page ? 'inset 0 -2px 0 var(--color-accent)' : 'none' })),
+      noAnnualNote: R.noAnnual && !(R.fin && FIN_KEYS.some(k => (R.fin[k] || []).some(ok))) ? (shortName(R.name) || T) + ' has not filed an annual report (10-K) yet: it is newly listed, so there are no full-year figures, and the ratios below, which need them, stay empty until its first 10-K. Its quarterly reports are under Statements, set to Quarterly.' : '',
       secKicker: (() => { const i = SECTIONS.findIndex(s => s.id === page); return 'Section 0' + i + ' of 0' + (SECTIONS.length - 1); })(), secTitle: ({ chart: 'Price chart', business: 'Understanding the business', finances: 'Understanding the finances', redflags: 'Red flags', strategy: 'Understanding the strategy', valuation: 'Stock valuation', events: 'Insiders and holders', news: 'News and lawsuits' })[page] || '',
       subChips: SECTIONS.find(s => s.id === page).subs.map(([id, label]) => ({ label, go: () => this.goSub(page, id) })), hasSubs: SECTIONS.find(s => s.id === page).subs.length > 0,
       liveNews: liveNewsSrc.map(n => { const key = n.url || n.title, logged = R.news.some(x => (n.url && x.url === n.url) || (x.headline && x.headline === n.title)), seen = !!(R.newsViewed || {})[key], markSeen = v => P(r => { r.newsViewed = r.newsViewed || {}; if (v) r.newsViewed[key] = 1; else delete r.newsViewed[key]; });
@@ -3426,7 +3874,7 @@ class Component extends DCLogic {
         { label: 'FCF conversion', value: pct(conv5, 0), sub: 'FCF / net income, 5-yr avg' },
         { label: 'Net debt / EBITDA', value: times(c.ndEbitda[L]), sub: `${Y[L]}` },
         { label: 'Share count', value: sgn(div(c.shares[L], c.shares[L - 10]) - 1), sub: 'change over 10 years' },
-        { label: 'P/E', value: times(peTtm), sub: `trailing · ${times(peFwd)} forward` },
+        { label: 'P/E', value: times(peTtm), sub: `trailing 12 months${ttm.from ? ' (' + ttm.from + ')' : ''} · ${times(peFwd)} forward` },
         { label: 'DCF value', value: usd(ps), sub: ok(mos) ? mosTxt : 'per share' },
       ],
       verdicts: ['Undecided', 'Pass', 'Watch', 'Buy'].map(v => ({ label: v, on: R.verdict === v, pick: () => P(r => { r.verdict = v; }) })),
@@ -3440,7 +3888,7 @@ class Component extends DCLogic {
         const view = (st.segViewFor === T && st.segView) || Object.keys(kinds).find(v => sd[v]) || 'segment', hasD = !!sd[view];
         const canLoad = !!(this.pkey('local') || this.pkey('fmp'));
         if ((R.segData === undefined || R.segVer !== 3) && !ss && canLoad) setTimeout(() => this.loadSegments(T), 0);
-        const status = segPer === 'q' && !this.pkey('local') ? 'Quarterly segment figures come from your local SEC database.' : segPer === 'q' && (!sq || sq.status === 'loading') ? 'Reading segment figures from the quarterly reports… the first time can take up to a minute.' : segPer === 'q' && sq.status === 'error' ? 'Could not be read: ' + sq.msg : ss === 'loading' ? 'Reading segment figures from the annual reports… the first time takes about 10 seconds.' : !canLoad || ss === 'nokey' ? 'Segment figures come from your local SEC database. Start it with python sec_db.py serve.' : ss && ss.startsWith('err:') && !hasD ? ss.slice(4) : (segPer === 'q' ? sq && sq.status === 'ok' : R.segData) && !hasD ? T + ' reports no ' + (segPer === 'q' ? 'quarterly ' : '') + 'breakdown by ' + kinds[view] + '.' : hasD ? (sd.filings || (sq && sq.status === 'ok' && sq.d && sq.d.filings) ? '' : 'From ' + (sd.src || 'filings')) : '';
+        const status = segPer === 'q' && !this.pkey('local') ? 'Quarterly segment figures come from the Diligence server.' : segPer === 'q' && (!sq || sq.status === 'loading') ? 'Reading segment figures from the quarterly reports… the first time can take up to a minute.' : segPer === 'q' && sq.status === 'error' ? 'Could not be read: ' + sq.msg : ss === 'loading' ? 'Reading segment figures from the annual reports… the first time takes about 10 seconds.' : !canLoad || ss === 'nokey' ? 'Segment figures come from the Diligence server. Start it with python3 sec_db.py serve.' : ss && ss.startsWith('err:') && !hasD ? ss.slice(4) : (segPer === 'q' ? sq && sq.status === 'ok' : R.segData) && !hasD ? T + ' reports no ' + (segPer === 'q' ? 'quarterly ' : '') + 'breakdown by ' + kinds[view] + '.' : hasD ? (sd.filings || (sq && sq.status === 'ok' && sq.d && sq.d.filings) ? '' : 'From ' + (sd.src || 'filings')) : '';
         const lagS = segPer === 'q' ? 4 : 1;
         const out = { segPeriodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: segPer === id, pick: () => this.setState({ segPeriod: id }) })), segViewTabs: [['segment', 'By segment'], ['product', 'By product'], ['geo', 'By region']].map(([id, label]) => ({ label, on: view === id, pick: () => this.setState({ segView: id, segViewFor: T }) })), reloadSegments: () => this.loadSegments(T), segStatus: status, segSources: [], segFrom: (() => { if (!hasD) return ''; const fa = sdA.filings, fq = sq && sq.status === 'ok' && sq.d ? sq.d.filings : null, name = f => (f.forms || []).join(', '); return segPer === 'q' ? (fq ? 'From quarterly reports (' + name(fq) + ')' : '') : fa ? 'From annual reports (' + name(fa) + ')' + (fq ? ' · TTM from quarterly reports (' + name(fq) + ')' : '') : ''; })(), segChartNote: '', hasSegHist: hasD, segYears: [], segHist: [], segCols: '', segHistNote: '', hasSegOp: false, hasSegOld: false, segOldLabel: '', toggleSegOld: () => this.setState(s => ({ segOld: !s.segOld })) };
         const D0 = sd[view];
@@ -3552,7 +4000,7 @@ class Component extends DCLogic {
           'Estimates the risk that a company goes bankrupt within about two years. Lenders and bond investors use it to screen for financial distress; for a stock investor it is a quick check that the company can survive long enough for the thesis to play out.',
           'Above 2.99 is the safe zone. Between 1.81 and 2.99 is a grey zone. Below 1.81 is the distress zone. It was built for manufacturers: asset-light companies such as software firms often score very high, and it does not apply to banks or insurers.',
           financial ? [] : zP.map(p => ({ label: p[0], tip: p[3], detail: ok(p[1]) ? p[1].toFixed(2) + ' × ' + p[2] + ' = ' + (p[1] * p[2]).toFixed(2) : 'not on file', icon: ok(p[1]) ? 'ph ph-dot-outline' : na, color: ok(p[1]) ? 'var(--color-neutral-400)' : NAc })),
-          financial ? 'Not worked out for banks, insurers and other financial companies, whose balance sheets work differently.' : !zOk ? 'Needs ' + [!ok(A.retained) && 'retained earnings (from the local SEC database)', !ok(mve) && 'the share price'].filter(Boolean).join(' and ') + '.' : 'Market value uses the current share price of ' + usd(price) + '. Most of a high score usually comes from that one line.'));
+          financial ? 'Not worked out for banks, insurers and other financial companies, whose balance sheets work differently.' : !zOk ? 'Needs ' + [!ok(A.retained) && 'retained earnings (from the Diligence server)', !ok(mve) && 'the share price'].filter(Boolean).join(' and ') + '.' : 'Market value uses the current share price of ' + usd(price) + '. Most of a high score usually comes from that one line.'));
         // Beneish M-Score
         const ltd = o => ok(o.ltDebt) ? o.ltDebt : o.debt, idx = (a, b) => ok(a) && ok(b) && b !== 0 ? a / b : NaN;
         const aq = o => 1 - div(o.curAssets + o.ppe, o.assets), dep = o => div(o.da, o.da + o.ppe), lv2 = o => div(ltd(o) + o.curLiab, o.assets);
@@ -3563,7 +4011,7 @@ class Component extends DCLogic {
           'Looks for the pattern of numbers that often goes with a company flattering its earnings: sales booked early, costs pushed out, profit that does not turn into cash. Short sellers, auditors and careful investors use it as an early warning before trusting reported profit.',
           'Lower is better. Below −2.22 is the normal range. Between −2.22 and −1.78 deserves a closer look. Above −1.78 is the pattern seen in companies later found to have manipulated earnings. It is a warning sign, not proof: honest companies growing very fast trip it, because sales growth itself counts against them.',
           financial ? [] : mP.map(p => ({ label: p[0], tip: p[4], detail: ok(p[1]) ? (p[0] === 'Profit not backed by cash' ? p1(p[1]) + ' of assets' : p[1].toFixed(2)) : 'not on file', icon: !ok(p[1]) ? na : p[1] > p[3] ? 'ph-fill ph-warning-circle' : yes, color: !ok(p[1]) ? NAc : p[1] > p[3] ? 'oklch(0.83 0.15 85)' : UPc })),
-          financial ? 'Not worked out for banks, insurers and other financial companies.' : !mOk ? 'Needs receivables and property figures from the local SEC database; this company does not report all of them.' : 'Each line is this period against a year earlier; about 1.00 means no change. An amber mark is a line moving the worrying way.' + (ok(SGAI0) ? '' : ' Selling and admin costs are not reported separately, so that line is treated as unchanged.')));
+          financial ? 'Not worked out for banks, insurers and other financial companies.' : !mOk ? 'Needs receivables and property figures from the Diligence server; this company does not report all of them.' : 'Each line is this period against a year earlier; about 1.00 means no change. An amber mark is a line moving the worrying way.' + (ok(SGAI0) ? '' : ' Selling and admin costs are not reported separately, so that line is treated as unchanged.')));
         // Return on capital against its cost
         const spread = ok(A.roic) && ok(wacc) ? A.roic - wacc : NaN;
         out.scores.push(card('Return on capital vs its cost', ok(spread) ? (spread >= 0 ? '+' : '−') + Math.abs(spread * 100).toFixed(1) + ' pts' : '—', !ok(spread) ? '' : spread >= 0.05 ? 'good' : spread >= 0 ? 'ok' : spread >= -0.03 ? 'watch' : 'flag',
@@ -3645,7 +4093,7 @@ class Component extends DCLogic {
             // the investing and financing totals are not on file: show what there is, operating cash and where it went
             const waiting = this.pkey('local') && (!sx || sx.status === 'loading'), title = 'Looking into ' + T + '\'s cash flow';
             if (!P(cfo)) { out.flows.push({ title, sub: 'Cash flow, ' + perLabel, has: false, msg: waiting ? 'Reading the cash flow statement…' : ok(cfo) ? 'Operations used ' + big(-cfo) + ' of cash in this period. How it was funded is not on file for this period.' : 'No cash flow statement is on file for this period.' }); return; }
-            const cx = P(capex) ? Math.min(capex, cfo) : 0, fcf = cfo - Z0(capex), lk = [], left = [], right = [], ni = core('netIncome'), da = core('da'), parts = [['Net income', ni], ['Depreciation & amortization', da]].filter(q => P(q[1])), ps = parts.reduce((a, q) => a + q[1], 0);
+            const cx = P(capex) ? Math.min(capex, cfo) : 0, fcf = ok(capex) ? cfo - capex : NaN, lk = [], left = [], right = [], ni = core('netIncome'), da = core('da'), parts = [['Net income', ni], ['Depreciation & amortization', da]].filter(q => P(q[1])), ps = parts.reduce((a, q) => a + q[1], 0);
             if (parts.length && ps <= cfo * 1.001) { if (cfo - ps > cfo * 0.004) parts.push(['Working capital and other', cfo - ps]); parts.forEach((q, i) => { left.push(N('p' + i, q[0], q[1], GOOD)); lk.push({ s: 'p' + i, t: 'cfo', v: q[1], c: GOOD }); }); }
             if (cx > 0) { right.push(N('cx', 'Capital expenditures', cx, BAD, 0, capex)); lk.push({ s: 'cfo', t: 'cx', v: cx, c: BAD }); }
             if (fcf > 0) { right.push(N('fcf', 'Free cash flow', fcf, GOOD, 1)); lk.push({ s: 'cfo', t: 'fcf', v: fcf, c: GOOD }); }
@@ -3666,7 +4114,7 @@ class Component extends DCLogic {
           src.forEach((q, i) => links.push({ s: 's' + i, t: 'pool', v: q.v, c: q.main ? GOOD : SOFT })); use.forEach((q, i) => links.push({ s: 'pool', t: 'u' + i, v: q.v, c: q.good ? GOOD : BAD }));
           // a column may only hold one stage, so the working-capital outflow, when there is one, rides in the sources column
           const cols = [].concat(c0.length ? [c0] : [], c1.length ? [[c1[0]]] : [], [cS.concat(c1.length ? [c1[1]] : [])], [[N('pool', 'Cash to use', total, MAIN, 1)]], [cU]);
-          out.flows.push({ title: 'Looking into ' + T + '\'s cash flow', sub: 'Cash flow, ' + perLabel + (made ? ' · percentages are of operating cash flow' : ' · operations used cash, so percentages are of all the cash raised') + ' · free cash flow ' + big(cfo - Z0(capex)), has: true, svg: this.flowChart(cols, links, made ? cfo : total, 'Cash flow for ' + T) }); })();
+          out.flows.push({ title: 'Looking into ' + T + '\'s cash flow', sub: 'Cash flow, ' + perLabel + (made ? ' · percentages are of operating cash flow' : ' · operations used cash, so percentages are of all the cash raised') + (ok(capex) ? ' · free cash flow ' + big(cfo - capex) : ' · capital spending is not on file, so free cash flow is not shown'), has: true, svg: this.flowChart(cols, links, made ? cfo : total, 'Cash flow for ' + T) }); })();
         const fTab = ['is', 'bs', 'cf'].includes(st.flowTab) ? st.flowTab : 'is';
         out.flowTabs = [['is', 'Income statement'], ['bs', 'Balance sheet'], ['cf', 'Cash flow']].map(([id, label]) => ({ label, on: fTab === id, pick: () => this.setState({ flowTab: id }) }));
         out.flows = [out.flows[['is', 'bs', 'cf'].indexOf(fTab)]].filter(Boolean);
@@ -3705,7 +4153,7 @@ class Component extends DCLogic {
       taxRate: R.taxRate, onTax: setR('taxRate'),
       years: isQ ? R.qLabels.map(label => ({ label })) : Y.map(y => ({ label: y })), stmtCols: '300px repeat(' + (isQ ? R.qLabels.length : Y.length) + ',' + (unitId === 'K' && unitAuto !== 'K' ? 112 : 84) + 'px)', stmtRows, unitTabs: [['K', 'Thousands'], ['M', 'Millions'], ['B', 'Billions']].map(([id, label]) => ({ label, bg: unitId === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: unitId === id ? 'var(--color-text)' : 'var(--color-neutral-300)', icon: unitId === id ? 'ph ph-check' : '', pick: () => this.setState(s0 => ({ unitOpen: false, unitBy: Object.assign({}, s0.unitBy, { [T]: id }) })) })),
       unitLabel: { K: 'Thousands', M: 'Millions', B: 'Billions' }[unitId], unitOpen: !!st.unitOpen, unitToggle: () => this.setState({ unitOpen: !st.unitOpen }), unitClose: () => this.setState({ unitOpen: false }), unitCaret: st.unitOpen ? 'ph ph-caret-up' : 'ph ph-caret-down', unitBtnBg: st.unitOpen ? 'var(--color-surface)' : 'transparent', unitBtnBorder: st.unitOpen ? 'var(--color-accent)' : 'var(--color-divider)', stmtToggleAll, stmtAllLabel: allOpen ? 'Collapse all' : 'Expand all', stmtAllIcon: allOpen ? 'ph ph-arrows-in-line-vertical' : 'ph ph-arrows-out-line-vertical', stmtNote, stmtUnit: U.name + (isQ ? ' · quarter' : ''), stmtUnitWords: U.words, segUnit: U.name,
-      periodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: (st.period || 'a') === id, pick: () => { this.setState({ period: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })),
+      periodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: (st.period || (R.noAnnual ? 'q' : 'a')) === id, pick: () => { this.setState({ period: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })),
       cmpTabs: [['yoy', 'YoY'], ['qoq', 'QoQ']].map(([id, label]) => ({ label, on: (st.cmp || 'yoy') === id, pick: () => this.setState({ cmp: id }) })),
       isQuarterly: wantQ, showChg, showHeat, toggleChg: () => this.setState({ showChg: !showChg }), toggleHeat: () => this.setState({ heat: !showHeat }),
       csYears: cy.map(i => ({ label: Y[i] })),
@@ -3733,7 +4181,7 @@ class Component extends DCLogic {
         { label: 'Capex growth', value: pct(cagr(c.capex, 5)), sub: '5-yr CAGR' },
       ],
       capexBars: (() => { const m = Math.max(0, ...c.capex.filter(ok)); return c.capex.map((v, i) => ({ h: ok(v) && m ? (v / m * 100).toFixed(1) + '%' : '0%', bg: i === L ? 'var(--color-accent)' : 'var(--color-accent-700)', y: "'" + String(Y[i]).slice(2), tip: `${Y[i]}: ${big(v)} · ${times(c.capexDa[i])} D&A` })); })(),
-      trackRows: [['Return on equity', 'Net income / equity', c.roe], ['Return on invested capital', 'EBIT × (1 − tax) / (debt + equity − cash)', c.roic], ['Return on capital employed', 'EBIT / (assets − current liabilities)', c.roce]].map(([label, formula, a]) => ({ label, formula, latest: pct(a[L]), a5: pct(avgN(a, 5)), a10: pct(avgN(a, 10)), a15: pct(avgN(a, 15)), bars: spark(a) })),
+      trackRows: [['Return on equity', 'Net income / equity', c.roe], ['Return on invested capital', 'EBIT × (1 − tax) / (debt + equity − cash and short-term investments)', c.roic], ['Return on capital employed', 'EBIT / (assets − current liabilities)', c.roce]].map(([label, formula, a]) => ({ label, formula, latest: pct(a[L]), a5: pct(avgN(a, 5)), a10: pct(avgN(a, 10)), a15: pct(avgN(a, 15)), bars: spark(a) })),
       allocTiles: [
         { label: 'Free cash flow, 10 yrs', value: big(sumN(c.fcf, 10)), sub: `${Y[L - 9]}–${Y[L]} cumulative` },
         { label: 'Capex, 10 yrs', value: big(sumN(c.capex, 10)), sub: `${Y[L - 9]}–${Y[L]} cumulative` },
@@ -3741,7 +4189,7 @@ class Component extends DCLogic {
       ],
 
       valInputs: [['Share price ($)', 'price'], ['Forward EPS ($)', 'fwdEps'], ['Forward EBITDA ($M)', 'fwdEbitda'], ['Forward FCF ($M)', 'fwdFcf']].map(([label, k]) => ({ label, v: R.val[k], on: setObj('val', k), ph: k === 'price' && ok(livePx) ? livePx.toFixed(2) + ' (live)' : '—' })),
-      valFacts: [{ label: 'Market cap', v: big(mcap) }, { label: 'Enterprise value', v: big(ev) }, { label: 'Net debt', v: big(c.netDebt[L]) }],
+      valFacts: [{ label: 'Market cap', v: big(mcap) + (ok(sharesNow) && sharesNow > 0 ? ' · ' + sharesNow.toLocaleString('en-US', { maximumFractionDigits: 0 }) + 'M shares at ' + ((R.sharesOut || {}).date || '') : '') }, { label: 'Enterprise value', v: big(ev) }, { label: 'Net debt', v: big(c.netDebt[L]) }],
       relRows: [
         { label: 'P/E', trailing: times(peTtm), forward: times(peFwd), peer: times(med.pe), vs: rel(peTtm, med.pe, false) },
         { label: 'EV/EBITDA', trailing: times(evE), forward: times(evEFwd), peer: times(med.ev), vs: rel(evE, med.ev, false) },
