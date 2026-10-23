@@ -1994,6 +1994,30 @@ const pick = (arr, names) => { const m = {}; (arr || []).forEach(x => { m[String
   const o = {}; Object.keys(v).forEach(key => { if (ok(v[key])) o[key] = v[key] / 1e6; }); return o;
 }
 const FLOW_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'cfo', 'capex'], CF_FLOW = { cfo: 1, capex: 1, da: 1 };
+// The last twelve months as one more column after the fiscal years, for the statements and their flow diagrams.
+// Income and cash-flow lines are the newest four quarters added up (share counts averaged); balance-sheet lines are
+// the newest quarter's. Only when four quarters in a row run past the last fiscal year: otherwise TTM is that year.
+const TTM_SUM = new Set(['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'cfo', 'capex', 'eps',
+  'rd', 'sga', 'pretax', 'tax', 'epsBasic', 'epsDiluted', 'sbc', 'dividends', 'buybacks', 'cfi', 'cff', 'acquisitions', 'debtIssued', 'debtRepaid']);
+const TTM_AVG = new Set(['shares', 'sharesBasic']);
+function ttmColumn(R, sx, tax) {
+  const F = R.finQ, QL = R.qLabels || []; if (!F || !F.revenue || !R.fin || !R.fin.revenue) return null;
+  const yq = l => { const m = /^Q([1-4])\s*(?:FY)?\s*(\d{2})$/.exec(String(l || '').trim()); return m ? [2000 + +m[2], +m[1]] : null; };
+  const idx = []; for (let i = F.revenue.length - 1; i >= 0 && idx.length < 4; i--) { if (ok(num(F.revenue[i])) || ok(num(F.netIncome[i]))) idx.unshift(i); else if (idx.length) break; }
+  if (idx.length < 4) return null;
+  const parts = idx.map(i => yq(QL[i])); if (parts.some(x => !x)) return null;
+  for (let j = 1; j < 4; j++) { const [y0, q0] = parts[j - 1], [y1, q1] = parts[j]; if (y1 * 4 + q1 !== y0 * 4 + q0 + 1) return null; }   // four in a row
+  const Y = yearsOf(R), lastFY = Y[Y.length - 1];
+  if (parts[3][0] <= lastFY) return null;   // the newest quarter is inside the last fiscal year already shown
+  const last = idx[3], add = vals => vals.every(ok) ? vals.reduce((a, v) => a + v, 0) : NaN;
+  const fin = {}; FIN_KEYS.forEach(k => { const q = idx.map(i => num(F[k][i]));
+    const v = TTM_SUM.has(k) ? add(q) : TTM_AVG.has(k) ? (q.every(ok) ? add(q) / 4 : NaN) : num(F[k][last]);
+    fin[k] = (R.fin[k] || []).concat([ok(v) ? v : null]); });   // a line not reported is left blank, as in the years
+  const xq = idx.map(i => (sx && sx.status === 'ok' && sx.q[QL[i]]) || {}), x = {};
+  const keys = new Set(xq.flatMap(o => Object.keys(o)));
+  keys.forEach(k => { const q = xq.map(o => ok(o[k]) ? o[k] : NaN); x[k] = TTM_SUM.has(k) ? add(q) : TTM_AVG.has(k) ? (q.every(ok) ? add(q) / 4 : NaN) : q[3]; });
+  return { i: fin.revenue.length - 1, label: QL[last], fin, c: calc(fin, tax), x };
+}
 function deCum(fy, annual, span, endD) {
   // span[y][q] = months covered by the filing (Finnhub gives 10-Q flows year-to-date: ~3, 6, 9 months)
   const out = [];
@@ -3426,10 +3450,12 @@ class Component extends DCLogic {
     // statements
     const stmt = STMT[st.tab];
     const wantQ = (st.period || (R.noAnnual ? 'q' : 'a')) === 'q', isQ = wantQ && !!R.finQ;
-    const FQ = isQ ? R.finQ : R.fin, CQ = isQ ? calc(R.finQ, ok(taxN) ? taxN / 100 : 0.21) : c, lag = isQ && st.cmp === 'qoq' ? 1 : isQ ? 4 : 1;
+    const sx = (st.stmtX || {})[T], TT = isQ ? null : ttmColumn(R, sx, ok(taxN) ? taxN / 100 : 0.21);   // the TTM column, after the years
+    const FQ = isQ ? R.finQ : TT ? TT.fin : R.fin, CQ = isQ ? calc(R.finQ, ok(taxN) ? taxN / 100 : 0.21) : TT ? TT.c : c, lag = isQ && st.cmp === 'qoq' ? 1 : isQ ? 4 : 1;
     const showChg = st.showChg !== false, showHeat = st.heat !== false;
     const INV = { cogs: 1, interest: 1, curLiab: 1, debt: 1, shares: 1, liab: 1, netDebt: 1 };
     const chg = (arr, i, k) => {
+      if (TT && i === TT.i) return { hasChg: false, chg: '', chgColor: 'var(--color-neutral-500)', heat: 'transparent' };   // TTM overlaps the last year
       const a = arr[i], b = arr[i - lag], g = i >= lag && ok(a) && ok(b) && b !== 0 ? (a - b) / Math.abs(b) : NaN;
       if (!ok(g)) return { hasChg: false, chg: '', chgColor: 'var(--color-neutral-500)', heat: 'transparent' };
       const good = INV[k] ? -g : g, col = good > 0.0005 ? UP : good < -0.0005 ? DOWN : 'var(--color-neutral-400)';
@@ -3437,9 +3463,8 @@ class Component extends DCLogic {
       return { hasChg: showChg, chg: (g >= 0 ? '+' : '−') + Math.abs(g * 100).toFixed(1) + '%', chgColor: col, heat: showHeat && Math.abs(good) > 0.0005 ? 'color-mix(in oklch, ' + col + ' ' + amt + '%, transparent)' : 'transparent' };
     };
     // extra statement lines from the Diligence server, lined up with the columns on screen
-    const sx = (st.stmtX || {})[T];
     if (page === 'finances' && !sx && this.pkey('local')) setTimeout(() => { if (!(this.state.stmtX || {})[T]) this.loadStmtDetail(T); }, 0);
-    const xCols = (isQ ? R.qLabels : Y.map(String)).map(l => (sx && sx.status === 'ok' ? (isQ ? sx.q : sx.a)[l] : null) || {});
+    const xCols = (isQ ? R.qLabels : Y.map(String)).map(l => (sx && sx.status === 'ok' ? (isQ ? sx.q : sx.a)[l] : null) || {}).concat(TT ? [TT.x] : []);
     // total liabilities as the company reports them; assets less shareholders' equity only when it does not (that would fold in minority interests)
     const sGet = (k, i) => k.charAt(0) === '+' ? (fitAt(BS_GRP[k.slice(1)], i).has(k.slice(1)) ? sGet(k.slice(1), i) : 0) : k === 'liabT' ? (ok(xCols[i].liabTotal) ? xCols[i].liabTotal : CQ.liab[i]) : FIN_KEYS.includes(k) ? num(FQ[k][i]) : k in xCols[i] ? xCols[i][k] : CQ[k] ? CQ[k][i] : NaN;
     const fitTotal = (grp, i) => grp === 'ca' ? sGet('curAssets', i) : grp === 'nca' ? sGet('assets', i) - sGet('curAssets', i) : grp === 'cl' ? sGet('curLiab', i) : sGet('liabT', i) - sGet('curLiab', i);
@@ -3459,7 +3484,7 @@ class Component extends DCLogic {
     const groupIds = []; (function walk(ns) { ns.forEach(n => { if (n.g) { groupIds.push(n.id); walk(n.kids); } }); })(stmt.tree);
     const stmtRows = [], LINE = 'linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px';
     const BAND0 = 'color-mix(in srgb, var(--color-accent) 20%, var(--color-bg))', BAND1 = 'color-mix(in srgb, var(--color-text) 7%, var(--color-bg))';
-    const inputCells = (n, nums, flat) => nums.map((_, i) => Object.assign({ v: inUnit(FQ[n.k][i]), ro: isQ, on: e => { const v = e.target.value, x = num(v); P(r => { (isQ ? r.finQ : r.fin)[n.k][i] = U.scale !== 1 && ok(x) ? x / U.scale : v; }); } }, chg(nums, i, n.k), flat ? { heat: 'transparent' } : null));
+    const inputCells = (n, nums, flat) => nums.map((_, i) => Object.assign({ v: inUnit(FQ[n.k][i]), ro: isQ || (TT && i === TT.i), on: e => { if (TT && i === TT.i) return; const v = e.target.value, x = num(v); P(r => { (isQ ? r.finQ : r.fin)[n.k][i] = U.scale !== 1 && ok(x) ? x / U.scale : v; }); } }, chg(nums, i, n.k), flat ? { heat: 'transparent' } : null));
     const tf = !!stmt.totalFirst;
     (function emit(nodes, depth) {
       nodes.forEach(n => {
@@ -3605,7 +3630,8 @@ class Component extends DCLogic {
         color: h.isNew || h.change > 0 ? UP : h.change < 0 ? DOWN : 'var(--color-neutral-400)', kind: h.type || '', value: money(h.value), date: h.date || d.period || '', src: h.src || '13F', url: h.url || '', hasUrl: !!h.url, noUrl: !h.url, srcTitle: /13F/.test(h.src || '13F') ? (h.src && h.src.length > 3 ? 'Holding from Form 13F; this holder also reported over 5% on Schedule ' + h.src.slice(-3) : 'From Form 13F') : 'From Schedule ' + h.src + (h['class'] ? ', ' + h['class'] : '') + '. Change is from this holder\'s previous filing.' }));
       out.holdHasMore = list.length > n; out.holdMoreLabel = 'Show ' + Math.min(50, list.length - n) + ' more'; out.holdMore = () => this.setState({ holdShown: n + 50 });
       const other = ok(d.otherShares) ? d.otherShares : 0, held = (d.totalShares || 0) + other;
-      out.holdFacts = (d.period ? [{ label: 'Quarter end', v: d.period }, { label: 'Institutions', v: (d.count || 0).toLocaleString('en-US') }, { label: 'Held by institutions', v: cnt(d.totalShares) + (ok(d.pctHeld) ? ' · ' + (d.pctHeld * 100).toFixed(1) + '%' : '') }] : []).concat(d.otherCount ? [{ label: 'Other 5%+ owners', v: d.otherCount + ' · ' + cnt(other) + (ok(d.sharesOutstanding) && d.sharesOutstanding > 0 ? ' · ' + (other / d.sharesOutstanding * 100).toFixed(1) + '%' : '') }] : []);
+      if (ok(d.adrShare)) out.holdStatus = T + ' trades mainly on its home market: ' + (d.adrShare * 100).toFixed(1) + '% of its shares are in its US ADRs' + (d.adrRatio ? ' (1 ADR = ' + d.adrRatio + ' shares; counts below are in ADRs)' : '') + '. US filings (13F, 13D/13G) show who holds the ADRs; the company\'s own annual report (20-F) names everyone with 5% or more of all its shares. Smaller holders of the home-market shares are in neither.';
+      out.holdFacts = (d.period ? [{ label: 'Quarter end', v: d.period }, { label: 'Institutions', v: (d.count || 0).toLocaleString('en-US') }, { label: ok(d.adrShare) ? 'ADRs held by US institutions' : 'Held by institutions', v: cnt(d.totalShares) + (ok(d.pctHeld) ? ' · ' + (d.pctHeld * 100).toFixed(1) + '%' : '') }] : []).concat(ok(d.adrShare) ? [{ label: 'In ADRs', v: (d.adrShare * 100).toFixed(1) + '% of shares' }] : []).concat(d.otherCount ? [{ label: 'Other 5%+ owners', v: d.otherCount + ' · ' + cnt(other) + (ok(d.sharesOutstanding) && d.sharesOutstanding > 0 ? ' · ' + (other / d.sharesOutstanding * 100).toFixed(1) + '%' : '') }] : []);
       // two rings: who the largest holders are, and what kind of holder owns the shares listed
       const E = React.createElement, cx = 100, cy = 100, Ro = 90, Ri = 61;
       const P = (r, a) => (cx + r * Math.cos(a)).toFixed(2) + ' ' + (cy + r * Math.sin(a)).toFixed(2);
@@ -3624,7 +3650,13 @@ class Component extends DCLogic {
         return { svg, legend };
       };
       const total = ok(d.sharesOutstanding) && d.sharesOutstanding > held ? d.sharesOutstanding : held, top = list.slice(0, 5), rest = held - top.reduce((a, h) => a + h.shares, 0);
-      const parts = top.map((h, i) => ({ name: h.name, v: h.shares, bg: MIX[i % MIX.length] })).concat(rest > 0 ? [{ name: 'Other holders listed', v: rest, bg: 'var(--color-neutral-600)' }] : [], total > held ? [{ name: 'Everyone else', v: total - held, bg: 'var(--color-neutral-800)' }] : []);
+      // a company whose shares trade mainly at home (TSMC): the rest is the ADRs no filing names, and the home shares
+      const adr = ok(d.adrShare) && d.adrShare > 0 && d.adrShare < 1 && total > held ? d.adrShare : null;
+      const homeListed = list.filter(h => h.home).reduce((a, h) => a + h.shares, 0);
+      const adrOthers = adr ? Math.max(0, total * adr - (d.totalShares || 0)) : 0, homeOthers = adr ? Math.max(0, total - held - adrOthers) : 0;
+      const parts = top.map((h, i) => ({ name: h.name, v: h.shares, bg: MIX[i % MIX.length] })).concat(rest > 0 ? [{ name: 'Other holders listed', v: rest, bg: 'var(--color-neutral-600)' }] : [],
+        adr ? [{ name: 'Other ADR holders', v: adrOthers, bg: 'var(--color-neutral-700)' }, { name: 'Shares traded at home, other holders', v: homeOthers, bg: 'var(--color-neutral-800)' }].filter(x => x.v > 0)
+          : total > held ? [{ name: 'Everyone else', v: total - held, bg: 'var(--color-neutral-800)' }] : []);
       const whole = total > held * 0.999 && ok(d.sharesOutstanding);
       const r1 = ring('holdHover', parts, total, whole ? (held / total * 100).toFixed(0) + '%' : cnt(held), whole ? 'held by those listed' : 'shares held', 'Share of ' + T + ' held by its largest holders');
       out.holdPie = r1.svg; out.holdLegend = r1.legend;
@@ -4028,10 +4060,12 @@ class Component extends DCLogic {
         const years = []; if (fPer === 'q') { for (let k = FQ2.revenue.length - 1; k >= 0 && years.length < 8; k--) if (ok(num(FQ2.revenue[k])) || ok(num(FQ2.assets[k]))) years.push(k); } else for (let k = L; k >= 0 && years.length < 8; k--) if (ok(c.revenue[k]) || ok(c.assets[k])) years.push(k);   // a company with no sales yet still has a balance sheet and cash flow
         const out = { hasFlows: years.length > 0 || !!R.finQ, flowYears: [], flowTabs: [], flows: [], flowNote: '', flowPeriodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: fPer === id, pick: () => { this.setState({ flowPeriod: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })) };
         if (!years.length) return out;
-        const sel = fPer === 'q' ? st.flowQ : st.flowYear, yi = years.includes(sel) ? sel : years[0];
-        const core = k => fPer === 'q' ? num(FQ2[k][yi]) : c[k][yi], perLabel = fPer === 'q' ? QL2[yi] : 'fiscal ' + Y[yi];
-        const x = (sx && sx.status === 'ok' ? (fPer === 'q' ? sx.q[QL2[yi]] : sx.a[String(Y[yi])]) : null) || {}, g = f => ok(x[f]) ? x[f] : NaN, P = v => ok(v) && v > 0;
-        out.flowYears = years.slice().reverse().map(k => ({ label: fPer === 'q' ? QL2[k] : 'FY' + String(Y[k]).slice(2), on: k === yi, pick: () => this.setState(fPer === 'q' ? { flowQ: k } : { flowYear: k }) }));
+        // the last twelve months, as the newest choice of the annual view
+        const TF = fPer === 'a' ? ttmColumn(R, sx, ok(taxN) ? taxN / 100 : 0.21) : null; if (TF) years.unshift('ttm');
+        const sel = fPer === 'q' ? st.flowQ : st.flowYear, yi = years.includes(sel) ? sel : years[0], isT = yi === 'ttm';
+        const core = k => isT ? TF.c[k][TF.i] : fPer === 'q' ? num(FQ2[k][yi]) : c[k][yi], perLabel = isT ? 'last twelve months to ' + TF.label : fPer === 'q' ? QL2[yi] : 'fiscal ' + Y[yi];
+        const x = (isT ? TF.x : sx && sx.status === 'ok' ? (fPer === 'q' ? sx.q[QL2[yi]] : sx.a[String(Y[yi])]) : null) || {}, g = f => ok(x[f]) ? x[f] : NaN, P = v => ok(v) && v > 0;
+        out.flowYears = years.slice().reverse().map(k => ({ label: k === 'ttm' ? 'TTM' : fPer === 'q' ? QL2[k] : 'FY' + String(Y[k]).slice(2), on: k === yi, pick: () => this.setState(fPer === 'q' ? { flowQ: k } : { flowYear: k }) }));
         const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MID = 'var(--color-neutral-400)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)';
         // a total split into named parts, with whatever is left over as "Other"; parts that overshoot are scaled to fit
         const split = (total, parts, otherLabel) => { const known = parts.filter(q => P(q[1])), sum = known.reduce((a, q) => a + q[1], 0), f = sum > total ? total / sum : 1, list = known.map(q => ({ label: q[0], v: q[1] * f, raw: q[1] })); if (total - sum > total * 0.004) list.push({ label: otherLabel, v: total - sum }); return list; };
@@ -4151,7 +4185,7 @@ class Component extends DCLogic {
       growthNote,
       stmtTabs: Object.keys(STMT).map(k => ({ label: STMT[k].label, on: st.tab === k, pick: () => this.setState({ tab: k }) })),
       taxRate: R.taxRate, onTax: setR('taxRate'),
-      years: isQ ? R.qLabels.map(label => ({ label })) : Y.map(y => ({ label: y })), stmtCols: '300px repeat(' + (isQ ? R.qLabels.length : Y.length) + ',' + (unitId === 'K' && unitAuto !== 'K' ? 112 : 84) + 'px)', stmtRows, unitTabs: [['K', 'Thousands'], ['M', 'Millions'], ['B', 'Billions']].map(([id, label]) => ({ label, bg: unitId === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: unitId === id ? 'var(--color-text)' : 'var(--color-neutral-300)', icon: unitId === id ? 'ph ph-check' : '', pick: () => this.setState(s0 => ({ unitOpen: false, unitBy: Object.assign({}, s0.unitBy, { [T]: id }) })) })),
+      years: isQ ? R.qLabels.map(label => ({ label })) : Y.map(y => ({ label: y })).concat(TT ? [{ label: 'TTM' }] : []), stmtCols: '300px repeat(' + (isQ ? R.qLabels.length : Y.length + (TT ? 1 : 0)) + ',' + (unitId === 'K' && unitAuto !== 'K' ? 112 : 84) + 'px)', stmtRows, unitTabs: [['K', 'Thousands'], ['M', 'Millions'], ['B', 'Billions']].map(([id, label]) => ({ label, bg: unitId === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: unitId === id ? 'var(--color-text)' : 'var(--color-neutral-300)', icon: unitId === id ? 'ph ph-check' : '', pick: () => this.setState(s0 => ({ unitOpen: false, unitBy: Object.assign({}, s0.unitBy, { [T]: id }) })) })),
       unitLabel: { K: 'Thousands', M: 'Millions', B: 'Billions' }[unitId], unitOpen: !!st.unitOpen, unitToggle: () => this.setState({ unitOpen: !st.unitOpen }), unitClose: () => this.setState({ unitOpen: false }), unitCaret: st.unitOpen ? 'ph ph-caret-up' : 'ph ph-caret-down', unitBtnBg: st.unitOpen ? 'var(--color-surface)' : 'transparent', unitBtnBorder: st.unitOpen ? 'var(--color-accent)' : 'var(--color-divider)', stmtToggleAll, stmtAllLabel: allOpen ? 'Collapse all' : 'Expand all', stmtAllIcon: allOpen ? 'ph ph-arrows-in-line-vertical' : 'ph ph-arrows-out-line-vertical', stmtNote, stmtUnit: U.name + (isQ ? ' · quarter' : ''), stmtUnitWords: U.words, segUnit: U.name,
       periodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: (st.period || (R.noAnnual ? 'q' : 'a')) === id, pick: () => { this.setState({ period: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })),
       cmpTabs: [['yoy', 'YoY'], ['qoq', 'QoQ']].map(([id, label]) => ({ label, on: (st.cmp || 'yoy') === id, pick: () => this.setState({ cmp: id }) })),

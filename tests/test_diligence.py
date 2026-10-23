@@ -93,6 +93,61 @@ class Database(TempDB):
         self.assertIn("country", [r[1] for r in self.db.execute("PRAGMA table_info(companies)")])
 
 
+class Holders13F(unittest.TestCase):
+    """The 13F data set: values in thousands, other share classes, restatements, incomplete reports."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, "01jun2026-31aug2026_form13f.zip")
+        sub = ["ACCESSION_NUMBER\tFILING_DATE\tSUBMISSIONTYPE\tCIK\tPERIODOFREPORT"]
+        cover = ["ACCESSION_NUMBER\tISAMENDMENT\tAMENDMENTTYPE\tFILINGMANAGER_NAME"]
+        summ = ["ACCESSION_NUMBER\tTABLEENTRYTOTAL\tTABLEVALUETOTAL"]
+        info = ["ACCESSION_NUMBER\tINFOTABLE_SK\tNAMEOFISSUER\tTITLEOFCLASS\tCUSIP\tVALUE\tSSHPRNAMT\tSSHPRNAMTTYPE\tPUTCALL"]
+        def filing(accn, cik, name, rows, kind="13F-HR", amend="N", atype="", entries=None, period="30-JUN-2026"):
+            sub.append(f"{accn}\t14-AUG-2026\t{kind}\t{cik}\t{period}")
+            cover.append(f"{accn}\t{amend}\t{atype}\t{name}")
+            summ.append(f"{accn}\t{entries if entries is not None else len(rows)}\t0")
+            for i, (cusip, value, shares) in enumerate(rows):
+                info.append(f"{accn}\t{i}\tBERKSHIRE HATHAWAY INC\tCL B\t{cusip}\t{value}\t{shares}\tSH\t")
+        B, A = "084670702", "084670108"          # B at $500 a share, A at $750,000
+        filing("a1", 1, "ONE", [(B, 500_000, 1000)])
+        filing("a2", 2, "THOUSANDS", [(B, 500, 1000)])                      # value in thousands
+        filing("a3", 3, "HOLDS A", [(A, 1_500_000, 2)])                      # 2 A shares = 3,000 B
+        filing("a4", 4, "MISLABELED", [(A, 100_000, 200)])                   # B shares filed under the A CUSIP
+        filing("a5", 5, "MISTAKE", [(B, 50_000_000, 100_000)])               # filed by mistake...
+        filing("a6", 5, "MISTAKE", [], kind="13F-HR/A", amend="Y", atype="RESTATEMENT")   # ...restated without it
+        filing("a7", 6, "PARTIAL", [(B, 500, 1)], entries=900)               # a report missing most of its table
+        import zipfile
+        with zipfile.ZipFile(self.path, "w") as z:
+            for name, lines in (("SUBMISSION.tsv", sub), ("COVERPAGE.tsv", cover), ("SUMMARYPAGE.tsv", summ), ("INFOTABLE.tsv", info)):
+                z.writestr(name, "\n".join(lines) + "\n")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_scan(self):
+        period, rows, restated = s.scan_13f(self.path, ["084670702", "084670108"], "Berkshire Hathaway Inc")
+        self.assertEqual(period, "2026-06-30")
+        got = {r[1]: (r[5], r[6]) for r in rows}
+        self.assertEqual(got[1], (1000, 500_000))
+        self.assertEqual(got[2], (1000, 500_000))                    # thousands put right
+        self.assertAlmostEqual(got[3][0], 3000)                      # A shares counted as B
+        self.assertAlmostEqual(got[4][0], 200)                       # by value, so a mislabeled class stays right
+        self.assertIn(("2026-06-30", 5), restated)                   # the restatement is seen though it holds nothing
+        filers = s.f13_complete_filers(self.path)["2026-06-30"]
+        self.assertIn(1, filers)
+        self.assertNotIn(6, filers)                                  # 1 row of 900: says nothing about what it held
+
+    def test_family(self):
+        self.assertEqual(s._family("VANGUARD CAPITAL MANAGEMENT LLC"), "Vanguard")
+        self.assertEqual(s._family("Vanguard Fiduciary Trust Co"), "Vanguard")
+        self.assertIsNone(s._family("Vanguard Capital Wealth Advisors"))   # an unrelated firm with the name
+        self.assertEqual(s._family("PRICE T ROWE ASSOCIATES INC /MD/"), "T. Rowe Price")
+        self.assertEqual(s._family("T. Rowe Price Investment Management, Inc."), "T. Rowe Price")
+        self.assertEqual(s._family("Capital World Investors"), "Capital Group")
+        self.assertIsNone(s._family("Capital Advisors Inc"))
+
+
 class Forget(TempDB):
     """Deleting a stock that is in no group: its rows go; anything shared, unrelated, or a report, stays."""
 

@@ -169,7 +169,7 @@ FLOW_METRICS = {
     "costs_and_expenses": ["CostsAndExpenses", "rendered:CostsAndExpenses"],
     "sales": ["rendered:Sales"],
     "interest_expense": ["InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt", "InterestExpenseOperating"],
-    "nonoperating_income": ["NonoperatingIncomeExpense"],   # everything between operating and pre-tax income
+    "nonoperating_income": ["rendered:NonoperatingTotal", "NonoperatingIncomeExpense"],   # the statement's own run first   # everything between operating and pre-tax income
     "pretax_income": [
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"],
@@ -207,7 +207,8 @@ FLOW_METRICS = {
                     "ProceedsFromIssuanceOfSeniorLongTermDebt"],
     "debt_repaid": ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt", "RepaymentsOfSeniorDebt"],
 }
-METRICS_VERSION = "18"   # raise when the lists of metrics change, so stored companies are rebuilt
+METRICS_VERSION = "22"   # raise when the lists of metrics change, so stored companies are rebuilt
+SEGMENTS_VERSION = "2"   # raise when the segment parser reads more, so each company's reports are read again when opened
 # Per-share and share-count figures can't be added up across quarters.
 NON_ADDITIVE = {"eps_basic", "eps_diluted", "shares_diluted", "eps_basic_shares"}
 SHARE_COUNTS = {"shares_diluted", "eps_basic_shares", "shares_outstanding"}
@@ -443,6 +444,8 @@ def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
     class_eps = {}   # class letter -> [EPS values], to learn how many of one class equal one of another (BRK: 1,500)
 
     def add(store, concept, key, value, r, start=None):
+        if store is flows and start is None:
+            return   # a period figure needs its start (Rigetti's 2020 EPS line has none)
         row = {"concept": concept, "value": value, "accession": r["accession"], "filed": r["filed"], "form": r["form"],
                "period_start": start, "period_end": key if start is None else key[1]}
         cur = store.setdefault(concept, {}).get(key)
@@ -457,7 +460,9 @@ def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
         # Other sections with their own totals are either parts of the whole (Berkshire's insurance and railroad
         # businesses, whose totals add up to the company's) or a second registrant in the same filing (NEE's Florida
         # Power & Light, which is only part of it): the parts count, a second registrant is left out.
-        anchored = {b for b, rs in blocks.items() if b != main and any(x["concept"] in _ANCHORS[kind] for x in rs)}
+        # a share class's section (Visa's "Class A common stock", with the net income allocated to it) is not a company
+        anchored = {b for b, rs in blocks.items() if b != main and any(x["concept"] in _ANCHORS[kind] for x in rs)
+                    and not re.search(r"\bClass [A-Z]\b|common stock|ordinary shares|preferred stock|Series [A-Z]\b", b, re.I)}
         part_anchor = next((c for c in sorted(_ANCHORS[kind]) if anchored and all(any(x["concept"] == c for x in blocks[b]) for b in anchored)), None)
         def anchor_total(bs_, end):
             return sum(x["value"] for b in bs_ for x in blocks[b] if x["concept"] == part_anchor and x["period_end"] == end and x["value"])
@@ -524,8 +529,12 @@ def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
                 if stis:
                     add(instants, "rendered:ShortTermInvestments", key, sum(x["value"] for x in stis), stis[0])
             elif kind == "cf":
+                # in the investing section only: Intel also lists equipment paid through vendor financing as "Additions to
+                # property, plant and equipment" under financing activities, which is not capital spending in the year's terms
+                inv_end = min((x["seq"] for x in rs if re.match(r"NetCashProvidedByUsedInInvestingActivities", x["concept"])), default=None)
                 caps = [x for x in rs if _CAPEX_LINE.search(x["concept"] + " " + x["label"]) and x["value"] is not None
-                        and not re.search(r"Proceeds|sale|disposal|incurred|accrued|unpaid", x["concept"] + " " + x["label"], re.I)]
+                        and not re.search(r"Proceeds|sale|disposal|incurred|accrued|unpaid|Financing", x["concept"] + " " + x["label"], re.I)
+                        and (inv_end is None or x["seq"] < inv_end)]
                 if caps:
                     add(flows, "rendered:Capex", key, abs(sum(x["value"] for x in caps)), caps[0], ps)
             else:
@@ -549,6 +558,34 @@ def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
                        and re.match(r"(total )?(operating income|income from operations|operating profit)( \(loss\))?$", x["label"], re.I)]
                 if ops:
                     add(flows, "rendered:OperatingIncome", key, ops[0]["value"], ops[0], ps)
+                # no operating income line at all (Disney, Pfizer): a tagged "operating income" then comes from a note
+                # (Disney's is its segments' total, before corporate costs and amortization) and is not the company's
+                main_rows = sorted((x for x in rs if x["block"] == main), key=lambda x: x["seq"])
+                if ps is not None and not ops and not any(x["concept"] == "OperatingIncomeLoss" or re.match(
+                        r"(total )?(operating income|income from operations|operating profit|operating loss)", x["label"], re.I) for x in main_rows):
+                    add(flows, "rendered:NoOperatingLine", key, 1, main_rows[0] if main_rows else rs[0], ps)
+                    # the run of non-operating lines just above pretax income is everything between operating and pretax
+                    # income: Pfizer's one "other (income)/deductions" line; Disney's other income, interest and investees.
+                    # Signs come from the company's own facts (an interest expense tag is reported positive)
+                    pre = next((i for i, x in enumerate(main_rows) if x["concept"] in FLOW_METRICS["pretax_income"]), None)
+                    run, i = [], (pre or 0) - 1
+                    while pre and i >= 0 and re.search(r"Nonoperating|InterestIncomeExpense|^InterestExpense|InvestmentIncome|"
+                                                       r"IncomeLossFromEquityMethodInvestments|GainLossOnInvestments|ForeignCurrencyTransactionGainLoss",
+                                                       main_rows[i]["concept"]):
+                        run.append(main_rows[i])
+                        i -= 1
+                    total = 0.0
+                    for x in run:
+                        # the statement page can date a period a day off its facts (Disney: Sept 28 / Sept 29)
+                        f = db.execute("SELECT value FROM facts WHERE cik=? AND concept=? AND period_end=? AND period_start "
+                                       "BETWEEN date(?, '-7 day') AND date(?, '+7 day') ORDER BY filed DESC LIMIT 1",
+                                       (cik, x["concept"], x["period_end"], x["period_start"], x["period_start"])).fetchone()
+                        if not f or f[0] is None:
+                            total = None
+                            break
+                        total += -f[0] if x["concept"].startswith("InterestExpense") else f[0]
+                    if run and total is not None:
+                        add(flows, "rendered:NonoperatingTotal", key, total, run[-1], ps)
                 # earnings per share and the share count of the ticker's own class (Berkshire's Class B)
                 eps = [x for x in rs if x["unit"].endswith("/shares") and re.search(r"EarningsPerShare|per (average )?(equivalent )?share", x["concept"] + " " + x["label"], re.I)]
                 shs = [x for x in rs if x["unit"] == "shares" and re.search(r"WeightedAverage|average", x["concept"] + " " + x["label"], re.I)]
@@ -739,7 +776,13 @@ CREATE TABLE IF NOT EXISTS segment_filings_read (
 CREATE TABLE IF NOT EXISTS holders_5pct (
     cik INTEGER, accession TEXT, filer_cik INTEGER, form TEXT, filed TEXT, event_date TEXT,
     class_title TEXT, person TEXT, person_type TEXT, shares REAL, pct REAL, url TEXT,
-    PRIMARY KEY (cik, accession, person)
+    issuer_cik INTEGER, issuer_cusip TEXT,      -- the company the filing is about: a company's own list also has
+    PRIMARY KEY (cik, accession, person)        -- the 13D/13Gs it filed as an investor in others
+);
+-- Every manager that filed a 13F for a quarter, so a holder missing from the quarter before is called new only
+-- when it filed that quarter (Norges Bank files twice a year).
+CREATE TABLE IF NOT EXISTS holders_13f_filers (
+    period TEXT, manager_cik INTEGER, PRIMARY KEY (period, manager_cik)
 );
 CREATE TABLE IF NOT EXISTS holders_5pct_read (
     cik INTEGER, accession TEXT, PRIMARY KEY (cik, accession)
@@ -786,6 +829,18 @@ def connect():
             for r in db.execute("SELECT cik FROM companies").fetchall():
                 build_metrics(db, r["cik"])
             db.execute("INSERT OR REPLACE INTO meta VALUES ('metrics_version', ?)", (METRICS_VERSION,))
+    if "issuer_cik" not in [r[1] for r in db.execute("PRAGMA table_info(holders_5pct)")]:
+        with db:   # older copies stored 13D/13Gs about other companies too: read them all again
+            db.execute("ALTER TABLE holders_5pct ADD COLUMN issuer_cik INTEGER")
+            db.execute("ALTER TABLE holders_5pct ADD COLUMN issuer_cusip TEXT")
+            db.execute("DELETE FROM holders_5pct")
+            db.execute("DELETE FROM holders_5pct_read")
+            db.execute("DELETE FROM meta WHERE key LIKE '13f:%'")
+    row = db.execute("SELECT value FROM meta WHERE key='segments_version'").fetchone()
+    if not row or row["value"] != SEGMENTS_VERSION:
+        with db:   # forget which reports were read; each company reads its own again the next time it is opened
+            db.execute("DELETE FROM segment_filings_read")
+            db.execute("INSERT OR REPLACE INTO meta VALUES ('segments_version', ?)", (SEGMENTS_VERSION,))
     return db
 
 
@@ -1305,6 +1360,15 @@ def build_metrics(db, cik):
                             store[key] = (p, val * k, row, st)
                             break
 
+    # an "operating income" tag for a period whose income statement has no such line comes from a note (Disney's
+    # segment total): left out, so it is worked out from the statement instead (pretax less non-operating)
+    no_line = {e for (_s, e) in rend["flows"].get("rendered:NoOperatingLine", {})}
+    for key in [k for k in annual if k[1] == "operating_income" and annual[k][2]["concept"] == "OperatingIncomeLoss" and k[0] in no_line]:
+        del annual[key]
+    for key in [k for k in quarterly if k[1] == "operating_income" and quarterly[k][2]["concept"] == "OperatingIncomeLoss"
+                and q_ends.get(k[0]) in no_line]:
+        del quarterly[key]
+
     rows = []
     for (e, metric), (_p, v, r, s) in annual.items():
         rows.append((cik, "annual", fiscal_year_of(e), None, s, e, metric, v,
@@ -1549,7 +1613,7 @@ def member_name(member):
 def parse_segment_periods(xml_bytes):
     """Return [(axis, member, metric, period_start, period_end, value)] for a quarter, half, nine months or a year."""
     root = ET.fromstring(xml_bytes)
-    contexts = {}
+    contexts, paired = {}, {}
     for c in root:
         if _local(c.tag) != "context":
             continue
@@ -1581,7 +1645,24 @@ def parse_segment_periods(xml_bytes):
             (dim, member), = dims.items()
             if dim in SEGMENT_AXES and member:
                 contexts[c.get("id")] = (SEGMENT_AXES[dim], member, start, end)
+        elif len(dims) == 2:
+            # A region tagged with a second axis too: Netflix writes each region's revenue as streaming in that
+            # region (product Streaming x region UCAN). Kept as the region, if the other axis is the same member
+            # for every region (checked below), so it is the whole company split by region, not a product's part.
+            geo = [(d, m) for d, m in dims.items() if SEGMENT_AXES.get(d) == "geo"]
+            other = [(d, m) for d, m in dims.items() if SEGMENT_AXES.get(d) in ("product", "segment")]
+            if len(geo) == 1 and len(other) == 1 and geo[0][1] and other[0][1]:
+                paired[c.get("id")] = (geo[0][1], other[0][1], start, end)
     priority = {c: (m, i) for m, names in SEGMENT_CONCEPTS.items() for i, c in enumerate(names)}
+    # regions paired with one other member: usable only when that member is the same for all of a period's regions
+    used = {}
+    for f in root:
+        p = paired.get(f.get("contextRef"))
+        if p and _local(f.tag) in priority:
+            used.setdefault((p[2], p[3]), set()).add(p[1])
+    for cid, (geo, other, start, end) in paired.items():
+        if len(used.get((start, end), ())) == 1:
+            contexts[cid] = ("geo", geo, start, end)
     best = {}
     for f in root:
         concept = _local(f.tag)
@@ -2037,18 +2118,10 @@ def ensure_13f_files(db, client, log=print):
 
 
 def company_cusips(db, client, cik):
-    """CUSIP numbers of the company's shares, read from recent Schedule 13G/13D filings about it."""
-    found = []
-    for f in db.execute(
-            "SELECT * FROM filings WHERE cik=? AND (form LIKE 'SCHEDULE 13G%' OR form LIKE 'SCHEDULE 13D%') "
-            "AND primary_document LIKE '%.xml' ORDER BY filing_date DESC LIMIT 4", (cik,)).fetchall():
-        url = ARCHIVE_URL.format(cik=cik, accn=f["accession"].replace("-", ""),
-                                 doc=f["primary_document"].split("/")[-1])
-        raw = client.get(url, as_json=False) or ""
-        for c in re.findall(r"<issuerCusipNumber>\s*([0-9A-Za-z]{9})\s*<", raw):
-            if c.upper() not in found:
-                found.append(c.upper())
-    return found
+    """CUSIP numbers of the company's shares, from the Schedule 13G/13D filings about it (read first)."""
+    return [r[0] for r in db.execute(
+        "SELECT issuer_cusip FROM holders_5pct WHERE cik=? AND issuer_cik=? AND issuer_cusip IS NOT NULL "
+        "GROUP BY issuer_cusip ORDER BY MAX(filed) DESC", (cik, cik)) if re.fullmatch(r"[0-9A-Z]{9}", r[0] or "")]
 
 
 def _issuer_key(name):
@@ -2058,12 +2131,41 @@ def _issuer_key(name):
     return " ".join(words)
 
 
+def f13_complete_filers(path):
+    """{quarter end: managers whose 13F for it is complete in this data set}. A filing whose table has far fewer rows
+    than its own cover page counts (Norges Bank's March 2026 report has 1 of 1,507) says nothing about what it held."""
+    with zipfile.ZipFile(path) as z:
+        name = lambda suffix: next(n for n in z.namelist() if n.upper().endswith(suffix))
+
+        def table(suffix):
+            with z.open(name(suffix)) as f:
+                head = f.readline().decode("utf-8", "replace").rstrip("\r\n").split("\t")
+                for line in f:
+                    yield dict(zip(head, line.decode("utf-8", "replace").rstrip("\r\n").split("\t")))
+        subs = {r["ACCESSION_NUMBER"]: r for r in table("SUBMISSION.TSV") if r["SUBMISSIONTYPE"].startswith("13F-HR")}
+        want = {r["ACCESSION_NUMBER"]: _num(r.get("TABLEENTRYTOTAL") or "") for r in table("SUMMARYPAGE.TSV")}
+        have = {}
+        with z.open(name("INFOTABLE.TSV")) as f:
+            f.readline()
+            for line in f:
+                a = line[:line.find(b"\t")].decode()
+                have[a] = have.get(a, 0) + 1
+    out = {}
+    for a, r in subs.items():
+        if have.get(a, 0) >= 0.9 * (want.get(a) or 0):
+            out.setdefault(_f13_date(r["PERIODOFREPORT"]), set()).add(int(r["CIK"]))
+    return out
+
+
 def scan_13f(path, cusips, company_name):
     """Find every manager holding the company in one quarterly data set.
 
     Returns (the quarter end most filings in it report, [(quarter end, manager cik, filed,
-    kind of filing, manager name, shares, value)]). A data set also carries late filings and
-    amendments for earlier quarters, so every quarter in it is returned.
+    kind of filing, manager name, shares, value)], {quarter end: every manager cik that filed for it}).
+    A data set also carries late filings and amendments for earlier quarters, so every quarter in it is returned.
+
+    Values are in dollars; a filer still reporting thousands (as before 2023) is put right by its price. Holdings of
+    another share class are counted in the main class by price: one Berkshire A share as about 1,500 B shares.
     """
     with zipfile.ZipFile(path) as z:
         def member(suffix):
@@ -2080,9 +2182,16 @@ def scan_13f(path, cusips, company_name):
         for r in subs.values():
             counts[r["PERIODOFREPORT"]] = counts.get(r["PERIODOFREPORT"], 0) + 1
         if not counts:
-            return None, []
+            return None, [], {}
         period = max(counts, key=counts.get)
         covers = {r["ACCESSION_NUMBER"]: r for r in table("COVERPAGE.TSV") if r["ACCESSION_NUMBER"] in subs}
+        # every restatement in the set, holding the company or not: it replaces the manager's report for that quarter
+        # (Sixth Street's August 2026 report listed 4,441 holdings by mistake; the restatement the same day has 9)
+        restated = {}
+        for a, r in subs.items():
+            if covers.get(a, {}).get("AMENDMENTTYPE", "").upper().startswith("RESTATE"):
+                key = (_f13_date(r["PERIODOFREPORT"]), int(r["CIK"]))
+                restated[key] = max(restated.get(key, ("", "")), (_f13_date(r["FILING_DATE"]) or "", a))
 
         def rows(match):
             with z.open(member("INFOTABLE.TSV")) as f:
@@ -2097,40 +2206,70 @@ def scan_13f(path, cusips, company_name):
                     yield (v[0], v[col["CUSIP"]].upper(), v[col["NAMEOFISSUER"]],
                            _num(v[col["SSHPRNAMT"]]) or 0.0, _num(v[col["VALUE"]]) or 0.0)
 
-        if not cusips:  # no 13G on file: find the shares by the company's name
+        def by_name():   # the CUSIP holders put the most money in under the company's name
             key, by_value = _issuer_key(company_name), {}
             first = key.split()[0].encode() if key else b""
             if first:
                 for _a, cusip, issuer, _s, value in rows(lambda line: first in line.upper()):
                     if _issuer_key(issuer) == key:
                         by_value[cusip] = by_value.get(cusip, 0.0) + value
-            cusips = [max(by_value, key=by_value.get)] if by_value else []
+            return max(by_value, key=by_value.get) if by_value else None
+
+        if cusips:   # a 13G's CUSIP can be a class funds hardly hold (TSMC's ordinary shares; they hold the ADR)
+            prefixes = {b"\t" + c[:6].encode() for c in cusips}
+            if len({a for a, *_r in rows(lambda line: any(p in line for p in prefixes))}) < 50:
+                alt = by_name()
+                if alt and alt not in cusips:
+                    cusips = list(cusips) + [alt]
+        else:   # no 13G on file: find the shares by the company's name
+            alt = by_name()
+            cusips = [alt] if alt else []
         if not cusips:
-            return _f13_date(period), []
+            return _f13_date(period), [], restated
         # The first six characters identify the issuer; the rest tell its share classes apart.
         prefixes = {b"\t" + c[:6].encode() for c in cusips}
-        held, by_cusip = {}, {}
+        held, by_cusip, prices = {}, {}, {}
         for accn, cusip, _i, shares, value in rows(lambda line: any(p in line for p in prefixes)):
             if accn in subs and cusip[:6] in {c[:6] for c in cusips}:
                 held.setdefault(accn, {}).setdefault(cusip, [0.0, 0.0])
                 held[accn][cusip][0] += shares
                 held[accn][cusip][1] += value
-                by_cusip[cusip] = by_cusip.get(cusip, 0.0) + value
+                if shares > 0 and value > 0:
+                    prices.setdefault(cusip, []).append(value / shares)
+        # each class's price: the middle of what its holders report (a filer in thousands is far below it)
+        price = {c: sorted(v)[len(v) // 2] for c, v in prices.items()}
+        for per in held.values():
+            for c, v in per.items():
+                # reported in thousands of dollars: times 1,000 it lands on the price everyone else reports. Anything
+                # else far off is another mistake (Vinva filed Berkshire B shares under the A CUSIP), left as it is
+                if c in price and v[0] > 0 and abs(v[1] * 1000 / v[0] / price[c] - 1) < 0.15:
+                    v[1] *= 1000
+                by_cusip[c] = by_cusip.get(c, 0.0) + v[1]
         top = max(by_cusip.values(), default=0.0)
         keep = {c for c, v in by_cusip.items() if c in cusips or v >= 0.05 * top}   # skip stray preferreds and units
+        # the main class is the one the 13D/13Gs name first (the newest); others are converted to it by price
+        held_sh = {}
+        for per in held.values():
+            for c, v in per.items():
+                held_sh[c] = held_sh.get(c, 0.0) + v[0]
+        main = max(keep & set(price), key=lambda c: held_sh.get(c, 0.0), default=None)
+        weight = {c: (price[c] / price[main] if main and c in price and price[main] else 1.0) for c in keep}
 
         out = []
         for accn, per_cusip in held.items():
             sub, cover = subs[accn], covers.get(accn, {})
-            shares = sum(v[0] for c, v in per_cusip.items() if c in keep)
+            # another class counted in the main one by what it is worth, which stays right when a filer puts one
+            # class's shares under the other's CUSIP
+            shares = sum(v[0] if c == main or not main else (v[1] / price[main] if v[1] > 0 and price.get(main) else v[0] * weight[c])
+                         for c, v in per_cusip.items() if c in keep)
             value = sum(v[1] for c, v in per_cusip.items() if c in keep)
             if shares <= 0:
                 continue
             kind = "restate" if cover.get("AMENDMENTTYPE", "").upper().startswith("RESTATE") else \
                    "add" if cover.get("ISAMENDMENT", "").upper() == "Y" else "original"
             out.append((_f13_date(sub["PERIODOFREPORT"]), int(sub["CIK"]), _f13_date(sub["FILING_DATE"]) or "",
-                        kind, cover.get("FILINGMANAGER_NAME") or sub["CIK"], shares, value))
-        return _f13_date(period), out
+                        kind, cover.get("FILINGMANAGER_NAME") or sub["CIK"], shares, value, accn))
+        return _f13_date(period), out, restated
 
 
 def fetch_holders(db, client, cik, log=print):
@@ -2138,7 +2277,7 @@ def fetch_holders(db, client, cik, log=print):
     paths = ensure_13f_files(db, client, log)
     if not paths:
         return
-    stamp = ",".join(os.path.basename(p) for p in paths)
+    stamp = "v5:" + ",".join(os.path.basename(p) for p in paths)   # v5: units, share classes by value, restatements
     row = db.execute("SELECT value FROM meta WHERE key=?", (f"13f:{cik}",)).fetchone()
     if row and row["value"] == stamp:
         return  # already searched these quarters
@@ -2146,10 +2285,19 @@ def fetch_holders(db, client, cik, log=print):
     cusips = company_cusips(db, client, cik)
     log(f"  Searching {len(paths)} quarters of 13F holdings...")
     periods, filings = [], {}
+    restated = {}
     for path in paths:
-        period, rows = scan_13f(path, cusips, company["name"] if company else "")
+        mark = "f13filers:" + os.path.basename(path)
+        if not db.execute("SELECT 1 FROM meta WHERE key=?", (mark,)).fetchone():
+            with db:   # once per data set: which managers filed a complete report for each quarter
+                for per, ciks in f13_complete_filers(path).items():
+                    db.executemany("INSERT OR IGNORE INTO holders_13f_filers VALUES (?, ?)", [(per, m) for m in ciks])
+                db.execute("INSERT OR REPLACE INTO meta VALUES (?, '1')", (mark,))
+        period, rows, rs = scan_13f(path, cusips, company["name"] if company else "")
         if period:
             periods.append(period)
+        for k, v in rs.items():
+            restated[k] = max(restated.get(k, ("", "")), v)
         for row in rows:
             filings.setdefault((row[0], row[1]), []).append(row[2:])
     found = []
@@ -2161,8 +2309,11 @@ def fetch_holders(db, client, cik, log=print):
             # A restatement replaces the original report; other amendments add holdings to it,
             # often ones first filed confidentially.
             forms.sort()
-            restated = [f for f in forms if f[1] == "restate"]
-            use = ([restated[-1]] if restated else [f for f in forms if f[1] == "original"]) + \
+            last = restated.get((per, mcik))
+            if last:   # a restatement replaces everything filed before it, even when it does not hold the company
+                forms = [f for f in forms if f[5] == last[1] or f[0] > last[0]]
+            restates = [f for f in forms if f[1] == "restate"]
+            use = ([restates[-1]] if restates else [f for f in forms if f[1] == "original"]) + \
                   [f for f in forms if f[1] == "add"]
             if use:
                 managers[mcik] = [use[-1][2], sum(f[3] for f in use), sum(f[4] for f in use), use[-1][0]]
@@ -2190,7 +2341,10 @@ def parse_schedule_13(xml_text):
         return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}" if m else None
 
     filer = tag(xml_text, "cik")
+    issuer = tag(xml_text, "issuerCik", "issuerCIK")
     out = {"filer_cik": int(filer) if filer and filer.isdigit() else None,
+           "issuer_cik": int(issuer) if issuer and issuer.isdigit() else None,
+           "issuer_cusip": (tag(xml_text, "issuerCusip", "issuerCUSIP", "issuerCusipNumber") or "").upper() or None,
            "event_date": day(tag(xml_text, "eventDateRequiresFilingThisStatement", "dateOfEvent")),
            "class_title": tag(xml_text, "securitiesClassTitle"), "persons": []}
     for _t, block in re.findall(
@@ -2221,10 +2375,12 @@ def fetch_major_holders(db, client, cik, log=print, limit=80):
             continue  # try again next time
         page = ARCHIVE_URL.format(cik=cik, accn=f["accession"].replace("-", ""), doc=f["primary_document"])
         with db:
-            for name, kind, shares, pct in d["persons"]:
-                db.execute("INSERT OR REPLACE INTO holders_5pct VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            # the company's own 13D/13Gs as an investor in others are in its filing list too: only the ones about it
+            about = d["issuer_cik"] is None or d["issuer_cik"] == cik
+            for name, kind, shares, pct in (d["persons"] if about else []):
+                db.execute("INSERT OR REPLACE INTO holders_5pct VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                            (cik, f["accession"], d["filer_cik"], f["form"], f["filing_date"], d["event_date"],
-                            d["class_title"], name, kind, shares, pct, page))
+                            d["class_title"], name, kind, shares, pct, page, d["issuer_cik"], d["issuer_cusip"]))
             db.execute("INSERT OR REPLACE INTO holders_5pct_read VALUES (?, ?)", (cik, f["accession"]))
 
 
@@ -2794,10 +2950,18 @@ def _pick_members(revenue, total):
 
     if total:
         tol, best = max(abs(total) * 0.002, 1.0), 0
-        for mask, v in enumerate(sums(names)):
+        all_sums = sums(names)
+        for mask, v in enumerate(all_sums):
             if abs(v - total) <= tol and bin(mask).count("1") > bin(best).count("1"):
                 best = mask
         if best:
+            return [m for i, m in enumerate(names) if best >> i & 1]
+        # Nothing adds up exactly: the parts can leave out a small business (Netflix's regions are streaming only,
+        # without DVD). Take the most parts within 2% of the total, the closest if several tie.
+        near = [(bin(mask).count("1"), -abs(v - total), mask) for mask, v in enumerate(all_sums)
+                if bin(mask).count("1") >= 2 and abs(v - total) <= abs(total) * 0.02]
+        if near:
+            best = max(near)[2]
             return [m for i, m in enumerate(names) if best >> i & 1]
     # No total to check against: drop any member that is the sum of several others.
     for m in list(names):
@@ -3009,7 +3173,8 @@ def _holder_key(name):
 # names and by words in the name; Schedule 13D/13G filers declare a type code, used when present.
 _TYPE_RULES = [
     ("Sovereign wealth and central banks", r"NORGES BANK|SWISS NATIONAL BANK|GIC PRIVATE|TEMASEK|INVESTMENT AUTHORITY|PUBLIC INVESTMENT FUND|"
-     r"SOVEREIGN|KOREA INVESTMENT CORP|CHINA INVESTMENT CORP|MUBADALA|QATAR INVESTMENT|BANK OF JAPAN|NATIONAL BANK OF"),
+     r"SOVEREIGN|KOREA INVESTMENT CORP|CHINA INVESTMENT CORP|MUBADALA|QATAR INVESTMENT|BANK OF JAPAN|NATIONAL BANK OF|"
+     r"NATIONAL DEVELOPMENT FUND|EXECUTIVE YUAN|MINISTRY OF FINANCE|GOVERNMENT OF|STATE COUNCIL|NATIONAL PENSION SERVICE"),
     ("Pension funds", r"RETIREMENT|PENSION|TEACHERS|\bPERS\b|\bSTRS\b|EMPLOYEES|SUPERANNUATION|CPP INVESTMENT|CAISSE DE DEPOT|"
      r"AUSTRALIANSUPER|AP-FONDEN|PUBLIC SECTOR|STATE BOARD OF ADMINISTRATION|TREASURER|\bSTATE OF\b|\bPGGM\b|\bAPG\b|PROVIDENT FUND"),
     ("Insurance companies", r"INSURANCE|ASSURANCE|\bLIFE\b|MUTUAL OF|ALLIANZ|\bAXA\b|METLIFE|PRUDENTIAL|AEGON|MANULIFE|"
@@ -3058,7 +3223,9 @@ def major_holders(db, cik):
     """The latest Schedule 13D/13G position of each filer, with the change from its filing before."""
     by_filer = {}
     for r in db.execute("SELECT * FROM holders_5pct WHERE cik=? ORDER BY filed, accession", (cik,)):
-        key = (r["filer_cik"] or r["person"], _holder_key(r["class_title"]))
+        # one filer's filings over time, by the share class's CUSIP: the class's name is written differently from one
+        # filing to the next ("Common Stock", "CLASS A SHARES"), which made one holder look like several
+        key = (r["filer_cik"] or r["person"], r["issuer_cusip"] or "")
         by_filer.setdefault(key, {}).setdefault(r["accession"], []).append(r)
     out = []
     for filings in by_filer.values():
@@ -3077,14 +3244,98 @@ def major_holders(db, cik):
     return out
 
 
+# Vanguard reports through several 13F filers since its 2025 reorganisation (and some smaller arms), T. Rowe Price through
+# two since 2022; each is one holder. Named one by one, so a firm that only shares the name (Vanguard Capital Wealth Advisors) is not swept in.
+HOLDER_FAMILIES = [("Vanguard", re.compile(
+    r"^vanguard (group|capital management|portfolio management|fiduciary trust|global advisers|asset management|"
+    r"investments (australia|canada|hong kong|uk|switzerland)|national trust|personalized indexing|advisers|marketing)\b", re.I)),
+    # Capital Group's investment divisions file separately; other sites show them as Capital Research
+    ("Capital Group", re.compile(r"^capital (research (global investors|and management|management)|world investors|"
+                                 r"international (investors|inc|ltd|limited|sarl|k\.?k)|group)\b", re.I)),
+    # T. Rowe Price has filed through two managers since 2022
+    ("T. Rowe Price", re.compile(r"^(price t rowe associates|t\.? rowe price (associates|investment management))\b", re.I))]
+
+
+def _family(name):
+    return next((f for f, pat in HOLDER_FAMILIES if pat.search(name or "")), None)
+
+
+def annual_report_holders(db, cik):
+    """A foreign company's own list of its major shareholders, from Item 7.A of its newest 20-F: everyone with 5% or
+    more of all its shares, wherever they trade (TSMC: Taiwan's National Development Fund, 6.38%), the as-of date, and
+    how many of its shares sit in the ADR program. None when there is no 20-F text on file."""
+    row = db.execute("SELECT text FROM documents WHERE cik=? AND form IN ('20-F','20-F/A') ORDER BY filing_date DESC LIMIT 1",
+                     (cik,)).fetchone()
+    if not row:
+        return None
+    text = row[0]
+    start = next((m.start() for m in re.finditer(r"Major Shareholders\s*\n", text)
+                  if re.search(r"(?i)beneficially owned|owned by|five percent|5%", text[m.start():m.start() + 1500])), None)
+    if start is None:
+        return None
+    block = text[start:start + 6000]
+    end = re.search(r"\n\s*Related Party Transactions\s*\n", block)
+    block = block[:end.start()] if end else block
+    lines = [l.strip() for l in block.split("\n") if l.strip()]
+    shares_re, pct_re = re.compile(r"^\(?([\d,]{5,})\)?$"), re.compile(r"^(\d{1,2}(?:\.\d+)?)\s*%$")
+    holders = []
+    for i, line in enumerate(lines):
+        both = re.match(r"^(.*?[A-Za-z].*?)\s+([\d,]{5,})\s+(\d{1,2}(?:\.\d+)?)\s*%$", line)   # name, shares and % on one line
+        if both:
+            name, sh, pc = both.groups()
+        elif i + 2 < len(lines) and shares_re.match(lines[i + 1]) and pct_re.match(lines[i + 2]) and re.search(r"[A-Za-z]{3}", line):
+            name, sh, pc = line, shares_re.match(lines[i + 1]).group(1), pct_re.match(lines[i + 2]).group(1)
+        else:
+            continue
+        name = re.sub(r"\(\d\)$", "", name).strip()
+        if re.match(r"(?i)names? of|total", name):
+            continue
+        holders.append({"name": name, "shares": float(sh.replace(",", "")), "pct": float(pc),
+                        "insiders": bool(re.search(r"(?i)directors|officers|management", name))})
+    if not holders:
+        return None
+    asof = re.search(r"as of ([A-Z][a-z]+ \d{1,2}, \d{4})", block)
+    try:
+        asof = datetime.strptime(asof.group(1), "%B %d, %Y").date().isoformat() if asof else None
+    except ValueError:
+        asof = None
+    adr = re.search(r"([\d,]{7,}) (?:common|ordinary) shares,? represented by ([\d,]{5,}) (?:ADSs|ADRs|American Depositary)", text[start:start + 8000])
+    total = re.search(r"a total of ([\d,]{7,}) (?:common|ordinary) shares were outstanding", text[start:start + 8000])
+    return {"holders": holders, "date": asof,
+            "adrShares": float(adr.group(1).replace(",", "")) if adr else None,
+            "totalShares": float(total.group(1).replace(",", "")) if total else None}
+
+
 def desk_holders(db, cik, limit=400):
     """Major holders: 13F managers at the latest quarter end plus the owners on Schedule 13D/13G."""
     periods = [r[0] for r in db.execute("SELECT DISTINCT period FROM holders_13f WHERE cik=? ORDER BY period DESC", (cik,))]
     latest, prior = (periods[0] if periods else None), (periods[1] if len(periods) > 1 else None)
     before = {r["manager_cik"]: r["shares"] for r in db.execute(
         "SELECT manager_cik, shares FROM holders_13f WHERE cik=? AND period=?", (cik, prior))} if prior else {}
-    out_shares = shares_outstanding(db, cik)
-    rows = db.execute("SELECT * FROM holders_13f WHERE cik=? AND period=? ORDER BY shares DESC", (cik, latest)).fetchall() if latest else []
+    filed_before = {r[0] for r in db.execute("SELECT manager_cik FROM holders_13f_filers WHERE period=?", (prior,))} if prior else set()
+    co = db.execute("SELECT ticker FROM companies WHERE cik=?", (cik,)).fetchone()
+    cover = cover_shares(db, cik, co["ticker"] if co else "")
+    out_shares = (cover or {}).get("value") or shares_outstanding(db, cik)   # all classes, in the ticker's class
+    if out_shares:
+        out_shares /= ads_ratio(db, cik) or 1   # funds hold the ADRs (TSMC: 1 ADR = 5 shares)
+    rows = [dict(r) for r in db.execute("SELECT * FROM holders_13f WHERE cik=? AND period=? ORDER BY shares DESC", (cik, latest))] if latest else []
+    # one row per family (Vanguard's filers), its change the sum of theirs
+    fam_rows, merged = {}, []
+    for r in rows:
+        f = _family(r["manager"])
+        if not f:
+            merged.append(r)
+            continue
+        g = fam_rows.get(f)
+        if not g:
+            g = fam_rows[f] = dict(r, manager=f, members=[], family=True)
+            g["shares"] = g["value"] = 0.0
+            merged.append(g)
+        g["members"].append(r)
+        g["shares"] += r["shares"]
+        g["value"] += r["value"] or 0
+        g["filed"] = max(g["filed"] or "", r["filed"] or "")
+    rows = sorted(merged, key=lambda r: -r["shares"])
     majors = major_holders(db, cik)
     by_cik = {m["filer_cik"]: m for m in majors if m["filer_cik"]}
     by_name = {n: m for m in majors for n in m["names"] if n}
@@ -3095,26 +3346,57 @@ def desk_holders(db, cik, limit=400):
         t[0] += shares or 0
         t[1] += 1
 
+    def was(r):   # (shares the quarter before, or None when it did not file then; whether it is new)
+        if r.get("family"):
+            prev = [before.get(x["manager_cik"]) for x in r["members"]]
+            return (sum(p or 0 for p in prev), False) if any(p is not None for p in prev) else (None, False)
+        if r["manager_cik"] in before:
+            return before[r["manager_cik"]], False
+        return None, r["manager_cik"] in filed_before   # new only if it filed that quarter without holding any
+
     for r in rows:
         name = r["manager"] or ""
-        change = r["shares"] - before[r["manager_cik"]] if r["manager_cik"] in before else None
+        prev, new = was(r)
+        change = r["shares"] - prev if prev is not None else None
         m = by_cik.get(r["manager_cik"]) or by_name.get(_holder_key(name))
+        shares, value, src_note = r["shares"], r["value"], ""
+        if r.get("family"):   # every Vanguard 13G (The Vanguard Group, Vanguard Capital Management) is the family's
+            fam = [x for x in majors if _family(x["name"]) == r["manager"] or _holder_key(x["name"]).startswith(_holder_key(name))]
+            matched.update(id(x) for x in fam)
+            m = m or (fam[0] if fam else None)
+        exact = bool(m)
+        if not m and not r.get("family"):   # the same firm under a slightly different name (Orbis ... Ltd / (U.S.), L.P.)
+            two = " ".join(_holder_key(name).split()[:2])
+            m = next((x for x in majors if len(two.split()) == 2 and id(x) not in matched and not _family(x["name"])
+                      and " ".join(_holder_key(x["name"]).split()[:2]) == two), None)
         if m:
-            matched.add(id(m))
+            # all of that filer's 13D/13Gs, whatever class or CUSIP they name (Baillie Gifford filed under two)
+            matched.update(id(x) for x in majors if x is m or (m["filer_cik"] and x["filer_cik"] == m["filer_cik"]))
+            # a 13D/13G as of this quarter's end with far more shares: it counts all of the firm's funds worldwide,
+            # where its 13F can list only some (BlackRock's Shopify 13G: 61.6M shares; its 13F: 5.8M)
+            if exact and (m["date"] or "") >= (latest or "") and m["shares"] > shares * 1.5:
+                value = value * m["shares"] / shares if value and shares else value
+                shares, src_note, change = m["shares"], " (13F lists fewer)", m["change"]
+        r["shares"] = shares
         kind = holder_type(name)
         count(kind, r["shares"])
         holders.append({
             "type": kind,
-            "name": _tidy_name(name), "shares": r["shares"], "value": r["value"],
+            "name": _tidy_name(name) + (f" ({len(r['members'])} filers)" if r.get("family") and len(r["members"]) > 1 else ""),
+            "shares": shares, "value": value,
             "pct": r["shares"] / out_shares if out_shares else None,
-            "change": change, "isNew": bool(prior) and r["manager_cik"] not in before,
+            "change": change, "isNew": new,
+            "members": len(r["members"]) if r.get("family") else None,
             "changePct": change / out_shares if change is not None and out_shares else None,
-            "filed": r["filed"], "date": latest, "src": "13F · " + m["form"] if m else "13F"})
+            "filed": r["filed"], "date": latest, "src": ("13F · " + m["form"] + src_note) if m else "13F"})
     total = sum(r["shares"] for r in rows)
     extra = 0.0
     for m in majors:
         if id(m) in matched:
             continue  # the same holder is already listed from its 13F
+        pct = m["pct"] if m["pct"] is not None else (m["shares"] / out_shares * 100 if out_shares else None)
+        if pct is not None and pct < 5:
+            continue  # a filing saying it has gone below 5%: no longer a major holder
         extra += m["shares"]
         count(m["type"], m["shares"])
         holders.append({
@@ -3125,8 +3407,24 @@ def desk_holders(db, cik, limit=400):
             "change": m["change"], "isNew": False,
             "changePct": m["change"] / out_shares if m["change"] is not None and out_shares else None,
             "filed": m["filed"], "date": m["date"], "src": m["form"], "url": m["url"], "class": m["class"]})
+    # a foreign company's own list (20-F): owners of its home-market shares the SEC filings never show
+    home = annual_report_holders(db, cik)
+    ratio = ads_ratio(db, cik) or 1
+    if home:
+        for h in home["holders"]:
+            if any(_holder_key(h["name"]) == _holder_key(x["name"]) for x in holders):
+                continue
+            sh = h["shares"] / ratio   # in ADRs, like the rest of the list
+            extra += sh
+            kind = "Insiders" if h["insiders"] else holder_type(h["name"])
+            count(kind, sh)
+            holders.append({"type": kind, "name": h["name"], "shares": sh, "value": None, "pct": h["pct"] / 100,
+                            "change": None, "isNew": False, "changePct": None, "filed": None, "date": home["date"],
+                            "src": "20-F", "home": True})
     holders.sort(key=lambda h: -(h["shares"] or 0))
+    adr_share = home["adrShares"] / home["totalShares"] if home and home["adrShares"] and home["totalShares"] else None
     return {"period": latest, "prior": prior, "holders": holders[:limit], "count": len(rows), "totalShares": total,
+            "adrRatio": ratio if ratio != 1 else None, "adrShare": adr_share,
             "otherCount": sum(1 for h in holders if "13F" not in h["src"]), "otherShares": extra,
             "types": sorted(({"name": k, "shares": v[0], "count": v[1]} for k, v in types.items()),
                             key=lambda t: -t["shares"]),
@@ -4090,8 +4388,8 @@ def make_handler(client, max_age_hours=12):
                             # the first time this downloads the SEC's 13F data sets (about 200 MB): never inside
                             # the request. Wait a few seconds, then answer with what is known and let the page ask again.
                             def holders_work(bdb, cik=cik):
+                                fetch_major_holders(bdb, client, cik, log=lambda *_: None)   # first: its CUSIPs
                                 fetch_holders(bdb, client, cik, log=lambda *_: None)
-                                fetch_major_holders(bdb, client, cik, log=lambda *_: None)
                             job = background(f"holders:{cik}", holders_work)
                             job.join(8)
                             out_of_date = job.is_alive()
