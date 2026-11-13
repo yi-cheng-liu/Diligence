@@ -354,7 +354,7 @@ async function drawReport() {
     <div class="head"><div class="eyebrow">${topic.label || topic.kind ? `<span>${esc(topic.label || topic.kind)}</span>` : ''}${date ? `<span>${esc(date)}</span>` : ''}</div><h1>${esc(title.replace(/\*\*/g, ''))}</h1>
       ${tk.length ? `<div class="tickers">${tk.slice(0, 40).map(t => `<button class="tk" data-open="${esc(t)}" title="Open ${esc(t)} in Companies">${esc(t)}</button>`).join('')}</div>` : ''}</div>
     <div class="rdg"><article class="md" id="md"></article><nav id="toc" aria-label="Sections"></nav></div></div>`;
-  const md = $('md'); md.innerHTML = marked.parse(doc.text.replace(/^Report date[:：].*$/im, ''), { gfm: true, breaks: false });   // the date is shown above
+  const md = $('md'); window.safeMarkdown(md, doc.text.replace(/^Report date[:：].*$/im, ''));   // cleaned of anything that could run as script; the date is shown above
   const toc = [...md.querySelectorAll('h2')].map((h, i) => { h.id = 's' + i; return `<a href="#s${i}">${esc(h.textContent)}</a>`; });
   if (toc.length > 2) $('toc').innerHTML = '<span>In this report</span>' + toc.join(''); else $('toc').remove();
   md.querySelectorAll('table').forEach(t => { const w = document.createElement('div'); w.className = 'tw'; t.parentNode.insertBefore(w, t); w.appendChild(t); });

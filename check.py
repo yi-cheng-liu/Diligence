@@ -11,6 +11,7 @@ empty, when it is missing, and brings an older one up to date, as the server wou
 Anything it could not check (a company not in the database, OpenD not running) is listed as skipped,
 never as passed. It exits with 1 when a check failed or when no database check could run.
 """
+import os
 import sys
 
 import sec_db as s
@@ -45,9 +46,12 @@ def main():
     mm = lambda t, y, m: (metric(t, y, m) or 0) / 1e6
 
     print("Figures that have been wrong before")
+    # sec.db holds only the stocks in your groups (the server deletes the rest), so some of these are usually missing
     for t in ("AAPL", "COST", "LLY", "CAT", "XOM", "NBIS", "NVDA", "MCD", "BRK-B", "NKE", "JPM", "ASTS", "TSM", "NEE"):
         if not have(t):
-            skip(f"{t} figures", f"{t} is not in sec.db; run `python3 sec_db.py fetch {t}`")
+            fixture = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures", t + ".json.gz"))
+            skip(f"{t} figures", f"{t} is not in sec.db; " + ("the tests check it instead, from tests/fixtures" if fixture else
+                                                             f"to check it here, run `python3 sec_db.py fetch {t}`"))
     if have("AAPL"):
         check("Apple FY2025 revenue is $416.2B", near(year("AAPL", 2025).get("revenue"), 416161))
     if have("COST"):

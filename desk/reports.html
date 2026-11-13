@@ -334,7 +334,7 @@ article{min-width:0}
       if (!doc || doc.error) { $('view').innerHTML = '<div class="empty"><h2>That report is gone</h2><p>It may have been renamed or moved. Press ↻ to reload the list.</p></div>'; return; }
       var text = doc.text.replace(/^﻿?---\n[\s\S]*?\n---\n/, '');
       var body = document.createElement('div'); body.className = 'md';
-      body.innerHTML = marked.parse(text, { gfm: true, breaks: false });
+      window.safeMarkdown(body, text);   // Markdown to HTML, with anything that could run as script taken out
       var h1 = body.querySelector('h1'), title = h1 ? h1.textContent : (r ? r.title : path);
       body.querySelectorAll('table').forEach(function (t) { var w = document.createElement('div'); w.className = 'tw'; t.parentNode.insertBefore(w, t); w.appendChild(t); });
       var toc = [];

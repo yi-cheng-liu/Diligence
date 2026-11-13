@@ -183,7 +183,8 @@ FLOW_METRICS = {
     # Some companies (Alphabet, Microsoft, Tesla) put a line of their own on the cash flow statement and tag
     # only plain depreciation in the standard vocabulary, so that is the last resort: it leaves out the
     # amortization of intangibles, which is usually the smaller part.
-    "depreciation_amortization": ["DepreciationDepletionAndAmortization",
+    "depreciation_amortization": ["derived:DepreciationAndAmortization",   # see build_metrics
+                                  "DepreciationDepletionAndAmortization",
                                   "DepreciationAndAmortization",
                                   "DepreciationAmortizationAndAccretionNet",
                                   "DepreciationAmortizationAndOther",
@@ -407,6 +408,10 @@ _DEBT_LINE = re.compile(r"Debt|Borrowing|NotesPayable|CommercialPaper|LoansPayab
 _NOT_DEBT = re.compile(r"Interest|Accrued|Securities|Repurchase|Deposit|Trading|FairValue|Receivable|Investment|Unamortized|Discount|"
                        r"IssuanceCost|Guarantee|Derivative|Asset|Beneficial|Collateral|"
                        r"\b(interest|accrued|securities|repurchase|deposits?|trading|receivables?|investments?|guarantee|beneficial)\b", re.I)
+# lines that mention debt but are not debt: totals of the liabilities side and equity (NVIDIA: "Total liabilities,
+# convertible debt conversion obligation and shareholders' equity", and that obligation, which sits in temporary equity)
+_NOT_DEBT_CONCEPT = re.compile(r"^(Liabilities|LiabilitiesCurrent|LiabilitiesNoncurrent)$|Equity", re.I)
+_NOT_DEBT_LABEL = re.compile(r"^total liabilities\b|conversion obligation|\bequity\b", re.I)
 _LEASE_ONLY = re.compile(r"Lease|\bleases?\b", re.I)   # a lease line is left out unless it is debt and leases together
 _CURRENT_LINE = re.compile(r"Current|ShortTerm|CommercialPaper|\b(current|short-term|commercial paper|due within one year)\b", re.I)
 _STI_LINE = re.compile(r"ShortTermInvestments|MarketableSecuritiesCurrent|DebtSecurities\w*Current|AvailableForSale\w*Current|"
@@ -414,7 +419,8 @@ _STI_LINE = re.compile(r"ShortTermInvestments|MarketableSecuritiesCurrent|DebtSe
                        r"HeldToMaturitySecuritiesCurrent|TradingSecuritiesCurrent|EquitySecuritiesFvNiCurrent|TreasuryBills|"
                        r"\b(short-term investments?|marketable securities|treasury bills|time deposits)\b", re.I)
 _CAPEX_LINE = re.compile(r"PaymentsToAcquire(PropertyPlantAndEquipment|ProductiveAssets|OtherPropertyPlantAndEquipment|OilAndGasProperty)|"
-                         r"CapitalExpenditure|\b(capital expenditures?|additions to (property|plant|utility plant)|purchases? of (property|plant|premises)|"
+                         r"PurchasesOfPropertyAndEquipment|"   # NVIDIA's own tag: "Purchases related to property and equipment ..."
+                         r"CapitalExpenditure|\b(capital expenditures?|additions to (property|plant|utility plant)|purchases? (of|related to) (property|plant|premises)|"
                          r"independent power and other investments|nuclear fuel purchases|expenditures for equipment leased to others|"
                          r"cost of equipment on operating leases acquired)\b", re.I)
 _TOTAL_REVENUE = re.compile(r"^(Revenues|RevenuesNetOfInterestExpense|RegulatedAndUnregulatedOperatingRevenue|Revenue)$")
@@ -493,6 +499,7 @@ def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
                         cur_at.setdefault(x["block"], x["seq"])
                 text = lambda x: x["concept"] + " " + x["label"]
                 debts = [x for x in rs if after_assets(x) and _DEBT_LINE.search(text(x)) and not _NOT_DEBT.search(text(x))
+                         and not _NOT_DEBT_CONCEPT.search(x["concept"]) and not _NOT_DEBT_LABEL.search(x["label"])
                          and not (_LEASE_ONLY.search(text(x)) and not re.search(r"Debt|Borrowing|\bdebt\b|borrowings?", text(x), re.I))]
                 if rs:   # a balance sheet was read for this date: investments come from its lines only
                     add(instants, "rendered:BalanceSheet", key, 1, rs[0])
@@ -561,7 +568,9 @@ def rendered_inputs(db, cik, ticker, have_accessions, gaap="us"):
                 # no operating income line at all (Disney, Pfizer): a tagged "operating income" then comes from a note
                 # (Disney's is its segments' total, before corporate costs and amortization) and is not the company's
                 main_rows = sorted((x for x in rs if x["block"] == main), key=lambda x: x["seq"])
-                if ps is not None and not ops and not any(x["concept"] == "OperatingIncomeLoss" or re.match(
+                has_revenue = any(re.search(r"Revenue|Sales", x["concept"]) or re.search(r"\b(revenues?|sales)\b", x["label"], re.I)
+                                  for x in main_rows)   # not a comprehensive income page read in its place (Netflix's 2021 10-K)
+                if ps is not None and not ops and has_revenue and not any(x["concept"] == "OperatingIncomeLoss" or re.match(
                         r"(total )?(operating income|income from operations|operating profit|operating loss)", x["label"], re.I) for x in main_rows):
                     add(flows, "rendered:NoOperatingLine", key, 1, main_rows[0] if main_rows else rs[0], ps)
                     # the run of non-operating lines just above pretax income is everything between operating and pretax
@@ -736,20 +745,6 @@ CREATE TABLE IF NOT EXISTS segment_q_facts (
     metric TEXT, period_start TEXT, period_end TEXT, value REAL,
     PRIMARY KEY (cik, accession, axis, member, metric, period_start, period_end)
 );
--- What a company attached to its results announcements (8-K, item 2.02): press releases,
--- shareholder letters and slide decks, with the heading each one opens with.
-CREATE TABLE IF NOT EXISTS ir_exhibits (
-    cik INTEGER, accession TEXT, seq INTEGER, type TEXT, doc TEXT, size INTEGER, title TEXT, graphics INTEGER,
-    PRIMARY KEY (cik, accession, doc)
-);
--- Earnings call transcripts fetched for you (Alpha Vantage allows few requests a day, so each is kept).
-CREATE TABLE IF NOT EXISTS transcripts (
-    ticker TEXT, fiscal_year INTEGER, quarter INTEGER, source TEXT, fetched_at TEXT, body TEXT,
-    PRIMARY KEY (ticker, fiscal_year, quarter)
-);
-CREATE TABLE IF NOT EXISTS ir_read (
-    cik INTEGER, accession TEXT, PRIMARY KEY (cik, accession)
-);
 CREATE TABLE IF NOT EXISTS debt_split (      -- debt reported only per business line (Caterpillar, Deere)
     cik INTEGER, accession TEXT, filed TEXT, axis TEXT, member TEXT, concept TEXT, period_end TEXT, value REAL,
     PRIMARY KEY (cik, accession, axis, member, concept, period_end)
@@ -792,6 +787,10 @@ CREATE TABLE IF NOT EXISTS macro_cache (        -- the Macro page's data series 
 );
 """
 
+# Tables of features that were taken out (results-announcement exhibits, earnings call transcripts): dropped from
+# older copies of sec.db when it is opened.
+RETIRED_TABLES = ("ir_exhibits", "ir_read", "transcripts")
+
 SECTION_TITLES_10K = {
     "1": "Business", "1A": "Risk Factors", "1B": "Unresolved Staff Comments",
     "1C": "Cybersecurity", "2": "Properties", "3": "Legal Proceedings",
@@ -817,6 +816,8 @@ def connect():
         db.execute("DROP TABLE insider_trades")
         db.execute("DROP TABLE IF EXISTS insider_filings_read")
     db.executescript(SCHEMA)
+    for old in RETIRED_TABLES:
+        db.execute(f"DROP TABLE IF EXISTS {old}")
     try:
         db.execute("CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5("
                    "text, cik UNINDEXED, accession UNINDEXED, section UNINDEXED)")
@@ -1065,7 +1066,7 @@ def build_metrics(db, cik):
     ifrs = uses_ifrs(db, cik)
     gaap, taxonomy = ("ifrs", "ifrs-full") if ifrs else ("us", "us-gaap")
     flow_map, inst_map = (IFRS_FLOW, IFRS_INSTANT) if ifrs else (FLOW_METRICS, INSTANT_METRICS)
-    wanted = {c for names in list(flow_map.values()) + list(inst_map.values()) for c in names} | FAMILY_TAGS
+    wanted = {c for names in list(flow_map.values()) + list(inst_map.values()) for c in names} | FAMILY_TAGS | {"AmortizationOfIntangibleAssets"}
 
     # A company that changed its reporting currency (Yandex in roubles became Nebius in dollars) has both on file.
     # Only the currency it reports in now is used, so years in the old one are left out instead of being mixed in.
@@ -1102,6 +1103,26 @@ def build_metrics(db, cik):
             for k, r in periods.items():
                 if k not in mine:
                     mine[k] = r
+
+    # D&A as usually counted for EBITDA: depreciation and the amortization of intangible assets. The largest of the
+    # company's combined figures (Salesforce tags a narrower one too), or depreciation plus the amortization of
+    # intangibles when that is clearly larger (Broadcom and AMD report those apart; for NVIDIA the two differ by a
+    # rounding, and its combined figure is the one in its cash flow statement). Content amortization (Netflix) is never added:
+    # it is a cost of running the business.
+    if not ifrs:
+        da = {}
+        for c in ("DepreciationDepletionAndAmortization", "DepreciationAndAmortization",
+                  "DepreciationAmortizationAndAccretionNet", "DepreciationAmortizationAndOther"):
+            for k, r in flows.get(c, {}).items():
+                if da.get(k) is None or r["value"] > da[k]["value"]:
+                    da[k] = dict(r)
+        intangibles = flows.get("AmortizationOfIntangibleAssets", {})
+        for base in ("OtherDepreciationAndAmortization", "Depreciation"):
+            for k, r in flows.get(base, {}).items():
+                if k in intangibles and (da.get(k) is None or r["value"] + intangibles[k]["value"] > 1.05 * da[k]["value"]):
+                    da[k] = dict(r, value=r["value"] + intangibles[k]["value"])
+        if da:
+            flows["derived:DepreciationAndAmortization"] = {k: dict(r, concept="derived:DepreciationAndAmortization") for k, r in da.items()}
 
     # Fiscal years come from the 12-month periods reported in annual reports.
     fy_starts = {}
@@ -2819,6 +2840,13 @@ def _desk_periods(db, cik, ptype):
                  "convertFailed": currency != "USD" and not rates}
 
 
+def data_version(db, cik):
+    """A stamp that changes whenever a new report adds figures for the company: the page compares it with the
+    one it saved to know when to load the company again."""
+    r = db.execute("SELECT MAX(filed), MAX(period_end) FROM metrics WHERE cik=?", (cik,)).fetchone()
+    return f"{r[0]}/{r[1]}" if r and r[0] else None
+
+
 def desk_fundamentals(db, cik):
     c = db.execute("SELECT * FROM companies WHERE cik=?", (cik,)).fetchone()
     t = db.execute("SELECT title FROM tickers WHERE cik=? LIMIT 1", (cik,)).fetchone()
@@ -2848,7 +2876,7 @@ def desk_fundamentals(db, cik):
         "adsRatio": info["adsRatio"], "financial": info["financial"],
         "profile": {"desc": desc, "sector": c["industry"], "industry": c["industry"], "sic": c["sic"], "employees": None,
                     "country": country, "website": c["website"]},
-        "fetchedAt": c["fetched_at"],
+        "fetchedAt": c["fetched_at"], "version": data_version(db, cik),
     }
 
 
@@ -2880,6 +2908,86 @@ DETAIL_KEYS = {   # the page's name for each extra statement line -> metric
 }
 
 
+_ONE_OFF = re.compile(r"Restructuring|Impairment|WrittenOff|WriteDown|WriteOff|LossContingency|Litigation|Settlement|GainLoss|"
+                      r"Nonrecurring|Termination|SpecialCharge|InProcessResearch|AcquisitionRelatedCosts|"
+                      r"\b(restructur\w*|impairments?|write-?(downs?|offs?)|termination (costs?|fees?|charges?)|litigation|"
+                      r"legal (settlements?|charges?)|settlements?|fines?|special charges?|in-process research|"
+                      r"(gains?|loss(es)?) on (the )?(sale|disposal|disposition|divestiture)s?|dispositions?|divestitures?|"
+                      r"separation costs?|(merger|acquisition|transaction)[- ]related (costs?|charges?|expenses?))\b", re.I)
+_NOT_ONE_OFF = re.compile(r"Amortization|Depreciation|OtherComprehensive|IncomeTax|\b(amortization|depreciation|taxes)\b|^total\b", re.I)
+
+
+def one_off_items(db, cik):
+    """One-off items inside operating income, as the income statements show them: restructuring, impairments, fines,
+    deal-termination costs, gains and losses on selling assets or businesses. Operating income is kept as reported;
+    these say what is in it. {(start, end): [(label, effect)]}, effect being what the item added to operating income
+    (a charge is negative), from the newest filing that shows the period; an empty list for a period read with none."""
+    rows = db.execute("SELECT accession, filed, block, seq, prefix, concept, label, period_start, period_end, value "
+                      "FROM statement_lines WHERE cik=? AND kind='is' AND period_start IS NOT NULL ORDER BY filed, accession, seq",
+                      (cik,)).fetchall()
+    by = {}
+    for r in rows:
+        by.setdefault(r["accession"], []).append(r)
+
+    def effect(x):
+        if x["prefix"] == "us-gaap":   # the tag's own sign: a gain or income positive, a charge positive as a cost
+            f = db.execute("SELECT value FROM facts WHERE cik=? AND concept=? AND period_start=? AND period_end=? "
+                           "ORDER BY filed DESC LIMIT 1", (cik, x["concept"], x["period_start"], x["period_end"])).fetchone()
+            if f and f[0] is not None:
+                return f[0] / 1e6 if re.search(r"Gain|Income", x["concept"]) else -f[0] / 1e6
+        lbl = x["label"].lower()   # a company's own tag: from the statement, where a cost is shown positive
+        if "gain" in lbl and not re.search(r"\(gain|loss \(gain", lbl):
+            return abs(x["value"]) / 1e6
+        return -x["value"] / 1e6
+
+    out, newest = {}, {}
+    for accn, rs in by.items():
+        main = next((x["block"] for x in rs if x["concept"] in ("NetIncomeLoss", "ProfitLoss")), "")
+        ops = [x["seq"] for x in rs if x["block"] == main and (x["concept"] == "OperatingIncomeLoss" or re.match(
+            r"(total )?(operating income|income from operations|operating profit|operating loss|(loss|earnings|income) from operations)",
+            x["label"], re.I))]
+        if not ops:
+            continue   # no operating income line (Disney), or not an income statement at all
+        op = min(ops)
+        items = {}
+        for x in rs:
+            if x["block"] != main or x["seq"] >= op or not x["value"]:
+                continue
+            t = x["concept"] + " " + x["label"]
+            if _ONE_OFF.search(t) and not _NOT_ONE_OFF.search(t):
+                items.setdefault((x["period_start"], x["period_end"]), []).append((x["label"], round(effect(x), 3)))
+        for p in {(x["period_start"], x["period_end"]) for x in rs if x["block"] == main and x["seq"] == op}:
+            if p not in newest or rs[0]["filed"] >= newest[p]:
+                newest[p], out[p] = rs[0]["filed"], items.get(p, [])
+    return out
+
+
+def _one_offs_by_period(db, cik, annual_rows, quarter_rows):
+    """The one-off items lined up with the page's years and quarters: {end: (net, items)} for each, net in $ millions.
+    A fourth quarter, which has no statement of its own, is the year less its first three quarters."""
+    found = one_off_items(db, cik)
+    D = date.fromisoformat
+
+    def match(rows, lo, hi):
+        got = {}
+        for e, p in rows.items():
+            for (s, pe), items in found.items():
+                n = (D(pe) - D(s)).days
+                if lo <= n <= hi and abs((D(pe) - D(e)).days) <= 7:
+                    got[e] = (round(sum(v for _, v in items), 3), items)
+                    break
+        return got
+    a, q = match(annual_rows, 340, 390), match(quarter_rows, 80, 100)
+    for e, p in quarter_rows.items():
+        if p["q"] == 4 and e not in q:
+            yr = next((v for ea, v in a.items() if abs((D(ea) - D(e)).days) <= 7), None)
+            first = [q.get(e2) for e2, p2 in quarter_rows.items() if p2["y"] == p["y"] and p2["q"] in (1, 2, 3)]
+            if yr is not None and len(first) == 3 and all(first):
+                net = round(yr[0] - sum(f[0] for f in first), 3)
+                q[e] = (net, [("Fourth quarter: the year's one-off items less the first three quarters'", net)] if abs(net) >= 0.5 else [])
+    return a, q
+
+
 def desk_statements(db, cik):
     """The statement lines beyond the page's core fifteen, for every year and quarter (USD millions)."""
     def row(m):
@@ -2897,7 +3005,7 @@ def desk_statements(db, cik):
     currency = main_currency(db, cik) or "USD"
     rates = fx_to_usd(db, currency) if currency != "USD" else None
     ads = ads_ratio(db, cik) if currency != "USD" or uses_ifrs(db, cik) else 1
-    flows = {"rd", "sga", "pretax", "tax", "sbc", "dividends", "buybacks", "cfi", "cff", "acquisitions", "debtIssued", "debtRepaid"}
+    flows = {"rd", "sga", "pretax", "tax", "sbc", "dividends", "buybacks", "cfi", "cff", "acquisitions", "debtIssued", "debtRepaid", "oneOff"}
 
     def usd(end, p, out):
         """In US dollars, as the core figures are; per depositary share for an ADS."""
@@ -2911,9 +3019,21 @@ def desk_statements(db, cik):
         if ads != 1:
             out = {k: (round(v * ads, 4) if k.startswith("eps") else round(v / ads, 3) if k in ("sharesBasic", "sharesOut") else v) for k, v in out.items()}
         return out
-    annual = {str(p["y"]): usd(e, p, row(p["m"])) for e, p in _period_rows(db, cik, "annual").items()}
-    quarterly = [{"y": p["y"], "q": p["q"], "row": usd(e, p, row(p["m"]))}
-                 for e, p in _period_rows(db, cik, "quarterly").items() if p["q"]]
+    rows_a, rows_q = _period_rows(db, cik, "annual"), _period_rows(db, cik, "quarterly")
+    one_a, one_q = _one_offs_by_period(db, cik, rows_a, rows_q)
+
+    def with_one_offs(e, p, found):
+        out = row(p["m"])
+        net, items = found.get(e, (0, []))
+        if abs(net) >= 0.5:   # half a million dollars or more
+            out["oneOff"] = net
+        out = usd(e, p, out)
+        if "oneOff" in out:
+            k = out["oneOff"] / net
+            out["oneOffItems"] = [[label, round(v * k, 3)] for label, v in items]
+        return out
+    annual = {str(p["y"]): with_one_offs(e, p, one_a) for e, p in rows_a.items()}
+    quarterly = [{"y": p["y"], "q": p["q"], "row": with_one_offs(e, p, one_q)} for e, p in rows_q.items() if p["q"]]
     return {"annual": annual, "quarterly": quarterly, "currency": "USD" if rates or currency == "USD" else currency,
             "reportedIn": currency}
 
@@ -3991,6 +4111,12 @@ def moomoo_insight(symbol):
                 earnings["next"] = nxt
         if earnings:
             out["earnings"] = earnings
+    try:   # moomoo's P/E now and on the earnings analysts expect (forward)
+        v = moomoo_valuation(symbol, "pe")
+        if v.get("forward"):
+            out["pe"] = {"current": v.get("current"), "forward": v["forward"], "updated": v.get("updated")}
+    except OpenDError:
+        pass
     with _MOOMOO_LOCK:
         _MOOMOO_CACHE[key] = (now + 1800, out)
     return out
@@ -4144,6 +4270,58 @@ def _is_local(value, schemes=None):
         return False
 
 
+def _utc(text):
+    """A moment as the SEC or this program writes it ("2026-11-09T21:12:33.000Z", "2026-11-09T21:12:33+00:00",
+    "2026-11-09") as a UTC time, or None."""
+    m = re.match(r"(\d{4})-(\d\d)-(\d\d)(?:[T ](\d\d):(\d\d):(\d\d))?", text or "")
+    try:
+        return datetime(*(int(x or 0) for x in m.groups()), tzinfo=timezone.utc) if m else None
+    except ValueError:
+        return None
+
+
+def report_state(db, cik, recent, now=None):
+    """What the SEC's list of a company's filings (the "recent" block of its submissions) says about its newest
+    10-K or 10-Q (or the foreign forms), against what is saved here:
+
+    - "new": the company has not been downloaded since that report was filed. Download it now.
+    - "late": it has, but the SEC's figures (company facts) still lack the report. They usually follow a filing
+      within minutes, and for some companies never arrive: NextEra's and Constellation's 10-Qs are read from the
+      statements themselves. So a late one is looked for again an hour after the last download, for three days
+      after the filing, and then left alone. Without this limit such a company was downloaded again every 10 minutes.
+    - None: its figures are saved, or it has none to save."""
+    forms = {f for f in ANNUAL_FORMS + QUARTER_FORMS if not f.endswith("/A")}
+    kinds = recent.get("form") or []
+    col = lambda k, d: recent.get(k) or [d] * len(kinds)
+    for accn, form, xbrl, filed, accepted in zip(recent.get("accessionNumber") or [], kinds, col("isXBRL", 1),
+                                                 col("filingDate", ""), col("acceptanceDateTime", "")):
+        if form not in forms:
+            continue
+        if not xbrl or db.execute("SELECT 1 FROM facts WHERE cik=? AND accession=? LIMIT 1", (cik, accn)).fetchone():
+            return None
+        row = db.execute("SELECT fetched_at FROM companies WHERE cik=?", (cik,)).fetchone()
+        fetched, when = _utc(row["fetched_at"] if row else None), _utc(accepted) or _utc(filed)
+        if fetched is None or when is None or fetched <= when:
+            return "new"
+        now = now or datetime.now(timezone.utc)
+        return "late" if now - when < timedelta(days=3) and now - fetched > timedelta(hours=1) else None
+    return None
+
+
+def desk_lists():
+    """The stocks in the page's groups and the one open on it, from the page's copy in notes/desk.json:
+    (symbols, open symbol). None when there is no copy yet or no stock is in any group."""
+    try:
+        with open(NOTES_PATH, encoding="utf-8") as f:
+            store = json.load(f).get("store") or {}
+        syms = [x for g in store.get("groups") or [] for x in g.get("symbols") or []]
+    except (OSError, ValueError, AttributeError, TypeError):
+        return None
+    syms = list(dict.fromkeys(x.strip().upper() for x in syms if isinstance(x, str) and x.strip()))
+    current = store.get("current")
+    return (syms, current.strip().upper() if isinstance(current, str) and current.strip() else None) if syms else None
+
+
 def make_handler(client, max_age_hours=12):
     locks, locks_guard = {}, threading.Lock()
 
@@ -4159,8 +4337,8 @@ def make_handler(client, max_age_hours=12):
                 bdb = connect()
                 try:
                     work(bdb)
-                except Exception as e:    # a failed refresh leaves the saved copy in place
-                    sys.stderr.write(f"  background {key}: {e!r}\n")
+                except (Exception, SystemExit) as e:    # a failed refresh leaves the saved copy in place; the SEC
+                    sys.stderr.write(f"  background {key}: {e}\n")   # refusing a request (403) ends up here too
                 finally:
                     bdb.close()
             t = jobs[key] = threading.Thread(target=run, daemon=True)
@@ -4175,9 +4353,25 @@ def make_handler(client, max_age_hours=12):
             cik = fetch_company(bdb, client, key, docs=1, insiders=40, log=lambda *_: None)
             fetch_debt_split(bdb, client, cik)
 
+    checked = {}   # cik -> when the SEC was last asked about new reports
+
+    def new_report(db, cik):
+        """Whether the SEC lists a newer 10-K or 10-Q (or the foreign forms) than the figures saved here: "new",
+        "late" (see report_state) or None. Asks at most every 10 minutes per company, so a report shows up soon
+        after it is filed."""
+        if client is None or time.monotonic() - checked.get(cik, -1e9) < 10 * 60:
+            return None
+        checked[cik] = time.monotonic()
+        try:
+            recent = ((client.get(SUBMISSIONS_URL.format(cik=cik)) or {}).get("filings") or {}).get("recent") or {}
+        except Exception:
+            return None
+        return report_state(db, cik, recent)
+
     def ensure(db, ticker, force=False, segments=False, insiders=0):
-        """Return the CIK, fetching from the SEC if the company is missing. A saved company that is out of
-        date is answered from what is saved and downloaded again in the background."""
+        """Return the CIK, fetching from the SEC if the company is missing or has filed a new report since.
+        A saved company that is otherwise out of date is answered from what is saved and downloaded again
+        in the background."""
         key = ticker.strip().upper()
         quiet = lambda *_: None
         with locks_guard:
@@ -4189,9 +4383,14 @@ def make_handler(client, max_age_hours=12):
                 row = db.execute("SELECT fetched_at FROM companies WHERE cik=?", (cik,)).fetchone()
                 age = datetime.now(timezone.utc) - datetime.fromisoformat(row["fetched_at"])
                 fresh = client is None or age < timedelta(hours=max_age_hours)
-                if not fresh:
+                state = new_report(db, cik)
+                if state == "new":
+                    fresh = False   # download it now, so this answer already has the new quarter
+                elif not fresh:
                     background("refresh:" + key, lambda bdb: refresh(bdb, key))
                     return cik
+                elif state == "late":   # its figures may have reached the SEC's feed by now: look, without waiting
+                    background("refresh:" + key, lambda bdb: refresh(bdb, key))
             if not fresh:
                 if client is None:
                     raise SystemExit(f"{ticker} is not in the database.")
@@ -4208,6 +4407,36 @@ def make_handler(client, max_age_hours=12):
             if segments and client is not None:
                 fetch_segments(db, client, cik, log=quiet)  # only reads reports it hasn't seen
             return cik
+
+    def watched(db):
+        """The stocks in your lists on the page (from its copy in notes/desk.json), or else every saved company."""
+        lists = desk_lists()
+        syms = lists[0] if lists else [r[0] for r in db.execute("SELECT ticker FROM companies WHERE ticker IS NOT NULL")]
+        return [x for x in syms if x[0] != "^"]
+
+    def watch_reports():
+        """Every 15 minutes, check each stock in your lists for a new 10-Q or 10-K and download it, so the figures
+        are current whether or not the page is open. Companies not saved yet are left for the page to open."""
+        time.sleep(20)
+        while True:
+            wdb = connect()
+            try:
+                for sym in watched(wdb):
+                    try:
+                        cik = lookup_cik(wdb, sym)
+                        if cik is not None and new_report(wdb, cik):
+                            ensure(wdb, sym, force=True)
+                            print(f"  {sym}: downloaded a new report from the SEC", flush=True)
+                    except (Exception, SystemExit) as e:   # one company failing leaves the others watched
+                        sys.stderr.write(f"  watching {sym}: {e!r}\n")
+            except Exception as e:
+                sys.stderr.write(f"  watching reports: {e!r}\n")
+            finally:
+                wdb.close()
+            time.sleep(15 * 60)
+
+    if client is not None:
+        threading.Thread(target=watch_reports, daemon=True).start()
 
     class Handler(BaseHTTPRequestHandler):
         def handle(self):
@@ -4360,6 +4589,14 @@ def make_handler(client, max_age_hours=12):
                     rows = db.execute("SELECT cik, ticker, name, industry, fetched_at FROM companies "
                                       "ORDER BY ticker").fetchall()
                     return self._send(200, [dict(r) for r in rows])
+                if len(parts) == 3 and parts[:2] == ["api", "desk"] and parts[2] == "latest":
+                    # the page polls this to learn which companies have new figures, without loading them
+                    out = {}
+                    for sym in ((qs.get("s") or [""])[0]).split(",")[:300]:
+                        cik = lookup_cik(db, sym.strip().upper()) if sym.strip() else None
+                        if cik is not None:
+                            out[sym.strip()] = data_version(db, cik)
+                    return self._send(200, out)
                 if len(parts) == 3 and parts[:2] == ["api", "desk"] and parts[2] == "search":
                     if client is not None:
                         refresh_tickers(db, client)
@@ -4592,7 +4829,8 @@ def data_sources(client):
                     "companies": companies},
             "moomoo": mm, "fred": macro_status(),
             "reports": {"dir": d, "setting": settings.get("reports_dir") or "", "exists": os.path.isdir(d), "count": count},
-            "notes": {"path": NOTES_PATH, "saved_at": (notes_get() or {}).get("saved_at")}}
+            "notes": {"path": NOTES_PATH, "saved_at": (notes_get() or {}).get("saved_at"), "backups": notes_backups(),
+                      "backup_count": len([n for n in os.listdir(notes_backups()) if n.endswith(".json")]) if os.path.isdir(notes_backups()) else 0}}
 
 
 def set_sec_identity(client, name, email):
@@ -4615,18 +4853,55 @@ def set_reports_dir(path):
     return {"ok": True, "dir": reports_dir()}
 
 
+NOTES_DAYS = 30        # one backup a day is kept this many days
+NOTES_BEFORE = 20      # and this many copies set aside before a save that looked wrong
+_NOTES_LOCK = threading.Lock()
+
+
+def notes_backups():
+    return os.path.join(os.path.dirname(NOTES_PATH), "backups")
+
+
+def _copy_file(src, dst):
+    """Copy through a temporary file, so a half-written copy never stands in for a whole one."""
+    shutil.copyfile(src, dst + ".tmp")
+    os.replace(dst + ".tmp", dst)
+
+
 def notes_put(body):
     """Keep the page's notes on disk, so a cleared browser loses nothing. Written to a temporary file first, so a
-    half-written copy never replaces a good one."""
+    half-written copy never replaces a good one.
+
+    Older copies are kept in notes/backups, each a notes file that Import notes in Settings can load:
+    - desk-2026-11-13.json: the notes as last saved that day, for the last 30 days with a save.
+    - desk-2026-11-13-101502-before.json: the copy a save replaced when that save looked wrong: it came from a
+      page that had not seen the copy on disk (another tab or browser saved in between; "base" in the request is
+      the copy the page last saw), or it was much smaller than what was there. The newest 20 are kept."""
     store = body.get("store")
     if not isinstance(store, dict) or not isinstance(store.get("data"), dict):
         raise ValueError("not a Diligence notes file")
-    os.makedirs(os.path.dirname(NOTES_PATH), exist_ok=True)
-    tmp = NOTES_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"store": store, "saved_at": store.get("savedAt") or int(time.time() * 1000)}, f)
-    os.replace(tmp, NOTES_PATH)
+    with _NOTES_LOCK:
+        os.makedirs(notes_backups(), exist_ok=True)
+        tmp = NOTES_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"store": store, "saved_at": store.get("savedAt") or int(time.time() * 1000)}, f)
+        old = notes_get()
+        stamp = time.strftime("%Y-%m-%d-%H%M%S")
+        if old.get("store"):
+            unseen = body.get("base") is not None and old.get("saved_at") not in (body["base"], store.get("savedAt"))
+            shrunk = os.path.getsize(tmp) < 0.7 * os.path.getsize(NOTES_PATH)
+            if unseen or shrunk:
+                _copy_file(NOTES_PATH, os.path.join(notes_backups(), f"desk-{stamp}-before.json"))
+        os.replace(tmp, NOTES_PATH)
+        _copy_file(NOTES_PATH, os.path.join(notes_backups(), f"desk-{stamp[:10]}.json"))
+        names = sorted(os.listdir(notes_backups()))
+        daily = [n for n in names if re.fullmatch(r"desk-\d{4}-\d\d-\d\d\.json", n)]
+        before = [n for n in names if re.fullmatch(r"desk-[\d-]+-before\.json", n)]
+        for n in daily[:-NOTES_DAYS] + before[:-NOTES_BEFORE]:
+            os.remove(os.path.join(notes_backups(), n))
     return {"ok": True, "saved_at": store.get("savedAt")}
+
+
 REPORT_KINDS = [("《看懂", "Series"), ("bottleneck-map", "Bottleneck scan"), ("-how-it-works-", "How it works"),
                 ("-tech-stack-", "Tech stack"), ("-supply-chain-", "Supply chain"), ("-overview-", "Theme overview"), ("-industry-", "Industry"), ("-funnel-", "Funnel"),
                 ("-earnings-", "Earnings"), ("財報", "Earnings"), ("-checklist", "Checklist"), ("-management-", "Management"),
@@ -4770,7 +5045,7 @@ PER_COMPANY_TABLES = [t for t in (   # tables, not views (annual_financials is a
     "facts", "filings", "metrics", "statement_lines", "statement_pages",
     "statement_read", "segment_facts", "segment_q_facts", "segment_filings_read", "debt_split", "debt_split_read",
     "holders_13f", "holders_5pct", "holders_5pct_read", "insider_trades", "insider_filings_read", "documents",
-    "documents_fts", "ir_exhibits", "ir_read", "companies")]
+    "documents_fts", "companies")]
 
 
 def stock_footprint(db, tickers, keep=()):
@@ -4788,20 +5063,128 @@ def stock_footprint(db, tickers, keep=()):
     return out
 
 
+def _company_tables(db):
+    return [tb for tb in PER_COMPANY_TABLES if tb != "documents_fts" or has_fts(db)]
+
+
+def delete_company(db, cik):
+    """Delete everything sec.db keeps about one company. It is read from the SEC again if the stock comes back."""
+    with db:
+        for tb in _company_tables(db):
+            db.execute(f"DELETE FROM {tb} WHERE cik=?", (cik,))
+        db.execute("DELETE FROM meta WHERE key=?", (f"13f:{cik}",))
+
+
 def forget_stocks(db, tickers, keep=()):
     """Delete what sec.db keeps about these stocks. Reports are not touched. A filer shared with a ticker in `keep`
     keeps its rows."""
     feet = stock_footprint(db, tickers, keep)
     done = []
     for f in feet:
-        t = f["ticker"]
         if f["cik"] and not f["shared"]:
-            for tb in PER_COMPANY_TABLES:
-                db.execute(f"DELETE FROM {tb} WHERE cik=?", (f["cik"],))
-        db.execute("DELETE FROM transcripts WHERE upper(ticker)=?", (t,))
-        db.commit()
-        done.append({"ticker": t, "secRows": f["secRows"], "shared": f["shared"]})
+            delete_company(db, f["cik"])
+        done.append({"ticker": f["ticker"], "secRows": f["secRows"], "shared": f["shared"]})
     return {"done": done}
+
+
+# ---- Tidying: while the server runs, sec.db is kept to what the page's groups need. Every couple of minutes it
+# deletes the companies that are in no group any more (a stock taken out of a moomoo list, a group deleted, a company
+# only looked up once), then whatever else has no use: rows a deleted company left behind and Macro series kept past
+# their time. All of it is data the SEC or FRED hand out again. Notes and reports are never touched.
+TIDY_EVERY = 2 * 60        # seconds between looks
+TIDY_AFTER = 10 * 60       # a company goes once it has been in no group this long (moving a stock between groups is quicker)...
+TIDY_FRESH = 60 * 60       # ...and was not downloaded in the last hour (one just looked up, or fetched from the terminal)
+TIDY_SWEEP = 24 * 3600     # how often every table is read through for rows left behind
+MACRO_STALE = 2 * 86400    # a Macro series nobody has asked for in this long
+_TIDY = {"since": {}, "swept": 0}   # cik -> when it was first seen in no group; when the tables were last read through
+
+
+def _setting(key, default=None):
+    try:
+        with open(SETTINGS_PATH, encoding="utf-8") as f:
+            return json.load(f).get(key, default)
+    except (OSError, ValueError, AttributeError):
+        return default
+
+
+def unneeded_companies(db):
+    """The saved companies nothing on the page needs: in none of its groups, not the one open on it, and not listed
+    under "keep" in settings.json. [(cik, ticker, fetched_at)].
+
+    Empty when the page has not saved its groups yet (notes/desk.json), since then nothing is known to be unneeded:
+    a database only used from the terminal keeps everything. Empty too with "tidy": false in settings.json."""
+    lists = desk_lists()
+    if not lists or _setting("tidy", True) is False:
+        return []
+    keep = _setting("keep") or []
+    wanted = lists[0] + [lists[1] or ""] + [str(x).strip().upper() for x in (keep if isinstance(keep, list) else [])]
+    need = {lookup_cik(db, t) for t in wanted if t} - {None}
+    return [(r["cik"], r["ticker"], r["fetched_at"])
+            for r in db.execute("SELECT cik, ticker, fetched_at FROM companies ORDER BY ticker").fetchall() if r["cik"] not in need]
+
+
+def tidy(db, now=None):
+    """One look: delete what sec.db no longer needs. Returns the tickers of the companies deleted."""
+    now = time.time() if now is None else now
+    since, gone = _TIDY["since"], []
+    idle = unneeded_companies(db)
+    for cik in set(since) - {c for c, _, _ in idle}:
+        del since[cik]                 # back in a group
+    for cik, ticker, fetched in idle:
+        at = _utc(fetched)
+        if now - since.setdefault(cik, now) < TIDY_AFTER or (at and now - at.timestamp() < TIDY_FRESH):
+            continue
+        delete_company(db, cik)
+        del since[cik]
+        gone.append(ticker or str(cik))
+    with db:
+        db.execute("DELETE FROM macro_cache WHERE fetched_at < ?", (now - MACRO_STALE,))
+    if now - _TIDY["swept"] > TIDY_SWEEP:
+        _TIDY["swept"] = now
+        for tb in _company_tables(db):   # rows whose company is gone: a download that was still running when it was deleted
+            if tb != "companies":
+                with db:
+                    db.execute(f"DELETE FROM {tb} WHERE cik NOT IN (SELECT cik FROM companies)")
+        with db:
+            db.execute("DELETE FROM meta WHERE key LIKE '13f:%' AND CAST(substr(key, 5) AS INTEGER) NOT IN (SELECT cik FROM companies)")
+    return gone
+
+
+def reclaim_space(db, least=20e6):
+    """Hand back to the disk what deleted rows freed, once that is worth it (20 MB and a twentieth of the file).
+    Returns the bytes handed back. The first time, the file is rewritten (some seconds, and it needs that much free
+    disk again) into a layout where freed space can be given back from then on without rewriting it."""
+    free, pages, size = (db.execute(f"PRAGMA {k}").fetchone()[0] for k in ("freelist_count", "page_count", "page_size"))
+    if free * size < least or free * 20 < pages:
+        return 0
+    if db.execute("PRAGMA auto_vacuum").fetchone()[0] == 2:
+        db.execute("PRAGMA incremental_vacuum").fetchall()
+    elif shutil.disk_usage(os.path.dirname(os.path.abspath(DB_PATH))).free > 2 * pages * size:
+        db.execute("PRAGMA auto_vacuum=INCREMENTAL")
+        db.execute("VACUUM")
+    else:
+        return 0
+    db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+    return (pages - db.execute("PRAGMA page_count").fetchone()[0]) * size
+
+
+def tidy_forever():
+    time.sleep(45)
+    while True:
+        try:
+            db = connect()
+            try:
+                gone = tidy(db)
+                if gone:
+                    print(f"  tidied sec.db: deleted {', '.join(gone)} (in none of your groups)", flush=True)
+                freed = reclaim_space(db)
+                if freed:
+                    print(f"  tidied sec.db: gave {freed / 1e6:.0f} MB back to the disk", flush=True)
+            finally:
+                db.close()
+        except Exception as e:     # a busy database or a full disk: try again at the next look
+            sys.stderr.write(f"  tidying sec.db: {e!r}\n")
+        time.sleep(TIDY_EVERY)
 
 
 def reports_for(db, ticker):
@@ -5123,17 +5506,18 @@ def theme_change(where, name, p):
         for tid in (p.get("stop") or []) + (p.get("remove") or []):
             t = by.get(tid)
             if t and t.get("status") == "running":
-                stop.append((tid, t.get("pid")))
+                stop.append((tid, t.get("pid"), t.get("pid_started")))
                 t.update(status="stopped", activity=None)
             elif t and t.get("status") == "queued":
                 t["status"] = "new"
         gone = set(p.get("remove") or [])
         d["topics"] = [t for t in topics if t["id"] not in gone]   # a removed topic's report stays in the folder
     _theme_edit(folder, edit)
-    for tid, pid in stop:
+    for tid, pid, stamp in stop:
         job = _THEME_JOBS.get((folder, tid))
         try:
-            os.killpg(job.pid if job else pid, signal.SIGTERM)
+            if job or _alive(None, pid, stamp):   # with no handle on it, only when it is still that run
+                os.killpg(job.pid if job else pid, signal.SIGTERM)
         except (OSError, TypeError):
             pass
     _research_pump()
@@ -5215,25 +5599,40 @@ def _research_start(folder, tid):
         except OSError:
             pass
     threading.Thread(target=feed, daemon=True).start()
-    if not _topic_update(folder, tid, status="running", pid=proc.pid, started=time.time(), searches=0, pages=0,
-                         activity="Starting", error=None):
+    if not _topic_update(folder, tid, status="running", pid=proc.pid, pid_started=_proc_stamp(proc.pid), started=time.time(),
+                         searches=0, pages=0, activity="Starting", error=None):
         proc.kill()            # removed while the run was starting
         return
     _THEME_JOBS[(folder, tid)] = proc
     threading.Thread(target=_research_watch, args=(folder, tid, proc, proc.pid), daemon=True).start()
 
 
-def _alive(proc, pid):
+def _proc_stamp(pid, what="lstart="):
+    """When a process started, as `ps` prints it ("Fri Nov 13 00:10:57 2026"); "" when there is none with that
+    number, or no `ps` (Windows). Saved with a run's process number, because numbers are handed out again: after
+    the computer restarts, the number of a run that was going may belong to some other program."""
+    try:
+        r = subprocess.run(["ps", "-o", what, "-p", str(int(pid))], capture_output=True, text=True, timeout=5,
+                           env=dict(os.environ, LC_ALL="C"))
+        return " ".join(r.stdout.split())
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return ""
+
+
+def _alive(proc, pid, stamp=None):
+    """Whether a research run is still going. `proc` is its handle; a run started before this server restarted has
+    none, only the process number saved in the theme's file and when that process started."""
     if proc is not None:
         return proc.poll() is None
-    try:                               # started before this server restarted: still its child, but without a handle
+    if not pid:
+        return False
+    try:                               # still this server's child (it restarted itself): the number cannot be anyone else's
         return os.waitpid(pid, os.WNOHANG)[0] != pid
-    except ChildProcessError:
-        try:
-            os.kill(pid, 0)
-            return True
-        except OSError:
-            return False
+    except ChildProcessError:          # not a child: the server was started afresh, perhaps after the computer restarted
+        if stamp:
+            return _proc_stamp(pid) == stamp
+        return "stream-json" in _proc_stamp(pid, "command=")   # a run from before start times were saved: at least a
+                                                                # program started the way a run is (claude --output-format stream-json)
 
 
 def _research_watch(folder, tid, proc, pid):
@@ -5241,7 +5640,8 @@ def _research_watch(folder, tid, proc, pid):
     log = os.path.join(folder, ".jobs", tid + ".jsonl")
     dec, buf, pos = codecs.getincrementaldecoder("utf-8")("replace"), "", 0
     result, searches, pages, activity, saved, final = None, 0, 0, "Starting", (0, 0, ""), False
-    started = next((t.get("started") for t in (_theme_read(folder) or {}).get("topics") or [] if t["id"] == tid), None) or time.time()
+    topic = next((t for t in (_theme_read(folder) or {}).get("topics") or [] if t["id"] == tid), None) or {}
+    started, stamp = topic.get("started") or time.time(), topic.get("pid_started")
     while True:
         try:
             with open(log, "rb") as f:
@@ -5272,7 +5672,7 @@ def _research_watch(folder, tid, proc, pid):
                 result = ev
         if result or final:
             break
-        if not _alive(proc, pid):
+        if not _alive(proc, pid, stamp):
             final = True               # one more read for anything written just before it stopped
             continue
         if time.time() - started > RESEARCH_TIMEOUT:
@@ -5308,7 +5708,7 @@ def _research_watch(folder, tid, proc, pid):
         t = next((x for x in d.get("topics") or [] if x["id"] == tid), None)
         if t is None:
             return
-        t.update(searches=searches, pages=pages, activity=None, finished=time.time(), pid=None)
+        t.update(searches=searches, pages=pages, activity=None, finished=time.time(), pid=None, pid_started=None)
         if ok:
             m = re.search(r"(?m)^# ", text)
             body = text[m.start():] if m else "# " + t["title"] + "\n\n" + text
@@ -5430,16 +5830,8 @@ def macro_set_key(key):
     key = (key or "").strip().lower()
     if key and not re.fullmatch(r"[a-z0-9]{32}", key):
         raise ValueError("A FRED API key is 32 letters and digits.")
-    with _MACRO_LOCK:
-        try:
-            with open(SETTINGS_PATH, encoding="utf-8") as f:
-                settings = json.load(f)
-        except (OSError, ValueError):
-            settings = {}
-        settings["fred_api_key"] = key
-        with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2)
-        _FRED_STATUS["at"] = 0
+    _write_settings(fred_api_key=key)
+    _FRED_STATUS["at"] = 0
     return macro_status()
 
 
@@ -5742,6 +6134,7 @@ def cmd_serve(db, args):
         raise
     restart_when_changed()
     threading.Thread(target=research_resume, daemon=True).start()
+    threading.Thread(target=tidy_forever, daemon=True).start()
     print(f"Diligence desk: http://localhost:{args.port}/")
     print(f"JSON API example:    http://localhost:{args.port}/api/desk/fundamentals/MSFT")
     print("Leave this window open while you use the page. Ctrl+C stops it.")
