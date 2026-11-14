@@ -349,6 +349,45 @@
     });
   }
 
+  // ---- Reports are not trusted as HTML. Themes reports are written by Claude from pages it read on the web, and a page
+  // could plant HTML in one; run on this page, a script could read your notes, keys and holdings. So after a report's
+  // Markdown is turned into HTML only the tags and attributes a report needs are kept: scripts, frames, forms and
+  // styles go, with every event handler (onerror=...) and every link that is not http(s), mailto or a path.
+  const SAFE_TAGS = new Set(('a abbr b blockquote br caption code col colgroup dd del details div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 '
+    + 'hr i img input ins kbd li mark ol p pre q s samp small span strong sub summary sup table tbody td tfoot th thead tr u ul').split(' '));
+  const DROPPED_WHOLE = new Set(('script style iframe frame frameset object embed applet link meta base form button select textarea option '
+    + 'template noscript svg math audio video source track canvas title head').split(' '));   // these go with all they hold
+  const SAFE_ATTRS = new Set('href src alt title class align colspan rowspan start width height open lang dir type checked disabled'.split(' '));
+  const safeUrl = (value, image) => {
+    const u = String(value || '').replace(/[\u0000-\u0020\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/g, '');   // browsers skip these inside "java script:"
+    return /^(https?:|mailto:)/i.test(u) || /^[^:/?#]*([/?#]|$)/.test(u) || (!!image && /^data:image\/(png|jpe?g|gif|webp);/i.test(u));
+  };
+  function cleanTree(node) {
+    for (const el of Array.from(node.children)) {
+      const tag = el.localName;
+      if (el.namespaceURI !== 'http://www.w3.org/1999/xhtml' || DROPPED_WHOLE.has(tag)) { el.remove(); continue; }
+      cleanTree(el);
+      if (!SAFE_TAGS.has(tag)) { el.replaceWith(...el.childNodes); continue; }   // an unknown tag: its (cleaned) contents stay
+      for (const a of Array.from(el.attributes)) {
+        const n = a.name.toLowerCase();
+        const bad = !SAFE_ATTRS.has(n) || ((n === 'href' || n === 'src') && !safeUrl(a.value, tag === 'img'))
+          || (n === 'class' && !/^language-[\w-]+$/.test(a.value));          // the only class Markdown itself writes
+        if (bad) el.removeAttribute(a.name);
+      }
+      if (tag === 'input') { if (el.getAttribute('type') !== 'checkbox') { el.remove(); continue; } el.setAttribute('disabled', ''); }   // task lists
+      if (tag === 'a' && /^https?:/i.test(el.getAttribute('href') || '')) { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
+    }
+  }
+  // Put a report's Markdown into an element, cleaned. The HTML is read into a <template> first, where nothing runs or
+  // loads, and the cleaned nodes themselves are moved in, so what was checked is what is shown.
+  window.safeMarkdown = function (el, text) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = window.marked.parse(String(text == null ? '' : text), { gfm: true, breaks: false });
+    cleanTree(tpl.content);
+    el.replaceChildren(tpl.content);
+    return el;
+  };
+
   window.enhanceMarkdown = function (root, opts) {
     const pick = lang => [...root.querySelectorAll('pre > code.language-' + lang)].map(c => c.parentElement);
     const jobs = [], m = pick('mermaid'), c = pick('chart');

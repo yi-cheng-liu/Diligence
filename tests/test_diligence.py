@@ -8,13 +8,16 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sec_db as s  # noqa: E402
+import make_fixtures as fx  # noqa: E402
 
 
 class TempDB(unittest.TestCase):
@@ -88,6 +91,15 @@ class Search(TempDB):
 
 
 class Database(TempDB):
+    def test_retired_tables_are_dropped(self):
+        self.db.execute("CREATE TABLE transcripts (ticker TEXT)")
+        self.db.execute("CREATE TABLE ir_exhibits (cik INTEGER)")
+        self.db.commit()
+        s.connect().close()
+        names = {r[0] for r in self.db.execute("SELECT name FROM sqlite_master")}
+        self.assertFalse(names & set(s.RETIRED_TABLES))
+        self.assertIn("companies", names)
+
     def test_wal_and_country_column(self):
         self.assertEqual(self.db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
         self.assertIn("country", [r[1] for r in self.db.execute("PRAGMA table_info(companies)")])
@@ -225,14 +237,62 @@ class Files(unittest.TestCase):
             json.dump({"reports_dir": "~/somewhere-else"}, f)
         self.assertEqual(s.reports_dir(), os.path.realpath(os.path.expanduser("~/somewhere-else")))
 
-    def test_notes_keep_one_copy(self):
+    def backups(self, kind):
+        return sorted(n for n in os.listdir(s.notes_backups()) if n.endswith(kind))
+
+    def test_notes_are_backed_up(self):
         self.assertEqual(s.notes_get(), {"store": None})
-        s.notes_put({"store": {"data": {"A": {}}, "savedAt": 1}})
-        s.notes_put({"store": {"data": {"B": {}}, "savedAt": 2}})
-        self.assertEqual(list(s.notes_get()["store"]["data"]), ["B"])
-        self.assertEqual(os.listdir(os.path.dirname(s.NOTES_PATH)), ["desk.json"])   # no older copy beside it
+        s.notes_put({"store": {"data": {"A": {"thesis": "x" * 500}}, "savedAt": 1}})
+        s.notes_put({"store": {"data": {"A": {"thesis": "x" * 600}}, "savedAt": 2}, "base": 1})   # the page had seen copy 1
+        self.assertEqual(s.notes_get()["saved_at"], 2)
+        today = time.strftime("desk-%Y-%m-%d.json")
+        self.assertEqual(os.listdir(s.notes_backups()), [today])               # one copy a day, and nothing set aside
+        with open(os.path.join(s.notes_backups(), today)) as f:
+            self.assertEqual(json.load(f)["saved_at"], 2)                      # the day's copy is the last save
         with self.assertRaises(ValueError):
             s.notes_put({"store": "nonsense"})
+
+    def test_a_save_that_looks_wrong_sets_the_old_copy_aside(self):
+        s.notes_put({"store": {"data": {"A": {"thesis": "x" * 500}}, "savedAt": 5}})
+        # a tab that last saw copy 1 saves over copy 5, which another tab wrote in between
+        s.notes_put({"store": {"data": {"A": {"thesis": "x" * 510}}, "savedAt": 6}, "base": 1})
+        self.assertEqual(len(self.backups("-before.json")), 1)
+        with open(os.path.join(s.notes_backups(), self.backups("-before.json")[0])) as f:
+            self.assertEqual(json.load(f)["saved_at"], 5)                      # what the stale tab replaced
+        # the same save sent twice is not a conflict with itself
+        s.notes_put({"store": {"data": {"A": {"thesis": "x" * 510}}, "savedAt": 6}, "base": 1})
+        self.assertEqual(len(self.backups("-before.json")), 1)
+
+    def test_notes_that_shrink_a_lot_set_the_old_copy_aside(self):
+        s.notes_put({"store": {"data": {"A": {"thesis": "x" * 5000}}, "savedAt": 1}})
+        s.notes_put({"store": {"data": {"A": {"thesis": ""}}, "savedAt": 2}, "base": 1})
+        self.assertEqual(len(self.backups("-before.json")), 1)
+
+    def test_old_backups_are_cleared_out(self):
+        os.makedirs(s.notes_backups())
+        for i in range(40):
+            day = (datetime(2026, 1, 1) + timedelta(days=i)).strftime("%Y-%m-%d")
+            for name in (f"desk-{day}.json", f"desk-{day}-000000-before.json"):
+                with open(os.path.join(s.notes_backups(), name), "w") as f:
+                    f.write("{}")
+        s.notes_put({"store": {"data": {}, "savedAt": 1}})
+        self.assertEqual(len(self.backups("-before.json")), s.NOTES_BEFORE)
+        daily = [n for n in self.backups(".json") if not n.endswith("-before.json")]
+        self.assertEqual(len(daily), s.NOTES_DAYS)
+        self.assertEqual(daily[-1], time.strftime("desk-%Y-%m-%d.json"))       # today's is the newest kept
+        self.assertNotIn("desk-2026-01-01.json", daily)
+
+    def test_fred_key_is_saved_with_the_other_settings(self):
+        with open(s.SETTINGS_PATH, "w") as f:
+            json.dump({"name": "A", "email": "a@b.co"}, f)
+        saved, s.macro_status = s.macro_status, lambda: {}                     # no call to FRED
+        try:
+            s.macro_set_key("0123456789abcdef0123456789abcdef")
+        finally:
+            s.macro_status = saved
+        with open(s.SETTINGS_PATH) as f:
+            self.assertEqual(json.load(f), {"name": "A", "email": "a@b.co", "fred_api_key": "0123456789abcdef0123456789abcdef"})
+        self.assertEqual(os.listdir(self.dir.name), ["settings.json"])         # written through a temporary file, none left
 
     def test_research_instructions_build(self):
         text = s.RESEARCH_HOW.format(today="2026-01-01", language="English")
@@ -253,6 +313,16 @@ class Figures(unittest.TestCase):
                "LongTermDebtAndCapitalLeaseObligationsCurrent": 6234, "LongTermDebtCurrent": 6200, "ShortTermBankLoansAndNotesPayable": 3}
         self.assertEqual(s.debt_from_tags(xom)[2], 9296 + 34241)
         self.assertIsNone(s.debt_from_tags({"Assets": 1}))
+
+    def test_redeemable_interests(self):
+        # Lunar: its own redeemable preferred stock and its minority holders' redeemable units, added
+        self.assertAlmostEqual(s.redeemable_from_tags({"TemporaryEquityCarryingAmountAttributableToParent": 6.6,
+                                                       "RedeemableNoncontrollingInterestEquityCarryingAmount": 951.5}), 958.1)
+        # a total given by the company is taken as it is, not added to its parts
+        self.assertEqual(s.redeemable_from_tags({s.REDEEMABLE_TOTAL: 58, "RedeemableNoncontrollingInterestEquityCarryingAmount": 58}), 58)
+        self.assertEqual(s.redeemable_from_tags({"RedeemableNoncontrollingInterestEquityCommonCarryingAmount": 3,
+                                                 "RedeemableNoncontrollingInterestEquityPreferredCarryingAmount": 4}), 7)
+        self.assertIsNone(s.redeemable_from_tags({"Liabilities": 1}))
 
     def test_short_term_investments(self):
         self.assertEqual(s.sti_from_tags({"DebtSecuritiesCurrent": 39065}), 39065)
@@ -300,6 +370,232 @@ class Figures(unittest.TestCase):
         self.assertIsNone(s.ticker_class("GOOGL"))
         self.assertTrue(s.is_financial("6021") and s.is_financial(6331))
         self.assertFalse(s.is_financial("2834") or s.is_financial("6798") or s.is_financial(None))
+
+
+class NewReports(TempDB):
+    """Whether a company should be downloaded again, from the SEC's list of its filings."""
+
+    def setUp(self):
+        super().setUp()
+        self.now = datetime(2026, 11, 13, 12, 0, tzinfo=timezone.utc)
+        self.recent = {"accessionNumber": ["8k", "q3", "q2"], "form": ["8-K", "10-Q", "10-Q"], "isXBRL": [1, 1, 1],
+                       "filingDate": ["2026-11-10", "2026-11-09", "2026-08-06"],
+                       "acceptanceDateTime": ["2026-11-10T13:00:00.000Z", "2026-11-09T21:12:33.000Z", "2026-08-06T20:30:00.000Z"]}
+        self.db.execute("INSERT INTO facts (cik, concept, period_end, value, accession) VALUES (1, 'Revenues', '2026-06-30', 1, 'q2')")
+
+    def state(self, fetched_at, now=None):
+        self.db.execute("DELETE FROM companies")
+        self.db.execute("INSERT INTO companies (cik, ticker, fetched_at) VALUES (1, 'CEG', ?)", (fetched_at,))
+        return s.report_state(self.db, 1, self.recent, now or self.now)
+
+    def test_a_report_filed_since_the_last_download_is_new(self):
+        self.assertEqual(self.state("2026-11-09T20:00:00+00:00"), "new")
+
+    def test_a_report_the_sec_never_adds_to_its_figures_is_left_alone(self):
+        # downloaded since the 10-Q was filed, and company facts still lack it four days on (Constellation, NextEra)
+        self.assertIsNone(self.state("2026-11-13T10:00:00+00:00"))
+        self.assertIsNone(self.state("2026-11-10T10:00:00+00:00"))
+
+    def test_late_figures_are_looked_for_hourly_for_three_days(self):
+        day_after = datetime(2026, 11, 10, 12, 0, tzinfo=timezone.utc)
+        self.assertEqual(self.state("2026-11-09T22:00:00+00:00", day_after), "late")
+        self.assertIsNone(self.state("2026-11-10T11:30:00+00:00", day_after))       # looked half an hour ago
+
+    def test_saved_figures_need_nothing(self):
+        self.db.execute("INSERT INTO facts (cik, concept, period_end, value, accession) VALUES (1, 'Revenues', '2026-09-30', 1, 'q3')")
+        self.assertIsNone(self.state("2026-11-01T00:00:00+00:00"))
+
+    def test_times_as_the_sec_writes_them(self):
+        self.assertEqual(s._utc("2026-11-09T21:12:33.000Z"), datetime(2026, 11, 9, 21, 12, 33, tzinfo=timezone.utc))
+        self.assertEqual(s._utc("2026-11-09"), datetime(2026, 11, 9, tzinfo=timezone.utc))
+        self.assertIsNone(s._utc("") or s._utc(None) or s._utc("2026-13-45"))
+
+
+class Tidy(TempDB):
+    """sec.db is kept to the stocks in the page's groups: the rest is deleted, with time to change your mind."""
+
+    def setUp(self):
+        super().setUp()
+        self.saved = (s.SETTINGS_PATH, s.NOTES_PATH, dict(s._TIDY))
+        s.SETTINGS_PATH = os.path.join(self.dir.name, "settings.json")
+        s.NOTES_PATH = os.path.join(self.dir.name, "notes", "desk.json")
+        s._TIDY.update(since={}, swept=0)
+        self.now = time.time()
+        stamp = lambda ago: (datetime.now(timezone.utc) - timedelta(seconds=ago)).isoformat(timespec="seconds")
+        for cik, t, ago in ((1, "LISTED", 2 * 86400), (2, "OPEN", 2 * 86400), (3, "KEPT", 2 * 86400), (4, "GONE", 2 * 86400), (5, "LOOKEDUP", 60)):
+            self.db.execute("INSERT INTO companies (cik, ticker, tickers, name, fetched_at) VALUES (?,?,?,?,?)", (cik, t, t, t, stamp(ago)))
+            self.db.execute("INSERT INTO facts (cik, concept, period_end, value) VALUES (?, 'Revenues', '2025-12-31', 1)", (cik,))
+        self.db.execute("INSERT INTO facts (cik, concept, period_end, value) VALUES (99, 'Revenues', '2025-12-31', 1)")   # its company is long gone
+        self.db.execute("INSERT INTO meta VALUES ('13f:4', 'x')")
+        self.db.execute("INSERT INTO macro_cache VALUES ('series:OLD', ?, '{}')", (self.now - 3 * 86400,))
+        self.db.execute("INSERT INTO macro_cache VALUES ('series:NEW', ?, '{}')", (self.now,))
+        self.db.commit()
+
+    def tearDown(self):
+        s.SETTINGS_PATH, s.NOTES_PATH = self.saved[:2]
+        s._TIDY.clear()
+        s._TIDY.update(self.saved[2])
+        super().tearDown()
+
+    def page(self, symbols, current="OPEN", **settings):
+        s.notes_put({"store": {"data": {}, "groups": [{"id": "g", "symbols": symbols}], "current": current, "savedAt": 1}})
+        with open(s.SETTINGS_PATH, "w") as f:
+            json.dump(settings, f)
+
+    def left(self):
+        return [r[0] for r in self.db.execute("SELECT ticker FROM companies ORDER BY cik")]
+
+    def test_nothing_goes_until_the_page_has_saved_its_groups(self):
+        self.assertEqual(s.tidy(self.db, self.now) + s.tidy(self.db, self.now + 86400), [])
+        self.assertEqual(len(self.left()), 5)
+        self.page([], current="OPEN")                      # a copy with no stock in any group says nothing either
+        self.assertEqual(s.tidy(self.db, self.now + 2 * 86400) + s.tidy(self.db, self.now + 3 * 86400), [])
+        self.assertEqual(len(self.left()), 5)
+
+    def test_a_company_in_no_group_goes_after_a_while(self):
+        self.page(["LISTED"], keep=["KEPT"])
+        self.assertEqual(s.tidy(self.db, self.now), [])                          # first seen in no group: not yet
+        self.assertEqual(s.tidy(self.db, self.now + 60), [])
+        self.assertEqual(s.tidy(self.db, self.now + s.TIDY_AFTER + 1), ["GONE"])
+        self.assertEqual(self.left(), ["LISTED", "OPEN", "KEPT", "LOOKEDUP"])     # in a group, open, kept, just looked up
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM facts WHERE cik=4").fetchone()[0], 0)
+        self.assertIsNone(self.db.execute("SELECT 1 FROM meta WHERE key='13f:4'").fetchone())
+        self.assertEqual(s.tidy(self.db, self.now + s.TIDY_FRESH + 1), ["LOOKEDUP"])   # an hour after it was downloaded
+
+    def test_a_stock_put_back_in_a_group_starts_over(self):
+        self.page(["LISTED"])
+        s.tidy(self.db, self.now)
+        self.page(["LISTED", "GONE", "KEPT"])                                    # moved to another group meanwhile
+        self.assertEqual(s.tidy(self.db, self.now + s.TIDY_AFTER + 1), [])
+        self.page(["LISTED"])
+        self.assertEqual(s.tidy(self.db, self.now + s.TIDY_AFTER + 2), [])        # the wait starts again
+        self.assertEqual(s.tidy(self.db, self.now + 2 * s.TIDY_AFTER + 3), ["GONE", "KEPT"])
+
+    def test_it_can_be_switched_off(self):
+        self.page(["LISTED"], tidy=False)
+        s.tidy(self.db, self.now)
+        self.assertEqual(s.tidy(self.db, self.now + 86400), [])
+        self.assertEqual(len(self.left()), 5)
+
+    def test_leftovers_go_too(self):
+        s.tidy(self.db, self.now)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM facts WHERE cik=99").fetchone()[0], 0)
+        self.assertEqual([r[0] for r in self.db.execute("SELECT key FROM macro_cache")], ["series:NEW"])
+        self.assertEqual(len(self.left()), 5)                                    # and no company with them
+
+    def test_freed_space_goes_back_to_the_disk(self):
+        self.db.execute("CREATE TABLE filler (cik INTEGER, body TEXT)")
+        self.db.executemany("INSERT INTO filler VALUES (?, ?)", [(i % 2, "x" * 900) for i in range(3000)])
+        self.db.commit()
+        self.assertEqual(s.reclaim_space(self.db, least=100_000), 0)             # nothing freed yet
+        self.db.execute("DELETE FROM filler")
+        self.db.commit()
+        self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()            # into the file itself, to measure it
+        before = os.path.getsize(s.DB_PATH)
+        self.assertGreater(s.reclaim_space(self.db, least=100_000), 2_000_000)
+        self.assertLess(os.path.getsize(s.DB_PATH), before - 2_000_000)
+        self.db.executemany("INSERT INTO filler VALUES (?, ?)", [(0, "x" * 900) for i in range(3000)])
+        self.db.commit()
+        self.db.execute("DELETE FROM filler")
+        self.db.commit()
+        self.assertGreater(s.reclaim_space(self.db, least=100_000), 2_000_000)   # the second time without rewriting the file
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM companies").fetchone()[0], 5)
+
+
+@unittest.skipIf(os.name == "nt", "research runs are followed by process number only on macOS and Linux")
+class ResearchRuns(unittest.TestCase):
+    """A run found in a theme's file after a restart is only this run if its process started when the run did."""
+
+    def test_a_number_now_used_by_another_program_is_not_the_run(self):
+        me = os.getpid()                                   # a live process that is no child of this one
+        started = s._proc_stamp(me)
+        self.assertTrue(started)
+        self.assertTrue(s._alive(None, me, started))
+        self.assertFalse(s._alive(None, me, "Thu Jan  1 00:00:00 1970"))
+        self.assertFalse(s._alive(None, 0, started))       # no number saved at all
+        self.assertFalse(s._alive(None, me, None))         # a run from before start times were saved must look like a run
+
+
+class Companies(unittest.TestCase):
+    """Whole companies, built from what they filed (tests/fixtures; see tests/make_fixtures.py). These are the ones
+    whose figures took special handling, so a change that moves any of their figures fails here."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.TemporaryDirectory()
+        cls.saved = (s.DB_PATH, s.SETTINGS_PATH)
+        s.DB_PATH, s.SETTINGS_PATH = os.path.join(cls.dir.name, "sec.db"), os.path.join(cls.dir.name, "settings.json")
+        cls.db = s.connect()
+        cls.fixtures = {}
+        for path in fx.paths():
+            data = fx.read(path)
+            cls.fixtures[data["company"]["ticker"]] = (fx.load(cls.db, data), data)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.db.close()
+        s.DB_PATH, s.SETTINGS_PATH = cls.saved
+        cls.dir.cleanup()
+
+    def year(self, t, y):
+        return s.desk_fundamentals(self.db, self.fixtures[t][0])["byYear"].get(str(y), {})
+
+    def metric(self, t, y, m):
+        row = self.db.execute("SELECT value FROM metrics WHERE cik=? AND period_type='annual' AND fiscal_year=? AND metric=?",
+                              (self.fixtures[t][0], y, m)).fetchone()
+        return row[0] if row else None
+
+    def test_every_figure_is_what_it_was(self):
+        self.assertGreaterEqual(len(self.fixtures), 5)
+        for t, (cik, data) in self.fixtures.items():
+            got, want = fx.figures(self.db, cik), data["expected"]
+            hint = f"{t}: if this change is meant, run `python3 tests/make_fixtures.py --expected`"
+            self.assertEqual([r[:5] for r in got], [r[:5] for r in want], hint)
+            for a, b in zip(got, want):
+                if a[5] != b[5]:
+                    self.assertAlmostEqual(a[5], b[5], delta=abs(b[5]) * 1e-9, msg=f"{a[:5]} {hint}")
+
+    def test_caterpillar_debt_is_added_up_from_its_business_lines(self):
+        self.assertAlmostEqual(self.year("CAT", 2025)["debt"], 43330, delta=43330 * 0.05)
+        quarters = s.desk_quarters(self.db, self.fixtures["CAT"][0])
+        self.assertGreater(quarters[-1]["row"].get("debt") or 0, 30000)
+
+    def test_nike_operating_income_is_worked_out(self):
+        self.assertAlmostEqual(self.year("NKE", 2025)["ebit"], 3676, delta=3676 * 0.05)
+
+    def test_mcdonalds_share_count_filed_in_millions(self):
+        self.assertTrue(650e6 < self.metric("MCD", 2023, "shares_diluted") < 800e6)
+
+    def test_nextera_quarters_come_from_the_statements(self):
+        cik, data = self.fixtures["NEE"]
+        last = s.desk_quarters(self.db, cik)[-1]
+        self.assertTrue((last["y"], last["q"]) >= (2026, 3))                     # the SEC's company facts stop two 10-Qs earlier
+        self.assertGreater(self.metric("NEE", 2025, "capex"), 10000e6)
+        # and that missing 10-Q does not make the company look out of date for ever
+        reports = sorted((f for f in data["filings"] if f[2] in ("10-K", "10-Q")), key=lambda f: f[3], reverse=True)
+        recent = {"accessionNumber": [f[1] for f in reports], "form": [f[2] for f in reports], "isXBRL": [f[9] for f in reports],
+                  "filingDate": [f[3] for f in reports]}
+        self.assertIsNone(self.db.execute("SELECT 1 FROM facts WHERE cik=? AND accession=?", (cik, reports[0][1])).fetchone())
+        filed = datetime.fromisoformat(reports[0][3]).replace(tzinfo=timezone.utc)
+        self.db.execute("UPDATE companies SET fetched_at=? WHERE cik=?", ((filed + timedelta(days=5)).isoformat(), cik))
+        self.assertIsNone(s.report_state(self.db, cik, recent, filed + timedelta(days=6)))
+
+    def test_balance_sheets_add_up_with_redeemable_interests(self):
+        # NextEra and Nebius report redeemable minority interests between liabilities and equity in some years
+        for t in ("NEE", "NBIS"):
+            cik = self.fixtures[t][0]
+            # the years with the line, where the company also gives total liabilities (not every year's filing does)
+            years = [(y, x, self.year(t, y)) for y, x in s.desk_statements(self.db, cik)["annual"].items()
+                     if x.get("redeemable") and x.get("liabTotal") is not None]
+            years = [(y, x, v) for y, x, v in years if v.get("equity") is not None and v.get("assets")]
+            self.assertTrue(years, t)
+            for y, x, v in years:
+                told = v["equity"] + x["liabTotal"] + x["redeemable"] + (x.get("minority") or 0)
+                self.assertAlmostEqual(told, v["assets"], delta=abs(v["assets"]) * 0.005, msg=f"{t} {y}")
+
+    def test_nebius_is_read_in_dollars(self):
+        self.assertEqual(s.desk_statements(self.db, self.fixtures["NBIS"][0]).get("currency"), "USD")
+        self.assertLess(self.year("NBIS", 2021).get("revenue") or 0, 20000)       # not its rouble years
 
 
 class Server(unittest.TestCase):

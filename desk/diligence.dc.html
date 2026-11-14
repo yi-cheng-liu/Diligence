@@ -222,10 +222,10 @@
               </div>
               <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px">
                 <sc-for list="{{ tiles }}" as="k" hint-placeholder-count="8">
-                  <div style="display:grid;gap:4px;padding:14px 16px;border-radius:var(--radius-md);background:var(--color-surface)">
+                  <div title="{{ k.tip }}" style="display:grid;gap:4px;align-content:start;padding:14px 16px;border-radius:var(--radius-md);background:var(--color-surface)">
                     <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500)">{{ k.label }}</span>
                     <span style="font-size:24px;font-weight:500;letter-spacing:-0.02em">{{ k.value }}</span>
-                    <span style="font-size:12px;color:var(--color-neutral-400)">{{ k.sub }}</span>
+                    <sc-if value="{{ k.sub }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:var(--color-neutral-400)">{{ k.sub }}</span></sc-if>
                   </div>
                 </sc-for>
               </div>
@@ -286,6 +286,132 @@
                 </div>
               </div>
             </div>
+          </sc-if>
+
+          <sc-if value="{{ is.minervini }}" hint-placeholder-val="{{ false }}">
+
+            <section id="sub-verdict" style="display:grid;gap:14px;padding-top:12px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <h4 style="margin:0;font-size:18px">Verdict</h4>
+                <sc-if value="{{ spHas }}" hint-placeholder-val="{{ true }}"><span class="{{ spVerdictClass }}" style="padding:3px 12px;font-size:12.5px">{{ spVerdict }}</span></sc-if>
+              </div>
+              <p style="margin:0;font-size:13px;color:var(--color-neutral-400)">Mark Minervini's SEPA method from <em>Trade Like a Stock Market Wizard</em>: buy a leading stock with strong, accelerating earnings, in a Stage 2 uptrend, as it breaks out of a tight base on heavy volume, with a stop set before buying. Prices from moomoo, figures from the SEC filings.</p>
+              <sc-if value="{{ spStatus }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px;color:var(--color-neutral-300)">{{ spStatus }}</p></sc-if>
+              <sc-if value="{{ spHas }}" hint-placeholder-val="{{ true }}">
+                <p style="margin:0;font-size:14px;color:var(--color-text)">{{ spVerdictText }}</p>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+                  <sc-for list="{{ spCards }}" as="k" hint-placeholder-count="3">
+                    <div style="display:grid;gap:6px;align-content:start;padding:14px 16px;border-radius:var(--radius-md);background:var(--color-surface)">
+                      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500)">{{ k.title }}</span><span class="{{ k.tagClass }}" style="margin-left:auto;padding:1px 8px;font-size:11px">{{ k.tagText }}</span></div>
+                      <span style="font-size:13px;color:var(--color-neutral-300)">{{ k.line }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+                  <sc-for list="{{ spKeys }}" as="k" hint-placeholder-count="5">
+                    <div title="{{ k.tip }}" style="display:grid;gap:4px;align-content:start;padding:14px 16px;border-radius:var(--radius-md);background:var(--color-surface)">
+                      <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500)">{{ k.label }}</span>
+                      <span style="font-size:22px;font-weight:500;letter-spacing:-0.02em">{{ k.value }}</span>
+                      <sc-if value="{{ k.sub }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:var(--color-neutral-400)">{{ k.sub }}</span></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <div><button class="btn btn-ghost" onClick="{{ spOpenChart }}" style="font-size:12.5px;padding-left:0"><i class="ph ph-chart-line"></i>See the base on the chart, with the 50, 150 and 200-day averages</button></div>
+              </sc-if>
+            </section>
+
+            <section id="sub-stock" style="display:grid;gap:14px;padding-top:36px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h4 style="margin:0;font-size:18px">The right stock</h4></div>
+              <p style="margin:0;font-size:13px;color:var(--color-neutral-400)">A leader: in a Stage 2 uptrend, stronger than the market, with earnings and sales growing fast and getting faster. Hover a rule for more.</p>
+              <sc-if value="{{ spHas }}" hint-placeholder-val="{{ true }}">
+                <div style="display:grid;gap:4px;padding:14px 16px;border-radius:var(--radius-md);background:var(--color-surface)">
+                  <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500)">Price cycle</span>
+                  <span style="font-size:16px;font-weight:600">{{ spStageLabel }}</span>
+                  <span style="font-size:13px;color:var(--color-neutral-300)">{{ spStageText }}</span>
+                </div>
+                <h5 style="margin:6px 0 0;font-size:14px">Trend</h5>
+                <div style="display:grid">
+                  <sc-for list="{{ spTrendRows }}" as="x" hint-placeholder-count="9">
+                    <div title="{{ x.tip }}" style="display:grid;grid-template-columns:72px minmax(160px,1fr) minmax(200px,1.4fr);gap:14px;align-items:center;padding:10px 0;background:linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px">
+                      <span class="{{ x.tagClass }}" style="justify-content:center">{{ x.tagText }}</span>
+                      <span style="font-size:13.5px;font-weight:500">{{ x.label }}</span>
+                      <span style="font-size:12.5px;color:var(--color-neutral-300)">{{ x.detail }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <h5 style="margin:6px 0 0;font-size:14px">Earnings</h5>
+                <div style="display:grid">
+                  <sc-for list="{{ spFundRows }}" as="x" hint-placeholder-count="7">
+                    <div title="{{ x.tip }}" style="display:grid;grid-template-columns:72px minmax(160px,1fr) minmax(200px,1.4fr);gap:14px;align-items:center;padding:10px 0;background:linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px">
+                      <span class="{{ x.tagClass }}" style="justify-content:center">{{ x.tagText }}</span>
+                      <span style="font-size:13.5px;font-weight:500">{{ x.label }}</span>
+                      <span style="font-size:12.5px;color:var(--color-neutral-300)">{{ x.detail }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ spHasQ }}" hint-placeholder-val="{{ true }}">
+                  <div style="overflow-x:auto">
+                    <div style="display:grid;grid-template-columns:{{ spQCols }};min-width:560px">
+                      <sc-for list="{{ spQHead }}" as="h" hint-placeholder-count="7"><span style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-neutral-500);text-align:{{ h.align }};padding:6px 8px">{{ h.label }}</span></sc-for>
+                      <sc-for list="{{ spQCells }}" as="c" hint-placeholder-count="28"><span style="font-size:13px;text-align:{{ c.align }};padding:6px 8px;color:{{ c.color }};font-weight:{{ c.weight }};background:linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 24px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 24px), transparent) no-repeat bottom / 100% 1px">{{ c.v }}</span></sc-for>
+                    </div>
+                  </div>
+                  <span style="font-size:12px;color:var(--color-neutral-500)">Growth is against the same quarter a year earlier. Operating margin is operating income over revenue. From {{ spQSrc }}.</span>
+                </sc-if>
+              </sc-if>
+            </section>
+
+            <section id="sub-timing" style="display:grid;gap:14px;padding-top:36px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h4 style="margin:0;font-size:18px">The right time</h4></div>
+              <p style="margin:0;font-size:13px;color:var(--color-neutral-400)">A rising market, and a base that tightens: each pullback shallower than the last while trading dries up. The buy point (pivot) is the top of the last, tightest pullback; the buy is the day the price clears it on heavy volume.</p>
+              <sc-if value="{{ spHas }}" hint-placeholder-val="{{ true }}">
+                <sc-if value="{{ spHasContr }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:stretch">
+                    <sc-for list="{{ spContr }}" as="k" hint-placeholder-count="3">
+                      <div title="{{ k.tip }}" style="display:grid;gap:2px;padding:8px 12px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid {{ k.border }}">
+                        <span style="font-size:16px;font-weight:600;color:{{ k.color }}">{{ k.depth }}</span>
+                        <span style="font-size:11.5px;color:var(--color-neutral-400)">{{ k.when }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <div style="display:grid">
+                  <sc-for list="{{ spTimeRows }}" as="x" hint-placeholder-count="8">
+                    <div title="{{ x.tip }}" style="display:grid;grid-template-columns:72px minmax(160px,1fr) minmax(200px,1.4fr);gap:14px;align-items:center;padding:10px 0;background:linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px">
+                      <span class="{{ x.tagClass }}" style="justify-content:center">{{ x.tagText }}</span>
+                      <span style="font-size:13.5px;font-weight:500">{{ x.label }}</span>
+                      <span style="font-size:12.5px;color:var(--color-neutral-300)">{{ x.detail }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </section>
+
+            <section id="sub-risk" style="display:grid;gap:14px;padding-top:36px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h4 style="margin:0;font-size:18px">Risk and position size</h4></div>
+              <p style="margin:0;font-size:13px;color:var(--color-neutral-400)">The stop comes first: it sits under the low of the last pullback, and never more than 10% below the buy. The size follows from how much of the account you are willing to lose if the stop is hit.</p>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:end">
+                <label style="display:grid;gap:4px;font-size:12.5px;color:var(--color-neutral-400)">Account size ($)<input class="input" value="{{ spAccount }}" onChange="{{ onSpAccount }}" inputMode="decimal" placeholder="e.g. 100000" style="width:170px"></label>
+                <label style="display:grid;gap:4px;font-size:12.5px;color:var(--color-neutral-400)">Risk per trade (% of account)<input class="input" value="{{ spRiskPct }}" onChange="{{ onSpRiskPct }}" inputMode="decimal" placeholder="1" style="width:170px"></label>
+              </div>
+              <sc-if value="{{ spHas }}" hint-placeholder-val="{{ true }}">
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+                  <sc-for list="{{ spRiskTiles }}" as="k" hint-placeholder-count="6">
+                    <div title="{{ k.tip }}" style="display:grid;gap:4px;align-content:start;padding:14px 16px;border-radius:var(--radius-md);background:var(--color-surface)">
+                      <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-neutral-500)">{{ k.label }}</span>
+                      <span style="font-size:22px;font-weight:500;letter-spacing:-0.02em">{{ k.value }}</span>
+                      <sc-if value="{{ k.sub }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:var(--color-neutral-400)">{{ k.sub }}</span></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ spRiskNote }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px;color:var(--color-neutral-300)">{{ spRiskNote }}</p></sc-if>
+                <ul style="margin:0;padding-left:18px;display:grid;gap:4px;font-size:12.5px;color:var(--color-neutral-400)">
+                  <li>Minervini keeps losses small: most of his are well under 10%, and a stock that falls back into its base soon after breaking out is often sold before the stop.</li>
+                  <li>Once a stock is up two or three times the amount risked, he raises the stop to break even, so a winner cannot turn into a loss.</li>
+                  <li>He sells into strength when a stock runs far above its 50-day average in a short time, rather than waiting for it to fall.</li>
+                </ul>
+              </sc-if>
+            </section>
           </sc-if>
 
           <sc-if value="{{ is.business }}" hint-placeholder-val="{{ false }}">
@@ -550,13 +676,13 @@
                         <sc-for list="{{ r.cells }}" as="cl" hint-placeholder-count="16"><div style="display:grid;margin:1px;border-radius:var(--radius-sm);background:{{ cl.heat }}"><input value="{{ cl.v }}" onChange="{{ cl.on }}" readOnly="{{ cl.ro }}" inputMode="decimal" placeholder="—" style="width:100%;min-width:0;background:transparent;border:1px solid transparent;border-radius:var(--radius-sm);color:var(--color-text);font:inherit;font-size:13px;font-weight:{{ r.weight }};padding:4px 6px 1px;outline:none;text-align:right" style-hover="border-color:var(--color-divider)" style-focus="border-color:var(--color-accent);background:var(--color-surface)"><sc-if value="{{ cl.hasChg }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;text-align:right;padding:0 7px 3px;color:{{ cl.chgColor }}">{{ cl.chg }}</span></sc-if></div></sc-for>
                       </sc-if>
                       <sc-if value="{{ r.isText }}" hint-placeholder-val="{{ false }}">
-                        <sc-for list="{{ r.cells }}" as="cl" hint-placeholder-count="16"><div style="display:grid;margin:1px;border-radius:var(--radius-sm);background:{{ cl.heat }}"><span style="font-size:13px;font-weight:{{ r.weight }};text-align:right;padding:5px 7px 1px;color:{{ r.color }}">{{ cl.v }}</span><sc-if value="{{ cl.hasChg }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;text-align:right;padding:0 7px 3px;color:{{ cl.chgColor }}">{{ cl.chg }}</span></sc-if></div></sc-for>
+                        <sc-for list="{{ r.cells }}" as="cl" hint-placeholder-count="16"><div title="{{ cl.tip }}" style="display:grid;margin:1px;border-radius:var(--radius-sm);background:{{ cl.heat }}"><span style="font-size:13px;font-weight:{{ r.weight }};text-align:right;padding:5px 7px 1px;color:{{ r.color }}">{{ cl.v }}</span><sc-if value="{{ cl.hasChg }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;text-align:right;padding:0 7px 3px;color:{{ cl.chgColor }}">{{ cl.chg }}</span></sc-if></div></sc-for>
                       </sc-if>
                     </div>
                   </sc-for>
                 </div>
               </div>
-              <p style="margin:0;font-size:12.5px;color:var(--color-neutral-500)">Figures in {{ stmtUnitWords }}, oldest year on the left, going back as far as the source has figures. Click a heading to show or hide its lines. On the balance sheet each heading is the total and the lines under it are what make it up; on the other statements a closed heading shows its total. White rows can be typed over, grey rows are read from the filings or calculated, and "Other" or "Not itemised" rows are what is left of a total after the named lines. A grey line marked "counted in another line" is a detail the filing reports inside one of the other lines, so it is shown but not added in twice. Money paid out (capex, acquisitions, dividends, buybacks, debt repaid) is shown as a positive number.</p>
+              <p style="margin:0;font-size:12.5px;color:var(--color-neutral-500)">Figures in {{ stmtUnitWords }}, oldest year on the left, going back as far as the source has figures. Click a heading to show or hide its lines. Operating income is as the company reported it; “Of which one-off items” is the part of it from restructuring, impairments, fines, deal costs and gains or losses on selling assets, as the income statement lists them (hover a figure for the items). On the balance sheet each heading is the total and the lines under it are what make it up; on the other statements a closed heading shows its total. White rows can be typed over, grey rows are read from the filings or calculated, and "Other" or "Not itemised" rows are what is left of a total after the named lines. A grey line marked "counted in another line" is a detail the filing reports inside one of the other lines, so it is shown but not added in twice. Money paid out (capex, acquisitions, dividends, buybacks, debt repaid) is shown as a positive number.</p>
             </section>
 
             <section id="sub-flows" style="display:grid;gap:14px;padding-top:36px">
@@ -1420,7 +1546,7 @@
           </sc-if>
 
           <sc-if value="{{ setIsOrphans }}" hint-placeholder-val="{{ false }}">
-            <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ forgetOrphans }}" disabled="{{ noOrphans }}"><i class="ph ph-trash"></i>Delete the data of all {{ orphanCount }}</button></div>
+            <div style="display:flex;gap:8px"><button class="btn btn-secondary" onClick="{{ forgetOrphans }}" disabled="{{ noOrphans }}"><i class="ph ph-trash"></i>Delete the notes of all {{ orphanCount }}</button></div>
           </sc-if>
           <sc-if value="{{ setIsNotes }}" hint-placeholder-val="{{ false }}">
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1438,6 +1564,9 @@
         </div>
       </main>
     </div>
+  </sc-if>
+  <sc-if value="{{ saveWarn }}" hint-placeholder-val="{{ false }}">
+    <div role="alert" style="position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:70;width:max-content;max-width:min(680px,calc(100vw - 32px));padding:10px 14px;border-radius:var(--radius-md);background:var(--color-surface);border:1px solid oklch(0.62 0.17 25);font-size:12.5px;line-height:1.45;color:var(--color-text);box-shadow:0 6px 24px rgba(0,0,0,0.35);text-wrap:pretty"><i class="ph ph-warning" style="color:oklch(0.62 0.17 25);margin-right:6px"></i>{{ saveWarnText }}</div>
   </sc-if>
   <sc-if value="{{ forgetOpen }}" hint-placeholder-val="{{ false }}">
     <div class="dialog-backdrop" onClick="{{ forgetCancel }}" style="z-index:60">
@@ -1470,6 +1599,34 @@ const Q_KEY = 'diligence.quotes.v1';
 const UP = 'oklch(0.78 0.14 155)', DOWN = 'oklch(0.72 0.16 25)';
 const WORKSPACES = ['macro', 'themes', 'companies', 'settings'];
 const clone = o => JSON.parse(JSON.stringify(o));
+// ---- What is saved where. What you write (theses, checklists, lists) is small and cannot be rebuilt: it is saved in
+// this browser's localStorage and copied to notes/desk.json. The figures the page downloads for each stock are thirty
+// times larger and can always be downloaded again: they are kept apart, in this browser's IndexedDB, which has room for
+// them. In memory a stock's record holds both, as it always did.
+const FIGURE_KEYS = ['live', 'fin', 'finQ', 'qLabels', 'qSrc', 'segData', 'profile', 'ttm', 'sharesOut', 'adsRatio', 'financial', 'noAnnual', 'finVer', 'qVer', 'segVer', 'endYear', 'insiders', 'news'];
+const downloaded = r => !!(r && r.live && r.live.years);   // its figures came from a source
+// a desk as { notes, figures }: notes is the desk without the downloaded figures; figures is { ticker: those figures }
+function splitStore(store) {
+  const notes = Object.assign({}, store, { data: {} }), figures = {};
+  Object.keys(store.data || {}).forEach(T => { const r = store.data[T];
+    if (!downloaded(r)) { notes.data[T] = r; return; }
+    const n = notes.data[T] = {}, f = figures[T] = {};
+    Object.keys(r).forEach(k => { (FIGURE_KEYS.includes(k) ? f : n)[k] = r[k]; }); });
+  return { notes, figures };
+}
+// put downloaded figures back on the stocks of a desk that came without them; `from` is { ticker: figures, or a whole record }
+function withFigures(store, from) {
+  Object.keys(store.data || {}).forEach(T => { const r = store.data[T], f = from[T];
+    if (r && !downloaded(r) && downloaded(f)) FIGURE_KEYS.forEach(k => { if (k in f) r[k] = f[k]; }); });
+  return store;
+}
+const figureDB = (() => { let p = null; return () => p || (p = new Promise((res, rej) => { try { const q = indexedDB.open('diligence', 1);
+  q.onupgradeneeded = () => q.result.createObjectStore('figures'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); q.onblocked = () => rej(new Error('blocked')); } catch (e) { rej(e); } })); })();
+// every stock's saved figures, as the JSON text they were saved as: { ticker: text }
+const figuresRead = () => figureDB().then(db => new Promise((res, rej) => { const tx = db.transaction('figures'), os = tx.objectStore('figures'), keys = os.getAllKeys(), vals = os.getAll();
+  tx.oncomplete = () => res(Object.fromEntries(keys.result.map((k, i) => [k, vals.result[i]]))); tx.onerror = tx.onabort = () => rej(tx.error); }));
+const figuresWrite = (put, drop) => figureDB().then(db => new Promise((res, rej) => { const tx = db.transaction('figures', 'readwrite'), os = tx.objectStore('figures');
+  Object.keys(put).forEach(k => os.put(put[k], k)); drop.forEach(k => os.delete(k)); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error); }));
 const yearsOf = R => { const e = R.endYear || 2025, n = Math.max(N, ((R.fin || {}).revenue || []).length); return Array.from({ length: n }, (_, i) => e - n + 1 + i); };
 const sparkPts = a => { const v = (a || []).filter(x => typeof x === 'number' && isFinite(x)); if (v.length < 2) return { line: '', area: '' }; const mn = Math.min(...v), mx = Math.max(...v), r = mx - mn || 1; const pts = v.map((x, i) => (i / (v.length - 1) * 64).toFixed(1) + ',' + (24 - (x - mn) / r * 22).toFixed(1)).join(' '); return { line: pts, area: pts + ' 64,26 0,26' }; };
 const DEFAULT_GROUPS = () => [{ id: 'fav', name: 'Favorites', symbols: ['COST'] }, { id: 'us', name: 'US', symbols: ['COST', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'] }, { id: 'pos', name: 'Positions', symbols: [] }];
@@ -1480,7 +1637,9 @@ const N = 16, MAX_N = 60;
 const shortName = n => { let s = String(n || '').trim(), prev; do { prev = s; s = s.replace(/[\s,]+(\/[A-Z]{2,3}\/?|inc\.?|incorporated|corp\.?|corporation|co\.?|company|ltd\.?|limited|plc|llc|l\.?p\.?|n\.?v\.?|s\.?a\.?|ag|se|holdings?|group|class [a-c]|common stock)$/i, '').trim(); } while (s !== prev && s.split(' ').length > 1); s = s.replace(/\s+(&|and)$/i, '') || n;
   // names the SEC stores in capitals take a third more room: JPMORGAN CHASE -> Jpmorgan Chase
   return /[a-z]/.test(s) || !s.includes(' ') ? s : s.toLowerCase().replace(/(^|[\s\-&.])([a-z])/g, (m, a, b) => a + b.toUpperCase()); };
-const Q_VER = 13, FIN_VER = 10;   // raise these when the server starts supplying figures it did not before, so saved copies are refreshed
+// a saved company is loaded again after this long; new reports come in sooner through checkLatest
+const liveFresh = R => !!(R && R.live && R.live.years && R.finVer === FIN_VER) && Date.now() - (R.live.at || 0) < 12 * 3600e3;
+const Q_VER = 14, FIN_VER = 11;   // raise these when the server starts supplying figures it did not before, so saved copies are refreshed
 // How many years of Form 4 filings the insider chart and tables go back over.
 const INSIDER_YEARS = 5;
 const INSIDER_TYPES = { P: 'Purchase', S: 'Sale', A: 'Award', M: 'Exercise', F: 'Tax withholding', G: 'Gift', D: 'Returned to company', C: 'Conversion', X: 'Exercise', J: 'Other', W: 'Inheritance', I: 'Discretionary', L: 'Small acquisition' };
@@ -1755,6 +1914,7 @@ const kcFetch = async url => { let r, d = null;
 const SECTIONS = [
   { id: 'overview', label: 'Overview', subs: [] },
   { id: 'chart', label: 'Chart', subs: [] },
+  { id: 'minervini', label: 'Minervini', subs: [['verdict', 'Verdict'], ['stock', 'Right stock'], ['timing', 'Right time'], ['risk', 'Risk and size']] },
   { id: 'business', label: 'Business', subs: [['segments', 'Segments'], ['swot', 'SWOT'], ['questions', 'Questions']] },
   { id: 'finances', label: 'Finances', subs: [['position', 'Financial position'], ['scores', 'Quality scores'], ['statements', 'Statements'], ['flows', 'Statement flows'], ['commonsize', 'Common-size'], ['ratios', 'Ratios'], ['peers', 'Peer analysis']] },
   { id: 'redflags', label: 'Red flags', subs: [['screens', 'Screens'], ['manual', 'Governance & accounting']] },
@@ -1792,7 +1952,7 @@ const STMT = {
   is: { label: 'Income statement', tree: [
     sG('is.rev', 'Revenue and gross profit', [sI('revenue', 'Revenue'), sI('cogs', 'Cost of revenue'), sC('grossProfit', 'Gross profit', 1)]),
     sG('is.op', 'Operating expenses and income', [sX('rd', 'Research & development'), sX('sga', 'Selling, general & administrative'),
-      sR('otherOpex', 'Other operating expenses', (g, i) => anyOk(g('rd', i), g('sga', i)) ? g('grossProfit', i) - Z0(g('rd', i)) - Z0(g('sga', i)) - g('ebit', i) : NaN), sI('ebit', 'Operating income (EBIT)', 1)]),
+      sR('otherOpex', 'Other operating expenses', (g, i) => anyOk(g('rd', i), g('sga', i)) ? g('grossProfit', i) - Z0(g('rd', i)) - Z0(g('sga', i)) - g('ebit', i) : NaN), sI('ebit', 'Operating income (EBIT)', 1), sX('oneOff', 'Of which one-off items', 0, 'oneoff')]),
     sG('is.nonop', 'Non-operating items and tax', [sI('interest', 'Interest expense'), sR('otherNonOp', 'Other income (expense), net', (g, i) => g('pretax', i) - g('ebit', i) + Z0(g('interest', i))),
       sX('pretax', 'Pretax income'), sX('tax', 'Income tax'), sI('netIncome', 'Net income', 1)]),
     sG('is.ps', 'Per share', [sX('epsBasic', 'EPS, basic ($)', 0, 'eps'), sC('eps', 'EPS, diluted ($)', 1, 'eps'), sX('sharesBasic', 'Basic shares (M)'), sI('shares', 'Diluted shares (M)')]),
@@ -1823,10 +1983,12 @@ const STMT = {
         sR('totalNCL', 'Total non-current liabilities', (g, i) => g('liabT', i) - g('curLiab', i), 1)]),
       sG('bs.d', 'Total debt', [sC('netDebt', 'Net debt (debt less cash and short-term investments)'), sI('debt', 'Total debt, excluding leases', 1)]),
       sR('liabT', 'Total liabilities', (g, i) => g('liabT', i), 1)]),
+    // stock the holder can make the company buy back, and minority holders' shares of that kind: neither debt nor equity
+    sX('redeemable', 'Redeemable interests (between liabilities and equity)'),
     sG('bs.e', "Shareholders' equity", [sX('paidIn', 'Common stock & paid-in capital'), sX('retained', 'Retained earnings'), sX('aoci', 'Accumulated other comprehensive income'),
       sR('treasuryNeg', 'Treasury stock', (g, i) => ok(g('treasury', i)) ? -g('treasury', i) : NaN),
       sR('otherEq', 'Other equity', (g, i) => anyOk(g('paidIn', i), g('retained', i)) ? g('equity', i) - Z0(g('paidIn', i)) - Z0(g('retained', i)) - Z0(g('aoci', i)) + Z0(g('treasury', i)) : NaN), sI('equity', "Total shareholders' equity", 1)]),
-    sR('nci', 'Noncontrolling and other interests', (g, i) => { const v = g('assets', i) - g('liabT', i) - g('equity', i); return ok(v) && Math.abs(v) > g('assets', i) * 0.001 ? v : NaN; }),
+    sR('nci', 'Noncontrolling and other interests', (g, i) => { const v = g('assets', i) - g('liabT', i) - Z0(g('redeemable', i)) - g('equity', i); return ok(v) && Math.abs(v) > g('assets', i) * 0.001 ? v : NaN; }),
     sR('totalLE', 'Total liabilities and equity', (g, i) => g('assets', i), 1),
     sG('bs.m', 'Other measures', [
       sR('workingCap', 'Working capital (current assets less current liabilities)', (g, i) => g('curAssets', i) - g('curLiab', i)),
@@ -1898,6 +2060,13 @@ function blankResearch(T, ex) {
     verdict: 'Undecided', thesis: '', wrong: '', buyBelow: '',
   };
 }
+// Whether a stock's record holds anything you wrote or set yourself, as against figures the page saved by itself.
+// A stock in no group is cleared by itself only when this is false.
+const wroteNotes = r => { if (!r) return false; const t = v => String(v || '').trim(), d = r.dcf || {}, q = r.questions || [];
+  return [r.thesis, r.wrong, r.buyBelow, (r.val || {}).price, (r.val || {}).fwdFcf, d.base].some(t) || (!!r.verdict && r.verdict !== 'Undecided')
+    || Object.values(r.swot || {}).some(a => (a || []).length) || q.some(x => t(x.a)) || q.length !== DEFAULT_QUESTIONS.length || q.some((x, i) => x.q !== DEFAULT_QUESTIONS[i])
+    || Object.keys(r.checks || {}).length > 0 || Object.keys(r.reviewed || {}).length > 0 || (r.segments || []).some(x => t(x.name))
+    || String(r.taxRate || '21') !== '21' || ['g1', 'g2', 'tg', 'wacc'].some(k => k in d && String(d[k]) !== { g1: '10', g2: '6', tg: '2.5', wacc: '9' }[k]); };
 // Lists added to existing saved desks once. There are none at present; new desks start with DEFAULT_GROUPS.
 function seedGroups(s) {
   s.seeded = s.seeded || {};
@@ -1993,7 +2162,7 @@ const pick = (arr, names) => { const m = {}; (arr || []).forEach(x => { m[String
         };
   const o = {}; Object.keys(v).forEach(key => { if (ok(v[key])) o[key] = v[key] / 1e6; }); return o;
 }
-const FLOW_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'cfo', 'capex'], CF_FLOW = { cfo: 1, capex: 1, da: 1 };
+const FLOW_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'cfo', 'capex'];
 // The last twelve months as one more column after the fiscal years, for the statements and their flow diagrams.
 // Income and cash-flow lines are the newest four quarters added up (share counts averaged); balance-sheet lines are
 // the newest quarter's. Only when four quarters in a row run past the last fiscal year: otherwise TTM is that year.
@@ -2016,6 +2185,9 @@ function ttmColumn(R, sx, tax) {
   const xq = idx.map(i => (sx && sx.status === 'ok' && sx.q[QL[i]]) || {}), x = {};
   const keys = new Set(xq.flatMap(o => Object.keys(o)));
   keys.forEach(k => { const q = xq.map(o => ok(o[k]) ? o[k] : NaN); x[k] = TTM_SUM.has(k) ? add(q) : TTM_AVG.has(k) ? (q.every(ok) ? add(q) / 4 : NaN) : q[3]; });
+  // one-off items: only quarters that had any carry a figure
+  const oo = xq.filter(o => ok(o.oneOff)); x.oneOff = oo.length ? oo.reduce((a, o) => a + o.oneOff, 0) : NaN;
+  x.oneOffItems = [].concat(...xq.map((o, j) => (o.oneOffItems || []).map(([l, v]) => [QL[idx[j]] + ': ' + l, v])));
   return { i: fin.revenue.length - 1, label: QL[last], fin, c: calc(fin, tax), x };
 }
 function deCum(fy, annual, span, endD) {
@@ -2063,6 +2235,7 @@ const API = {
     quarters: async (k, s) => { const v = await localJSON(k, 'quarters/' + encodeURIComponent(s)); if (!v || !v.length) throw new Error('No quarterly statements for ' + s); return v; },
     holders: async (k, s) => localJSON(k, 'holders/' + encodeURIComponent(s), 600000),
     statements: async (k, s) => localJSON(k, 'statements/' + encodeURIComponent(s)),
+    latest: async (k, syms) => localJSON(k, 'latest?' + new URLSearchParams({ s: syms.join(',') }), 20000),
     segmentsQ: async (k, s) => localJSON(k, 'segments/' + encodeURIComponent(s) + '?period=q', 600000),
     segments: async (k, s) => { const v = await localJSON(k, 'segments/' + encodeURIComponent(s)); if (!v || !(v.segment || v.product || v.geo)) throw new Error('The SEC filings for ' + s + ' report no segment breakdown'); return v; },
     // years > 0 also reads every Form 4 filed in that many years the first time (slow once, then kept)
@@ -2134,6 +2307,7 @@ const API = {
     insiders: async (k, s) => ((await getJSON(fmpU(k, 'insider-trading/search', { symbol: s, limit: 40 }))) || []).slice(0, 30).map(x => ({ date: String(x.transactionDate || x.filingDate || '').slice(0, 10), who: x.reportingName || '', role: x.typeOfOwner || '', type: x.transactionType || '', shares: num(x.securitiesTransacted), price: num(x.price) })),
   },
   finnhub: {
+    surprises: async (k, s) => ((await getJSON(fhU(k, 'stock/earnings', { symbol: s }))) || []).filter(x => ok(num(x.actual)) && ok(num(x.estimate))).map(x => ({ period: x.period, actual: num(x.actual), estimate: num(x.estimate), pct: num(x.surprisePercent) })),
     search: async (k, q) => (((await getJSON(fhU(k, 'search', { q }))) || {}).result || []).filter(x => x.symbol && !/\s/.test(x.symbol)).map(x => ({ symbol: x.symbol, name: x.description || '', meta: x.type || '' })),
     quarters: async (k, s, annual) => {
       const rep = await getJSON(fhU(k, 'stock/financials-reported', { symbol: s, freq: 'quarterly' }));
@@ -2289,6 +2463,81 @@ function trendTemplate(c, bench) {
     row('Relative strength: stronger than the market', ok(rs) && ok(rb) ? rs > rb : null, ok(rs) && ok(rb) ? `Stock ${pc(rs)} · S&P 500 ${pc(rb)} (12-month return, latest quarter counted double)` : 'Needs a year of prices for the stock and the S&P 500', 'Stand-in for the book\'s rule, which asks for an IBD relative strength rating of 70 or more. That rating ranks a stock against every other stock and is not available here, so this checks it against the S&P 500 instead.'),
   ] };
 }
+// ---- Mark Minervini's SEPA checks (Trade Like a Stock Market Wizard; Think & Trade Like a Champion) ----
+// Where the stock is in its price cycle (Stan Weinstein's stages, which Minervini uses), from its 200-day average.
+// c: daily closes, oldest first.
+function sepaStage(c) {
+  const n = c.length, sma = (len, back = 0) => n - back >= len ? c.slice(n - back - len, n - back).reduce((a, b) => a + b, 0) / len : NaN;
+  const p = c[n - 1], m150 = sma(150), m200 = sma(200), mMonth = sma(200, 21), mHalf = sma(200, 126);
+  if (!ok(m200) || !ok(mMonth)) return { n: 0, label: 'Not enough history', text: 'Needs about a year of daily prices.' };
+  const slope = m200 / mMonth - 1;   // how much the 200-day average moved in the last month
+  if (slope > 0.002) {   // the 200-day average still rising
+    if (p > m150 && p > m200 && m150 > m200) return { n: 2, label: 'Stage 2: advancing', text: 'Price above a rising 200-day average. The only stage Minervini buys in.' };
+    if (p < m200) return { n: 3, label: 'Stage 3?: breaking down', text: 'The price has fallen below a 200-day average that is still rising: often the start of a top, sometimes only a deep pullback. Not a buy until it repairs.' };
+    return ok(mHalf) && mMonth > mHalf * 1.03
+      ? { n: 2, label: 'Stage 2: pulling back', text: 'Still in an uptrend, but the price has slipped under its shorter averages. Minervini waits for it to recover above them before buying.' }
+      : { n: 1, label: 'Stage 1 to 2: turning up', text: 'The 200-day average has started rising, but the price and the shorter averages have not lined up above it yet.' };
+  }
+  if (p < m150 && p < m200 && slope < -0.002) return { n: 4, label: 'Stage 4: declining', text: 'Price below a falling 200-day average. Minervini never buys here, however cheap it looks.' };
+  // a flat 200-day average after it had been climbing is a top forming; after a fall or a long flat spell, a base
+  return ok(mHalf) && mMonth > mHalf * 1.03
+    ? { n: 3, label: 'Stage 3: topping', text: 'The 200-day average has stopped rising after an advance. Often where leaders top out; Minervini sells here rather than buys.' }
+    : { n: 1, label: 'Stage 1: basing', text: 'Moving sideways around a flat 200-day average. Not yet a buy: Minervini waits for Stage 2.' };
+}
+// The volatility contraction pattern (VCP): from the base's high, a run of pullbacks, each shallower than the one
+// before, while trading dries up; the buy point (pivot) is the top of the last, tightest one.
+// h, l, c, v: daily highs, lows, closes and volumes, oldest first (v may be all NaN).
+function sepaVcp(h, l, c, v) {
+  const n = c.length, W = 5;
+  if (n < 60) return null;
+  const from = Math.max(0, n - 260);   // a base runs from a few weeks to about a year
+  let top = -1; for (let i = from; i < n - 10; i++) if (top < 0 || h[i] >= h[top]) top = i;   // the base's left side: the year's high, at least two weeks back
+  // turning points after it: a day whose high (low) is the highest (lowest) of the five days either side
+  const pts = [{ i: top, t: 'H', p: h[top] }];
+  for (let i = top + 1; i < n; i++) {
+    let isH = true, isL = true;
+    for (let j = Math.max(top, i - W); j <= Math.min(n - 1, i + W); j++) { if (h[j] > h[i]) isH = false; if (l[j] < l[i]) isL = false; }
+    if (isH) pts.push({ i, t: 'H', p: h[i] });
+    if (isL) pts.push({ i, t: 'L', p: l[i] });
+  }
+  const alt = [];   // alternate high, low, high...: of two in a row keep the higher high or the lower low
+  pts.forEach(x => { const last = alt[alt.length - 1]; if (last && last.t === x.t) { if (x.t === 'H' ? x.p >= last.p : x.p <= last.p) alt[alt.length - 1] = x; } else alt.push(x); });
+  const cs = [];   // the pullbacks: a high and the low after it
+  for (let k = 0; k + 1 < alt.length; k++) if (alt[k].t === 'H' && alt[k + 1].t === 'L') cs.push({ hi: alt[k].p, lo: alt[k + 1].p, hiI: alt[k].i, loI: alt[k + 1].i, depth: 1 - alt[k + 1].p / alt[k].p });
+  // a high with no low after it yet: still pulling back if it is below the last pullback's high, a breakout if above
+  const tail = alt[alt.length - 1];
+  if (tail && tail.t === 'H' && tail.i !== top && (!cs.length || tail.p < cs[cs.length - 1].hi)) {
+    let lo = tail.i; for (let j = tail.i; j < n; j++) if (l[j] < l[lo]) lo = j;
+    if (1 - l[lo] / tail.p > 0.015) cs.push({ hi: tail.p, lo: l[lo], hiI: tail.i, loI: lo, depth: 1 - l[lo] / tail.p, open: true });
+  }
+  const real = cs.filter((x, k) => x.depth >= 0.015 || k === cs.length - 1);   // wiggles under 1.5% are noise, except the last
+  const last = real[real.length - 1], price = c[n - 1];
+  let baseLow = top; for (let j = top; j < n; j++) if (l[j] < l[baseLow]) baseLow = j;
+  const avg = (a, i0, i1) => { const x = a.slice(Math.max(0, i0), i1).filter(ok); return x.length ? x.reduce((s2, y) => s2 + y, 0) / x.length : NaN; };
+  const vol50 = avg(v, n - 60, n - 10), vol10 = avg(v, n - 10, n), volToday = v[n - 1], vol50now = avg(v, n - 51, n - 1);
+  const shrinking = real.length >= 2 && real.every((x, k) => k === 0 || x.depth <= real[k - 1].depth * 1.1) && last.depth < real[0].depth * 0.75;
+  return {
+    top, topHi: h[top], baseLen: n - top, baseDepth: 1 - l[baseLow] / h[top], contractions: real, pivot: last ? last.hi : h[top], pivotI: last ? last.hiI : top,
+    stopLow: last ? last.lo : l[baseLow], lastDepth: last ? last.depth : NaN, shrinking, price, vsPivot: price / (last ? last.hi : h[top]) - 1,
+    volDry: ok(vol50) && ok(vol10) ? vol10 / vol50 : NaN, volToday: ok(volToday) && ok(vol50now) ? volToday / vol50now : NaN,
+  };
+}
+// The earnings checks, from the quarterly statements (fq: the page's quarterly figures, oldest first)
+function sepaFund(fq, labels) {
+  const col = k => (fq && fq[k]) || [], n = col('revenue').length;
+  let L = -1; for (let i = n - 1; i >= 0; i--) if (ok(num(col('revenue')[i])) || ok(num(col('eps')[i]))) { L = i; break; }
+  if (L < 4) return null;
+  const v = (k, i) => num(col(k)[i]);
+  const eps = i => ok(v('eps', i)) ? v('eps', i) : div(v('netIncome', i), v('shares', i));
+  const yoy = (f, i) => { const a = f(i), b = f(i - 4); return ok(a) && ok(b) && b > 0 ? a / b - 1 : NaN; };
+  const epsG = i => yoy(eps, i), salesG = i => yoy(i2 => v('revenue', i2), i), opm = i => div(v('ebit', i), v('revenue', i)), npm = i => div(v('netIncome', i), v('revenue', i));
+  const rising = (f, step) => [L - 2, L - 1, L].every(i => ok(f(i))) && f(L) > f(L - 1) + step && f(L - 1) > f(L - 2) + step;   // a real step up each quarter, not a rounding
+  const quarters = []; for (let i = Math.max(4, L - 5); i <= L; i++) quarters.push({ label: labels[i] || '', eps: eps(i), epsG: epsG(i), salesG: salesG(i), opm: opm(i) });
+  const yearBefore = [L - 7, L - 6, L - 5, L - 4].map(eps), prevLoss = ok(eps(L - 4)) && eps(L - 4) <= 0;
+  const known = yearBefore.filter(ok), turned = ok(eps(L)) && eps(L) > 0 && prevLoss && known.reduce((a, b) => a + b, 0) <= 0;   // a newly listed company has only some of them
+  return { L, label: labels[L] || '', eps: eps(L), epsPrev: eps(L - 4), epsG: epsG(L), salesG: salesG(L), turned, oddLoss: prevLoss && !turned && ok(eps(L)) && eps(L) > 0,
+    epsAccel: rising(epsG, 0.01), salesAccel: rising(salesG, 0.01), marginUp: rising(opm, 0.002), opm: opm(L), npm: npm(L), ebit: v('ebit', L), ni: v('netIncome', L), quarters };
+}
 // how wide a group's name is on its button (12.5px, the page's font)
 const chipTextW = (() => { let ctx = null, font = ''; return name => { try { if (!ctx) ctx = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(document.body), f = (cs.fontWeight || '400') + ' 12.5px ' + cs.fontFamily; if (f !== font) { font = f; ctx.font = f; } return ctx.measureText(String(name)).width; } catch (e) { return String(name).length * 7.2; } }; })();
 const WEEK = 7 * 864e5;
@@ -2297,7 +2546,7 @@ const mondayOf = t => { if (!ok(t)) return NaN; const d = new Date(t); d.setUTCH
 function loadQuotesCache() { try { return JSON.parse(localStorage.getItem(Q_KEY)) || {}; } catch (e) { return {}; } }
 
 class Component extends DCLogic {
-  state = { store: loadStore(), quotes: loadQuotesCache(), fetchState: {}, quoting: false, page: 'overview', tab: 'is', w: window.innerWidth, railOpen: false, drafts: {}, newSymbol: '', newGroup: '', groupMenu: false, keyDraft: '', keyDrafts: {}, roleDrafts: {}, keyTests: {}, showKey: {}, conn: { status: 'idle' }, keyTest: null, addingSource: false, srcLabel: '', srcUrl: '' };
+  state = { store: loadStore(), quotes: loadQuotesCache(), fetchState: {}, quoting: false, page: 'overview', tab: 'is', w: window.innerWidth, railOpen: false, drafts: {}, newSymbol: '', newGroup: '', groupMenu: false, keyDrafts: {}, roleDrafts: {}, keyTests: {}, showKey: {}, conn: { status: 'idle' }, addingSource: false, srcLabel: '', srcUrl: '' };
   mainRef = React.createRef();
   chipsRef = el => { const first = !this._chipsEl && !!el; this._chipsEl = el; if (first && el.clientWidth && el.clientWidth !== 242) this.forceUpdate(); };   // the row of group buttons, measured to see how many fit
   segScrollRef = el => { if (el) requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; }); };
@@ -2577,8 +2826,22 @@ class Component extends DCLogic {
     // embedded frame. A non-passive wheel listener makes it check, each time, what is really under the pointer.
     try { const cs = getComputedStyle(document.body), c = document.createElement('canvas').getContext('2d'); c.fillStyle = cs.backgroundColor; this.setState({ tvBg: c.fillStyle }); } catch (e) {}
     this._prevState = this.state;
-    this.loadQuotes(); this.ensureResearch(); this.scrollEnds(true); this.restoreNotes();
+    this.loadQuotes(); this.scrollEnds(true);
+    // The saved figures first (IndexedDB answers in a few milliseconds), so nothing already saved is downloaded again;
+    // then whatever is missing is loaded, and the notes on disk are compared with this browser's.
+    const begin = () => { if (this._began) return; this._began = this._figReady = true; this.ensureResearch(); this.restoreNotes(); };
+    figuresRead().then(saved => { this._figSaved = saved; const from = {}; Object.keys(saved).forEach(T => { try { from[T] = JSON.parse(saved[T]); } catch (e) {} });
+      this._figReady = true;
+      this.setState(s => ({ store: withFigures(clone(s.store), from) }), () => { this.persist(this.state.store); begin(); }); })
+      .catch(() => { this._figSaved = this._figSaved || {}; this.persist(this.state.store); begin(); });   // no IndexedDB (a private window): figures are downloaded each time
+    setTimeout(begin, 3000);
     this._seRO = () => this.scrollEnds(true); window.addEventListener('resize', this._seRO); setTimeout(() => this.preloadAll(), 3000);
+    this._liveT = setInterval(() => { this.ensureResearch(); this.preloadAll(); this.checkLatest(); this.dropIdle(); }, 2 * 60e3);   // a page left open picks up new reports too
+    // Another tab or browser may have saved since this one last looked: on coming back here, take the newer notes
+    // before anything is changed, so a tab left open does not save its old copy over them.
+    this.onBack = () => { if (document.hidden || !this._notesReady || this._notesT || Date.now() - (this._backAt || 0) < 5000) return; this._backAt = Date.now(); this.restoreNotes(true); };
+    document.addEventListener('visibilitychange', this.onBack); window.addEventListener('focus', this.onBack);
+    setTimeout(() => this.checkLatest(), 8000);
     this.mmQuotes(); setTimeout(() => this.mmRefreshLinked(), 1500);
     // themes and macro, each in its own frame, ask the desk to open a company, add stocks to a list or switch workspace
     this.onScrMsg = e => { const m = e.data || {}; if (e.origin !== location.origin || !['themes', 'macro'].includes(m.from)) return;
@@ -2589,7 +2852,7 @@ class Component extends DCLogic {
         m.symbols.forEach(S => { S = String(S).toUpperCase(); if (!g.symbols.includes(S)) g.symbols.push(S); if (!so.data[S]) so.data[S] = blankResearch(S, false); }); }); };
     window.addEventListener('message', this.onScrMsg);
     const open = new URLSearchParams(location.search).get('open');   // a link to a company: ?open=NVDA
-    if (open) { this.openSymbol(open.toUpperCase()); this.setWorkspace('companies'); history.replaceState(null, '', location.pathname); }
+    if (open) { this.openSymbol(open.toUpperCase()); this.setWorkspace('companies'); const pg = new URLSearchParams(location.search).get('page'); if (SECTIONS.some(x => x.id === pg)) this.goPage(pg); history.replaceState(null, '', location.pathname); }   // &page=minervini opens that tab
     else { const w = (this.state.store.prefs || {}).workspace; if (w === 'themes') this.setState({ thmMounted: true }); if (w === 'macro') this.setState({ macMounted: true }); if (w === 'settings') this.initSettings(); }
   }
   settingsView() {
@@ -2613,7 +2876,7 @@ class Component extends DCLogic {
       ['API keys · ' + nKeys + ' of ' + (PROVIDERS.length - 1), PROVIDERS.filter(x => x.id !== 'local').map(x => [x.id, x.name, 'ph ph-key', keyS(x)])],
       ['How they are used', [['roles', 'Which source for what', 'ph ph-arrows-split', ['Prices ' + (mm && mm.ok ? 'moomoo' : useFor('prices')) + ' · statements ' + useFor('fundamentals'), NONE]]]],
       ['Your files', [['reports', 'Reports folder', 'ph ph-folder-open', rpS], ['notes', 'Research notes', 'ph ph-notebook', [LOCAL_DB === location.origin ? 'Copied to notes/desk.json' : 'This browser only', NONE]],
-        ['orphans', 'Stocks in no group', 'ph ph-broom', (() => { const o = this.orphans(); return [o.length ? o.length + ' with data still kept' : 'None', o.length ? ACC : NONE]; })()]]],
+        ['orphans', 'Stocks in no group', 'ph ph-broom', (() => { const o = this.orphans(); return [o.length ? o.length + ' with notes still kept' : 'None with notes', o.length ? ACC : NONE]; })()]]],
     ];
     const all = Object.fromEntries(GROUPS.flatMap(g => g[1]).map(x => [x[0], x]));
     const cur = all[item] || all.moomoo, [stTxt, stDot] = cur[3];
@@ -2632,10 +2895,10 @@ class Component extends DCLogic {
       roles: { desc: 'Several services can supply the same kind of data. Auto takes the first one with a key, in the order listed under API keys; pick one to spread the load across free plans. Live prices come from moomoo whenever OpenD is running.' },
       reports: { desc: 'The Reports tab reads the research reports saved in this folder, and shows a new one as soon as it is written.',
         facts: rp ? [['Reading from', rp.dir], ['Reports', fmtN(rp.count)]] : [] },
-      orphans: { desc: 'Stocks you took out of every group, or that left with a moomoo list, still have their notes, saved figures and SEC data kept. Delete that data here. Their reports are always kept.',
+      orphans: { desc: 'A stock you took out of every group, or that left with a moomoo list, is cleared by itself about ten minutes later: the figures saved for it here, and its SEC data in sec.db (read from the SEC again if it comes back). What you wrote about it is kept and listed here until you delete it. Reports are always kept.',
         facts: this.orphans().length ? [['Stocks', this.orphans().join(', ')]] : [] },
-      notes: { desc: (LOCAL_DB === location.origin ? 'Your theses, checklists, notes and lists are saved in this browser and copied to notes/desk.json in the Diligence folder a few seconds after each change. Export them to keep a copy elsewhere or move them to another computer; API keys are not included.' : 'Your theses, checklists, notes and lists are saved only in this browser. Export them to keep a copy; API keys are not included.'),
-        facts: src && !err ? [['Last copied to disk', when(src.notes.saved_at)]] : [] },
+      notes: { desc: (LOCAL_DB === location.origin ? 'Your theses, checklists, notes and lists are saved in this browser and copied to notes/desk.json in the Diligence folder a few seconds after each change. The server also keeps a backup for each of the last 30 days, and sets the old copy aside when a save replaces notes it had not seen or shrinks them a lot; Import notes loads any of them back. Export to keep a copy elsewhere or move to another computer; API keys and downloaded figures are not included.' : 'Your theses, checklists, notes and lists are saved only in this browser. Export them to keep a copy; API keys are not included.'),
+        facts: src && !err ? [['Last copied to disk', when(src.notes.saved_at)], ['Backups', (src.notes.backup_count || 0) + ' in ' + (src.notes.backups || 'notes/backups')]] : [] },
     };
     const P = PROV_BY[cur[0]], det = D[cur[0]] || { desc: P.note, uses: P.covers.map(c => ROLE_LABEL[c]), link: P.signup, linkText: 'Get a key ↗' };
     const msg = st.setMsg && st.setMsg.item === cur[0] ? st.setMsg : null, sd = st.secDraft || { name: '', email: '' };
@@ -2706,26 +2969,44 @@ class Component extends DCLogic {
     if (n(ps.store) !== n(s) || JSON.stringify(ps.store.prefs.keys) !== JSON.stringify(s.prefs.keys)) setTimeout(() => this.preloadAll(), 1500);
   }
   async preloadAll() {
-    if (this._preloading || !this.roleProvider('fundamentals')) return; this._preloading = true;
+    if (this._preloading || !this._figReady || !this.roleProvider('fundamentals')) return; this._preloading = true;
     try {
       const syms = [...new Set(this.state.store.groups.flatMap(g => g.symbols))].filter(s => !/^\^/.test(s));
       const missing = syms.filter(s => !this.state.store.data[s]);
       if (missing.length) await new Promise(res => this.setState(s => { const store = clone(s.store); missing.forEach(S => { if (!store.data[S]) store.data[S] = blankResearch(S, false); }); return { store }; }, () => { this.save(); res(); }));
       for (const S of syms) {
         const R = this.state.store.data[S], fs = this.state.fetchState[S];
-        if (R && R.live && R.live.years && R.finVer === FIN_VER) { if (!R.finQ || R.qVer !== Q_VER) { await this.loadQuarters(S); await new Promise(r => setTimeout(r, 1200)); } continue; }
+        if (liveFresh(R)) { if (!R.finQ || R.qVer !== Q_VER) { await this.loadQuarters(S); await new Promise(r => setTimeout(r, 1200)); } continue; }
         if (!R || (fs && fs.status === 'loading')) continue;
         try { await this.loadResearch(S, true); } catch (e) { this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [S]: { status: 'error', errs: [e.message] } }) })); }
         await new Promise(r => setTimeout(r, 1500));
       }
     } finally { this._preloading = false; }
   }
+  // Ask the Diligence server which companies in your lists have new figures (it checks the SEC every 15 minutes)
+  // and load just those again.
+  async checkLatest() {
+    const k = this.pkey('local'); if (this._checking || !this._figReady || !k || this.roleProvider('fundamentals') !== 'local') return;
+    const st = this.state.store, syms = [...new Set(st.groups.flatMap(g => g.symbols).concat(st.current ? [st.current] : []))].filter(x => x && !/^\^/.test(x));
+    if (!syms.length) return; this._checking = true;
+    try {
+      const v = await API.local.latest(k, syms).catch(() => null); if (!v) return;
+      // the open company first
+      for (const S of syms.sort((a, b) => (b === st.current) - (a === st.current))) {
+        const R = this.state.store.data[S], fs = this.state.fetchState[S];
+        if (!R || !R.live || !R.live.years || !R.live.src || R.live.src.fundamentals !== 'local' || !v[S] || v[S] === R.live.ver || (fs && fs.status === 'loading')) continue;
+        try { await this.loadResearch(S, true); } catch (e) {}
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } finally { this._checking = false; }
+  }
   ensureResearch() {
+    if (!this._figReady) return;   // the saved figures have not been read yet
     const T = this.state.store.current, R = this.state.store.data[T], fs = this.state.fetchState[T];
     if (R && R.live && R.live.years && R.finVer === FIN_VER && R.finQ && R.qVer !== Q_VER && !(this.state.qState || {})[T]) { this.loadQuarters(T); return; }
-    if (!R || !this.roleProvider('fundamentals') || (R.live && R.live.years && R.finVer === FIN_VER)) return;
+    if (!R || !this.roleProvider('fundamentals') || liveFresh(R)) return;
     if (fs && fs.status === 'error') { this._retried = this._retried || {}; if (this._retried[T]) return; this._retried[T] = 1; setTimeout(() => { if (this.state.store.current === T) this.loadResearch(T, true); }, 15000); return; }
-    if (fs) return;
+    if (fs && !(fs.status === 'ok' && R.live && R.live.years)) return;   // an old copy loaded earlier is asked for again
     this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [T]: { status: 'loading' } }) }), () => this.loadResearch(T, true).catch(e => this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [T]: { status: 'error', errs: [e.message] } }) }))));
   }
   pkey(id) { return (((this.state.store.prefs.keys || {})[id]) || '').trim(); }
@@ -2768,6 +3049,8 @@ class Component extends DCLogic {
     if (!roles.fundamentals && !roles.news && !roles.insiders) return;
     const R0 = this.state.store.data[T]; if (!R0) return;
     const sameSrc = R0.live && R0.live.src && R0.live.src.fundamentals === roles.fundamentals;
+    // a quick re-check for new reports: estimates and peer figures (from rate-limited keys) keep their usual pace
+    const recheck = !!(R0.live && R0.live.years && R0.finVer === FIN_VER && Date.now() - (R0.live.at0 || R0.live.at || 0) < 12 * 3600e3);
     if (!force && sameSrc && R0.live.years && Date.now() - R0.live.at < 24 * 3600e3) return;
     this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [T]: { status: 'loading' } }) }));
     const jobs = Object.keys(roles).filter(r => roles[r]);
@@ -2806,7 +3089,7 @@ class Component extends DCLogic {
         ok2.forEach(({ v }) => {
           merged.name = merged.name || v.name; if (!merged.profile || (!merged.profile.desc && v.profile && v.profile.desc)) merged.profile = v.profile || merged.profile;
           if (!merged.peers.length && v.peers && v.peers.length) merged.peers = v.peers;
-          ['ttm', 'sharesOutstanding', 'currency', 'adsRatio', 'financial'].forEach(k => { if (merged[k] == null && v[k] != null) merged[k] = v[k]; });
+          ['ttm', 'sharesOutstanding', 'currency', 'adsRatio', 'financial', 'version'].forEach(k => { if (merged[k] == null && v[k] != null) merged[k] = v[k]; });
           Object.keys(v.byYear).forEach(y => { merged.byYear[y] = merged.byYear[y] || {}; Object.keys(v.byYear[y]).forEach(k => { if (!ok(merged.byYear[y][k])) merged.byYear[y][k] = v.byYear[y][k]; }); });
         });
         out[r] = merged; roles[r] = ok2[0].pid; return;
@@ -2840,16 +3123,17 @@ class Component extends DCLogic {
       }
       if (!r.peers.length) r.peers = [{ t: '', pe: '', ev: '', fy: '', roic: '', growth: '', margin: '' }];
       const prev = r.live || {};
-      r.live = { at: Date.now(), years, sources: fd && fd.sources ? fd.sources : prev.sources, news: out.news || prev.news || [], insiders: (out.insiders || prev.insiders || []).slice(0, 60), src: roles };
+      r.live = { at: Date.now(), at0: recheck ? prev.at0 || prev.at : Date.now(), ver: fd ? fd.version || null : prev.ver, years, sources: fd && fd.sources ? fd.sources : prev.sources, news: out.news || prev.news || [], insiders: (out.insiders || prev.insiders || []).slice(0, 60), src: roles };
       const any = (fd && Object.keys(fd.byYear || {}).length) || (r.live && r.live.years) || jobs.some(j => out[j]);
       return { store, fetchState: Object.assign({}, s.fetchState, { [T]: { status: any ? 'ok' : 'error', errs } }) };
-    }, () => { this.save(); this.loadPeerMetrics(T); this.loadEstimates(T); this.loadQuarters(T); this.loadSegments(T); });
+    }, () => { this.save(); if (!recheck) { this.loadPeerMetrics(T); this.loadEstimates(T); } this.loadQuarters(T); this.loadSegments(T); if ((this.state.segQ || {})[T]) this.loadSegmentsQ(T); });
   }
+  setSepa(p) { this.setState(s => { const store = clone(s.store); store.prefs.sepa = Object.assign({}, store.prefs.sepa, p); return { store }; }, () => this.save()); }
   setChart(p) { this.setState(s => { const store = clone(s.store); store.prefs.chart = Object.assign({ interval: 'D', style: '1', studies: [] }, store.prefs.chart, p); return { store }; }, () => this.save()); }
   async loadQuarters(T) {
     const keys = this.state.store.prefs.keys || {}, R0 = this.state.store.data[T]; if (!R0) return;
     const order = [this.roleProvider('fundamentals'), 'finnhub', 'fmp', 'alphavantage'].filter((p, i, a) => p && a.indexOf(p) === i && API[p] && API[p].quarters && (keys[p] || '').trim());
-    if (!order.length) return;
+    if (!order.length) { this.setState(s => ({ qState: Object.assign({}, s.qState, { [T]: 'error' }) })); return; }
     const annual = {}; yearsOf(R0).forEach((y, i) => { annual[y] = {}; FIN_KEYS.forEach(k => { const v = num(R0.fin[k][i]); if (ok(v)) annual[y][k] = v; }); });
     this.setState(s => ({ qState: Object.assign({}, s.qState, { [T]: 'loading' }) }));
     const qCells = qs => qs.reduce((a, x) => a + Object.values(x.row).filter(ok).length, 0);
@@ -2972,10 +3256,16 @@ class Component extends DCLogic {
       sankeyNote: (D.ttm ? 'Segments and income for the last twelve months, to ' + D.ttm.label + '. ' : fy !== yr ? 'Segments from FY' + yr + ', scaled to FY' + fy + ' revenue. ' : 'Segments scaled to reported revenue. ') + ('Percentages are of revenue.' + (!(ok(ni) && ni > 0) ? ' Net income is not shown because the period was a loss.' : levels.length < 3 ? ' Profit levels the company does not report (' + [!levels.find(l => l.id === 'gp') && 'gross profit', !levels.find(l => l.id === 'ebit') && 'operating income'].filter(Boolean).join(', ') + ') are skipped.' : ''))
     };
   }
+  async loadSurprises(T) {
+    const set = v => this.setState(s => ({ surp: Object.assign({}, s.surp, { [T]: v }) }));
+    const k = this.pkey('finnhub'); if (!k) { set({ status: 'nokey' }); return; }
+    set({ status: 'loading' });
+    try { set({ status: 'ok', d: await API.finnhub.surprises(k, T) }); } catch (e) { set({ status: 'error', msg: e.message }); }
+  }
   async loadSegmentsQ(T) {
     const k = this.pkey('local'); if (!k) return;
     const set = v => this.setState(s => ({ segQ: Object.assign({}, s.segQ, { [T]: v }) }));
-    set({ status: 'loading' });
+    const had = (this.state.segQ || {})[T]; if (!(had && had.status === 'ok')) set({ status: 'loading' });
     try { set({ status: 'ok', d: await API.local.segmentsQ(k, T) }); } catch (e) { set({ status: 'error', msg: e.message }); }
   }
   async loadSegments(T) {
@@ -3024,7 +3314,7 @@ class Component extends DCLogic {
     set({ status: 'loading' });
     // moomoo first: twenty years of daily closes with their dates, the same prices the chart draws, and what the week-by-week score needs
     try { const d = await kcFetch(LOCAL_DB + '/api/moomoo/kline/' + encodeURIComponent(sym) + '?k=D&all=1'), b = (d.bars || []).filter(x => ok(x[0]) && ok(x[4]) && x[4] > 0);
-      if (b.length >= 60) { set({ status: 'ok', closes: b.map(x => x[4]), times: b.map(x => x[0]), tz: d.tz, last: b[b.length - 1][0], src: 'moomoo' }); return; } } catch (e) {}
+      if (b.length >= 60) { set({ status: 'ok', closes: b.map(x => x[4]), times: b.map(x => x[0]), highs: b.map(x => ok(x[2]) ? x[2] : x[4]), lows: b.map(x => ok(x[3]) ? x[3] : x[4]), vols: b.map(x => ok(x[5]) ? x[5] : NaN), tz: d.tz, last: b[b.length - 1][0], src: 'moomoo' }); return; } } catch (e) {}
     let err = 'Start moomoo OpenD, or add a price data key in settings (Twelve Data, FMP or Polygon), to check the trend template';
     for (const id of chain) {
       try { const pts = (await DAILY_HISTORY[id](this.pkey(id), sym, daysAgo(760))).filter(x => ok(x.t) && ok(x.p) && x.p > 0).sort((a, b) => a.t - b.t); if (pts.length >= 60) { set({ status: 'ok', closes: pts.map(x => x.p), last: pts[pts.length - 1].t, src: PROV_BY[id].short }); return; } err = PROV_BY[id].short + ': not enough daily prices for ' + sym; }
@@ -3206,7 +3496,7 @@ class Component extends DCLogic {
     const R = this.state.store.data[S], fs = this.state.fetchState[S];
     if (!this.roleProvider('fundamentals') && !this.roleProvider('news')) return;
     if (fs && fs.status === 'loading') return;
-    if (R && R.live && R.live.years && R.finVer === FIN_VER) { if (!R.finQ || R.qVer !== Q_VER) this.loadQuarters(S); return; }
+    if (liveFresh(R)) { if (!R.finQ || R.qVer !== Q_VER) this.loadQuarters(S); return; }
     this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [S]: { status: 'loading' } }) }), () => this.loadResearch(S, true).catch(e => this.setState(s => ({ fetchState: Object.assign({}, s.fetchState, { [S]: { status: 'error', errs: [e.message] } }) }))));
   }
   moveWorkspace(id, target, after, current) {
@@ -3219,12 +3509,24 @@ class Component extends DCLogic {
     this.patch((r, so) => { const g = so.groups.find(x => x.id === so.activeGroup); if (!g || !g.symbols.includes(S) || !g.symbols.includes(target)) return;
       const list = g.symbols.filter(x => x !== S); list.splice(list.indexOf(target) + (after ? 1 : 0), 0, S); g.symbols = list; });
   }
-  // A stock in none of the groups: offer to delete the data kept about it (notes, saved figures, SEC data). Its
-  // reports are never touched. Nothing is deleted without saying yes.
+  // A stock in none of the groups (taken out by hand, gone with a moomoo list, or only looked up) is cleared by itself:
+  // dropIdle removes the figures saved for it here, and the server deletes its SEC data from sec.db, about ten minutes
+  // later. What you wrote about it is never deleted without saying yes: such a stock is asked about, and stays listed
+  // under Settings → Stocks in no group. Reports are never touched.
   inGroups(store) { const set = new Set(); (store || this.state.store).groups.forEach(g => g.symbols.forEach(x => set.add(x))); return set; }
-  orphans() { const st = this.state.store, used = this.inGroups(st); return Object.keys(st.data || {}).filter(S => !used.has(S)).sort(); }
+  orphans() { const st = this.state.store, used = this.inGroups(st); return Object.keys(st.data || {}).filter(S => !used.has(S) && wroteNotes(st.data[S])).sort(); }
+  // every couple of minutes: drop the stocks that have been in no group for ten minutes, are not open and hold no notes
+  dropIdle() {
+    const st = this.state.store, used = this.inGroups(st), now = Date.now(), idle = this._idle = this._idle || {};
+    Object.keys(idle).forEach(S => { if (used.has(S) || !st.data[S]) delete idle[S]; });
+    const gone = Object.keys(st.data).filter(S => { if (used.has(S) || S === st.current || wroteNotes(st.data[S])) return false; idle[S] = idle[S] || now; return now - idle[S] >= 10 * 60e3; });
+    if (!gone.length) return;
+    this.setState(s => { const store = clone(s.store), quotes = Object.assign({}, s.quotes), still = this.inGroups(store);
+      gone.forEach(S => { if (!still.has(S) && S !== store.current) { delete store.data[S]; delete quotes[S]; delete idle[S]; } }); return { store, quotes }; },
+      () => { this.save(); try { localStorage.setItem(Q_KEY, JSON.stringify(this.state.quotes)); } catch (e) {} });
+  }
   async askForget(syms) {
-    syms = [...new Set(syms)].filter(S => !this.inGroups().has(S)); if (!syms.length) return;
+    syms = [...new Set(syms)].filter(S => !this.inGroups().has(S) && wroteNotes(this.state.store.data[S])); if (!syms.length) return;   // only where there are notes to lose
     this.setState({ forget: { syms, foot: null, busy: false, msg: '' } });
     try {
       const keep = [...this.inGroups()].join(',');
@@ -3256,7 +3558,7 @@ class Component extends DCLogic {
     }
     if (cur && cur.moomoo && cur.moomoo.kind === 'list') this.mmChange(cur, [], [S]);   // out of this list; it stays in moomoo's All
     this.patch((r, so) => { const g = so.groups.find(x => x.id === so.activeGroup); if (g) g.symbols = g.symbols.filter(x => x !== S); });
-    setTimeout(() => this.askForget([S]), 0);   // in no group now: offer to delete its data
+    setTimeout(() => this.askForget([S]), 0);   // in no group now: if it has notes, ask whether they go too
   }
   pickGroup(id) { this.setState(s => ({ store: Object.assign({}, s.store, { activeGroup: id }), groupMenu: false, editGroup: null, mmNote: '' }), () => this.save()); }
   addGroup() { const name = this.state.newGroup.trim(); if (!name) return; const id = 'g' + Date.now(); this.setState(s => { const store = clone(s.store); store.groups.push({ id, name, symbols: [] }); store.activeGroup = id; return { store, newGroup: '', groupMenu: false }; }, () => this.save()); }
@@ -3274,25 +3576,47 @@ class Component extends DCLogic {
     const gone = store.groups.find(g => g.id === id); if (gone && gone.moomoo) store.prefs.mmSkip = [...new Set(((store.prefs.mmSkip) || []).concat(gone.moomoo.kind === 'positions' ? '__positions' : gone.moomoo.name))];
     store.groups = store.groups.filter(g => g.id !== id); if (store.activeGroup === id) store.activeGroup = store.groups[0].id; return { store, goneSyms: gone ? gone.symbols : [] }; },
     () => { this.save(); const left = (this.state.goneSyms || []).filter(S => !this.inGroups().has(S)); if (left.length) this.askForget(left); }); }
-  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('message', this.onScrMsg); this.kcDispose(); clearTimeout(this._mmTimer); }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('message', this.onScrMsg); document.removeEventListener('visibilitychange', this.onBack); window.removeEventListener('focus', this.onBack); this.kcDispose(); clearTimeout(this._mmTimer); clearInterval(this._liveT); }
 
-  save() { this.state.store.savedAt = Date.now(); try { localStorage.setItem(LS_KEY, JSON.stringify(this.state.store)); } catch (e) {} this.queueNotesCopy(); }
+  save() { this.state.store.savedAt = Date.now(); this.persist(this.state.store); this.queueNotesCopy(); }
+  // What you wrote goes to localStorage at once; the downloaded figures follow to IndexedDB a moment later, only the
+  // stocks whose figures changed. A browser that cannot save (storage full or blocked) says so on the page.
+  persist(store) {
+    const { notes, figures } = splitStore(store);
+    let failed = false; try { localStorage.setItem(LS_KEY, JSON.stringify(notes)); } catch (e) { failed = true; }
+    if (failed !== !!this.state.saveFailed) this.setState({ saveFailed: failed });
+    this._figures = figures; clearTimeout(this._figT); this._figT = setTimeout(() => this.flushFigures(), 1500);
+  }
+  flushFigures() {
+    const was = this._figSaved, now = this._figures || {}; if (!was) return;   // nothing is written before what is there has been read
+    const put = {}; Object.keys(now).forEach(T => { const text = JSON.stringify(now[T]); if (was[T] !== text) put[T] = text; });
+    const drop = Object.keys(was).filter(T => !(T in now));
+    if (!Object.keys(put).length && !drop.length) return;
+    figuresWrite(put, drop).then(() => { Object.assign(was, put); drop.forEach(T => { delete was[T]; }); }).catch(() => {});
+  }
   // Notes also go to notes/desk.json in the Diligence folder, so a cleared browser or another browser loses nothing.
-  // API keys are left out of that copy and of exports.
-  notesForDisk() { const s = JSON.parse(JSON.stringify(this.state.store)); if (s.prefs) delete s.prefs.keys; return s; }
+  // The server keeps dated backups of that file. API keys and downloaded figures are left out of it and of exports.
+  notesForDisk() { const s = splitStore(this.state.store).notes; return JSON.parse(JSON.stringify(Object.assign({}, s, { prefs: Object.assign({}, s.prefs, { keys: undefined }) }))); }
   queueNotesCopy() {
     if (!this._notesReady || LOCAL_DB !== location.origin) return;
     clearTimeout(this._notesT);
-    this._notesT = setTimeout(() => fetch('/api/desk/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ store: this.notesForDisk() }) }).catch(() => {}), 3000);
+    // "base" is the copy on disk this page last saw: when another tab has saved since, the server sets that copy aside
+    this._notesT = setTimeout(() => { this._notesT = null;
+      fetch('/api/desk/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ store: this.notesForDisk(), base: this._diskAt || null }) })
+        .then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.status); this._diskAt = d.saved_at || this._diskAt; if (this.state.diskFailed) this.setState({ diskFailed: false }); }))
+        .catch(() => { if (!this.state.diskFailed) this.setState({ diskFailed: true }); }); }, 3000);
   }
-  // on opening: take the copy on disk when this browser has none, or an older one
-  restoreNotes() {
+  // On opening, and on coming back to this tab: take the copy on disk when this browser has none, or an older one.
+  // The figures this browser has saved are kept with it. keepView leaves this tab on the stock and group it is showing.
+  restoreNotes(keepView) {
     if (LOCAL_DB !== location.origin) { this._notesReady = true; return; }
     fetch('/api/desk/notes').then(r => r.json()).then(d => {
       const mine = this.state.store, disk = d && d.store ? normalizeStore(d.store) : null;
+      this._diskAt = (d && d.saved_at) || null;
       if (disk && (d.saved_at || 0) > (mine.savedAt || 0)) {
-        disk.prefs.keys = mine.prefs.keys;
-        this.setState({ store: disk }, () => { try { localStorage.setItem(LS_KEY, JSON.stringify(disk)); } catch (e) {} this._notesReady = true; this.ensureResearch(); });
+        disk.prefs.keys = mine.prefs.keys; withFigures(disk, mine.data);
+        if (keepView) { if (disk.data[mine.current]) disk.current = mine.current; if (disk.groups.some(g => g.id === mine.activeGroup)) disk.activeGroup = mine.activeGroup; if (mine.prefs.workspace) disk.prefs.workspace = mine.prefs.workspace; }
+        this.setState({ store: disk }, () => { this.persist(disk); this._notesReady = true; this.ensureResearch(); });
       } else { this._notesReady = true; if (!d || !d.store) this.queueNotesCopy(); }
     }).catch(() => { this._notesReady = true; });
   }
@@ -3308,7 +3632,7 @@ class Component extends DCLogic {
       if (!s) throw new Error('This is not a Diligence notes file.');
       const n = Object.keys(s.data).length;
       if (!confirm('Replace the notes in this browser with the ' + n + ' compan' + (n === 1 ? 'y' : 'ies') + ' in ' + file.name + '?')) return;
-      s.prefs.keys = this.state.store.prefs.keys;
+      s.prefs.keys = this.state.store.prefs.keys; withFigures(s, this.state.store.data);   // a notes file has no figures: keep the ones saved here
       this.setState({ store: s }, () => { this.save(); this.ensureResearch(); });
     }).catch(e => alert('Could not import: ' + e.message));
   }
@@ -3319,15 +3643,6 @@ class Component extends DCLogic {
     const go = () => { const m = this.mainRef.current; const el = m && m.querySelector('#sub-' + sub); const sec = SECTIONS.find(x => x.id === page); if (m && sec && sec.subs[0] && sec.subs[0][0] === sub) { m.scrollTo({ top: 0, behavior: 'auto' }); return; } if (el) { const sh = m.querySelector('[data-sticky]'); const y = m.scrollTop + el.getBoundingClientRect().top - m.getBoundingClientRect().top - (sh ? sh.getBoundingClientRect().height : 0) + 20; m.scrollTo({ top: Math.max(0, y), behavior: 'auto' }); }; };
     if (this.state.page !== page) this.setState({ page, addingSource: false }, () => setTimeout(go, 60)); else go();
   }
-  addTicker() {
-    const T = this.state.newTicker.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, '');
-    if (!T) return;
-    this.setState(s => { const store = JSON.parse(JSON.stringify(s.store)); if (!store.data[T]) { store.data[T] = blankResearch(T, false); store.list.push(T); } store.current = T; return { store, newTicker: '', page: 'overview' }; }, () => this.save());
-  }
-  removeTicker(T) {
-    this.setState(s => { if (s.store.list.length < 2) return null; const store = JSON.parse(JSON.stringify(s.store)); store.list = store.list.filter(x => x !== T); delete store.data[T]; if (store.current === T) store.current = store.list[0]; return { store }; }, () => this.save());
-  }
-
   renderVals() {
     const st = this.state, store = st.store, T = store.current, R = store.data[T];
     const Y = yearsOf(R), L = Y.length - 1;
@@ -3358,7 +3673,9 @@ class Component extends DCLogic {
     // enterprise value: what buying the whole company costs, so minority holders and preferred stock count too
     const claims = (ok(c.minority[L]) ? c.minority[L] : 0) + (ok(c.preferred[L]) ? c.preferred[L] : 0);
     const mcap = price * shN, ev = mcap + c.debt[L] + claims - c.liquid[L];
-    const peTtm = div(price, ok(num(ttm.eps)) ? num(ttm.eps) : c.eps[L]), peFwd = div(price, num(R.val.fwdEps));
+    // forward P/E: moomoo's when it has one, otherwise from the forward EPS on the Valuation tab (FMP estimates or typed in)
+    const mmPe = (((st.insight || {})[T] || {}).d || {}).pe || {}, mmFwd = num(mmPe.forward);
+    const peTtm = div(price, ok(num(ttm.eps)) ? num(ttm.eps) : c.eps[L]), peFwd = ok(mmFwd) ? mmFwd : div(price, num(R.val.fwdEps));
     const evE = div(ev, c.ebitda[L]), evEFwd = div(ev, num(R.val.fwdEbitda));
     const fcfTtm = ok(num(ttm.cfo)) && ok(num(ttm.capex)) ? num(ttm.cfo) - num(ttm.capex) : c.fcf[L];
     const fy = div(fcfTtm, mcap), fyFwd = div(num(R.val.fwdFcf), mcap);
@@ -3449,8 +3766,16 @@ class Component extends DCLogic {
 
     // statements
     const stmt = STMT[st.tab];
-    const wantQ = (st.period || (R.noAnnual ? 'q' : 'a')) === 'q', isQ = wantQ && !!R.finQ;
+    const stPer = st.period || (R.finQ || R.noAnnual || (st.qState || {})[T] !== 'error' ? 'q' : 'a'), wantQ = stPer === 'q', isQ = wantQ && !!R.finQ;
     const sx = (st.stmtX || {})[T], TT = isQ ? null : ttmColumn(R, sx, ok(taxN) ? taxN / 100 : 0.21);   // the TTM column, after the years
+    // one-off items inside each year's operating income ($ millions, a charge negative), for the notes on the Overview tiles
+    const ooA = sx && sx.status === 'ok' ? sx.a : {}, ooAt = i => { const v = num((ooA[String(Y[i])] || {}).oneOff); return ok(v) ? v : 0; };
+    const ooRoic = Array.from({ length: 10 }, (_, j) => L - 9 + j).filter(i => i >= 0 && ooAt(i));
+    const roicEx = avgN(c.roic.map((_, i) => div((c.ebit[i] - ooAt(i)) * (1 - (ok(taxN) ? taxN / 100 : 0.21)), c.debt[i] + c.equity[i] - c.liquid[i])), 10);
+    const ooMoney = v => (v < 0 ? '−' : '+') + '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(2) + 'B' : Math.round(Math.abs(v)) + 'M');
+    const ooTip = (idx, what, without) => idx.length ? 'Operating income is as reported, and includes one-off items:\n' +
+      idx.map(i => 'FY' + Y[i] + ': ' + ((ooA[String(Y[i])] || {}).oneOffItems || []).map(([l, v]) => l + ' ' + ooMoney(v)).join(', ')).join('\n') +
+      '\n' + what + ' without them: ' + without : '';
     const FQ = isQ ? R.finQ : TT ? TT.fin : R.fin, CQ = isQ ? calc(R.finQ, ok(taxN) ? taxN / 100 : 0.21) : TT ? TT.c : c, lag = isQ && st.cmp === 'qoq' ? 1 : isQ ? 4 : 1;
     const showChg = st.showChg !== false, showHeat = st.heat !== false;
     const INV = { cogs: 1, interest: 1, curLiab: 1, debt: 1, shares: 1, liab: 1, netDebt: 1 };
@@ -3463,7 +3788,7 @@ class Component extends DCLogic {
       return { hasChg: showChg, chg: (g >= 0 ? '+' : '−') + Math.abs(g * 100).toFixed(1) + '%', chgColor: col, heat: showHeat && Math.abs(good) > 0.0005 ? 'color-mix(in oklch, ' + col + ' ' + amt + '%, transparent)' : 'transparent' };
     };
     // extra statement lines from the Diligence server, lined up with the columns on screen
-    if (page === 'finances' && !sx && this.pkey('local')) setTimeout(() => { if (!(this.state.stmtX || {})[T]) this.loadStmtDetail(T); }, 0);
+    if ((page === 'finances' || page === 'overview') && !sx && this.pkey('local')) setTimeout(() => { if (!(this.state.stmtX || {})[T]) this.loadStmtDetail(T); }, 0);
     const xCols = (isQ ? R.qLabels : Y.map(String)).map(l => (sx && sx.status === 'ok' ? (isQ ? sx.q : sx.a)[l] : null) || {}).concat(TT ? [TT.x] : []);
     // total liabilities as the company reports them; assets less shareholders' equity only when it does not (that would fold in minority interests)
     const sGet = (k, i) => k.charAt(0) === '+' ? (fitAt(BS_GRP[k.slice(1)], i).has(k.slice(1)) ? sGet(k.slice(1), i) : 0) : k === 'liabT' ? (ok(xCols[i].liabTotal) ? xCols[i].liabTotal : CQ.liab[i]) : FIN_KEYS.includes(k) ? num(FQ[k][i]) : k in xCols[i] ? xCols[i][k] : CQ[k] ? CQ[k][i] : NaN;
@@ -3479,7 +3804,9 @@ class Component extends DCLogic {
     const leafNums = n => n.t === 'in' || n.t === 'v' ? FQ[n.k].map(num) : n.t === 'x' ? xCols.map(c => ok(c[n.k]) ? c[n.k] : NaN) : n.t === 'c' ? CQ[n.k].slice() : n.t === 'rest' ? colIdx.map(i => fitRest(n.grp, i)) : colIdx.map(i => n.f(sGet, i));
     const leafFmt = (n, x) => n.fmt === 'eps' ? (ok(x) ? x.toFixed(2) : '—') : n.fmt === 'pct' ? pct(x) : uFmt(x);
     const noChg = { hasChg: false, chg: '', chgColor: '', heat: 'transparent' };
-    const textCells = (n, nums) => nums.map((x, i) => Object.assign({ v: leafFmt(n, x) }, n.fmt === 'pct' ? noChg : chg(nums, i, n.k)));
+    // hovering a one-off figure lists the items in it
+    const oneOffTip = i => { const it = (xCols[i] || {}).oneOffItems || []; return it.length ? 'One-off items in operating income (' + U.name + ', a charge is negative):\n' + it.map(([l, v]) => l + ': ' + (v < 0 ? '−' : '+') + uFmt(Math.abs(v))).join('\n') : ''; };
+    const textCells = (n, nums) => nums.map((x, i) => Object.assign({ v: leafFmt(n, x), tip: n.k === 'oneOff' ? oneOffTip(i) : '' }, n.fmt === 'pct' || n.fmt === 'oneoff' ? noChg : chg(nums, i, n.k)));
     const sLabel = l => l.replace('(M)', '(' + U.sh + ')');
     const groupIds = []; (function walk(ns) { ns.forEach(n => { if (n.g) { groupIds.push(n.id); walk(n.kids); } }); })(stmt.tree);
     const stmtRows = [], LINE = 'linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px';
@@ -3523,16 +3850,12 @@ class Component extends DCLogic {
     const rr = (label, a, f = pct) => ({ label, latest: f(a[L]), a5: f(avgN(a, 5)), a10: f(avgN(a, 10)) });
     const POS_EQ = {'Current ratio': 'Current assets / current liabilities', 'Cash ratio': 'Cash / current liabilities', 'Working capital': 'Current assets − current liabilities', 'Interest coverage': 'Operating income (EBIT) / interest expense', 'Net debt / EBITDA': '(Total debt − cash) / EBITDA', 'Debt / free cash flow': 'Total debt / free cash flow', 'Debt / capital': 'Total debt / (total debt + equity)', 'Debt / equity': "Total debt / shareholders' equity", 'Equity / assets': "Shareholders' equity / total assets"};
     const pos = (label, x, f, guide, status, tip) => ({ label, eq: POS_EQ[label] || '', value: f(x), guide: showGuides ? guide : '', has: !!status, tagClass: TAG[status || ''][0], tagText: TAG[status || ''][1], tip: tip || '' });
-    const dFcf = c.debtFcf[L];
 
     const c10rev = cagr(c.revenue, 10), c10cost = cagr(c.costs, 10);
     const growthNote = ok(c10rev) && ok(c10cost) ? (c10cost < c10rev ? `Over 10 years costs grew ${((c10rev - c10cost) * 100).toFixed(1)} points a year slower than sales, so operating margin widened from ${pct(div(c.ebit[L - 10], c.revenue[L - 10]))} to ${pct(div(c.ebit[L], c.revenue[L]))}.` : `Over 10 years costs grew ${((c10cost - c10rev) * 100).toFixed(1)} points a year faster than sales, so operating margin narrowed from ${pct(div(c.ebit[L - 10], c.revenue[L - 10]))} to ${pct(div(c.ebit[L], c.revenue[L]))}.`) : '';
 
     const bb = num(R.buyBelow);
     const verdictTags = { Buy: 'tag tag-accent', Watch: 'tag tag-outline', Pass: 'tag tag-neutral', Undecided: 'tag tag-neutral' };
-    const insVal = x => num(x.shares) * num(x.price);
-    const buys = R.insiders.filter(x => x.type !== 'Sell').reduce((s, x) => s + (ok(insVal(x)) ? insVal(x) : 0), 0);
-    const sells = R.insiders.filter(x => x.type === 'Sell').reduce((s, x) => s + (ok(insVal(x)) ? insVal(x) : 0), 0);
     const curLabel = SECTIONS.find(s => s.id === page).label;
     const hasKey = this.anyKey(), priceSrc = !!this.roleProvider('prices');
     const mmOn = !!(st.mmLive && Date.now() - st.mmLive.at < 90000);
@@ -3613,7 +3936,6 @@ class Component extends DCLogic {
     };
     const insTable = (id, title, note, priceHead, list) => { const n = insShown[id] || 15; return { note, priceHead, cols: '84px minmax(90px,1.6fr) ' + (id === 'trades' ? '58px' : 'minmax(104px,1fr)') + ' minmax(58px,0.55fr) minmax(68px,0.6fr) minmax(84px,0.9fr) minmax(104px,0.7fr)', minW: id === 'trades' ? '592px' : '628px', rows: weekRows(id, list, n), empty: !list.length, hasMore: list.length > n, moreLabel: 'Show ' + Math.min(25, list.length - n) + ' more', more: () => this.setState(s => ({ insShown: Object.assign({}, s.insShown, { [id]: n + 25 }) })) }; };
     const insTrades = liveInsSrc.filter(isOpenMarket), insOther = liveInsSrc.filter(x => !isOpenMarket(x));
-    const liveBuys = insTrades.filter(isBuy).length, liveSells = insTrades.length - liveBuys;
     const priceHist = (st.priceHist || {})[T], insYears = st.insYears || 2;
     const hold = (st.holders || {})[T];
     if (page === 'events' && !hold && this.pkey('local')) setTimeout(() => { if (!(this.state.holders || {})[T]) this.loadHolders(T); }, 0);
@@ -3652,7 +3974,6 @@ class Component extends DCLogic {
       const total = ok(d.sharesOutstanding) && d.sharesOutstanding > held ? d.sharesOutstanding : held, top = list.slice(0, 5), rest = held - top.reduce((a, h) => a + h.shares, 0);
       // a company whose shares trade mainly at home (TSMC): the rest is the ADRs no filing names, and the home shares
       const adr = ok(d.adrShare) && d.adrShare > 0 && d.adrShare < 1 && total > held ? d.adrShare : null;
-      const homeListed = list.filter(h => h.home).reduce((a, h) => a + h.shares, 0);
       const adrOthers = adr ? Math.max(0, total * adr - (d.totalShares || 0)) : 0, homeOthers = adr ? Math.max(0, total - held - adrOthers) : 0;
       const parts = top.map((h, i) => ({ name: h.name, v: h.shares, bg: MIX[i % MIX.length] })).concat(rest > 0 ? [{ name: 'Other holders listed', v: rest, bg: 'var(--color-neutral-600)' }] : [],
         adr ? [{ name: 'Other ADR holders', v: adrOthers, bg: 'var(--color-neutral-700)' }, { name: 'Shares traded at home, other holders', v: homeOthers, bg: 'var(--color-neutral-800)' }].filter(x => x.v > 0)
@@ -3704,29 +4025,29 @@ class Component extends DCLogic {
       searchOpen: !!st.search, searchMsg: st.search ? st.search.msg : '',
       searchResults: (st.search ? st.search.results : []).map((x, i) => ({ symbol: x.symbol, name: x.name, meta: x.meta, bg: i === st.search.sel ? 'var(--color-neutral-800)' : 'transparent', pick: e => { e.preventDefault(); this.addSymbol(x.symbol); } })),
       stmtScrollRef: this.stmtScrollRef,
-      refreshQuotes: () => (hasKey ? this.loadQuotes(true) : this.openSettings()), refreshIcon: st.quoting ? 'ph ph-spinner-gap' : 'ph ph-arrows-clockwise',
+      saveWarn: !!st.saveFailed,
+      saveWarnText: !st.saveFailed ? '' : LOCAL_DB === location.origin && !st.diskFailed
+        ? 'This browser could not save your notes: its storage is full or blocked. They are still being copied to notes/desk.json, so nothing is lost while the Diligence server runs.'
+        : 'Your notes are not being saved: this browser\'s storage is full or blocked' + (LOCAL_DB === location.origin ? ' and the Diligence server is not answering' : '') + '. Export them now from Settings → Research notes.',
       exportNotes: () => this.exportNotes(), importNotes: e => { this.importNotes(e.target.files && e.target.files[0]); e.target.value = ''; },
       openSettings: () => this.openSettings(), stop: e => e.stopPropagation(),
       ...(() => {   // the "delete this stock's data?" box
         const f = st.forget; if (!f) return { forgetOpen: false };
         const one = f.syms.length === 1, foot = f.foot, n = k => (foot || []).reduce((a, x) => a + (x[k] || 0), 0);
-        // what the user wrote, as against figures the page saved by itself
-        const wrote = S => { const r = store.data[S]; if (!r) return false; const t = v => String(v || '').trim();
-          return [r.thesis, r.wrong, r.buyBelow].some(t) || (r.verdict && r.verdict !== 'Undecided') || Object.values(r.swot || {}).some(a => (a || []).length)
-            || (r.questions || []).some(q => t(q.a)) || Object.keys(r.checks || {}).length > 0 || Object.keys(r.reviewed || {}).length > 0; };
+        const wrote = S => wroteNotes(store.data[S]);   // what the user wrote, as against figures the page saved by itself
         const notes = f.syms.filter(wrote).length;
         const rows = (foot || f.syms.map(t => ({ ticker: t, secRows: 0 }))).map(x => ({ t: x.ticker,
           what: [store.data[x.ticker] ? (wrote(x.ticker) ? 'your notes' : 'saved figures') : '', x.secRows ? x.secRows.toLocaleString() + ' SEC rows' : x.shared ? 'SEC data kept (shared with a ticker still in a group)' : ''].filter(Boolean).join(' · ') || 'nothing saved' }));
-        return { forgetOpen: true, forgetTitle: one ? 'Delete the data kept about ' + f.syms[0] + '?' : 'Delete the data kept about ' + f.syms.length + ' stocks?',
-          forgetLead: (one ? f.syms[0] + ' is' : 'These stocks are') + ' in none of your groups now. Deleting removes:',
+        return { forgetOpen: true, forgetTitle: one ? 'Delete your notes on ' + f.syms[0] + ' too?' : 'Delete your notes on ' + f.syms.length + ' stocks too?',
+          forgetLead: (one ? f.syms[0] + ' is' : 'These stocks are') + ' in none of your groups now. The figures saved for ' + (one ? 'it' : 'them') + ' are cleared by themselves; your notes are kept unless you delete them. Deleting removes:',
           forgetRows: rows, forgetMany: !one,
           forgetPoints: !foot ? [{ t: 'Checking what is saved…' }] : [
             { t: notes ? (one ? 'Your thesis, checklist and notes for it' : 'Your theses, checklists and notes for ' + notes + ' of them') + ', and the figures the page saved, in this browser and in notes/desk.json'
                 : 'The figures the page saved for ' + (one ? 'it' : 'them') + ' (you wrote no notes), in this browser and in notes/desk.json' },
-            { t: n('secRows') ? n('secRows').toLocaleString() + ' rows of SEC filings and figures in sec.db. They are read from the SEC again if you add ' + (one ? 'it' : 'one') + ' back.' : 'No SEC data of ' + (one ? 'its' : 'their') + ' own in sec.db' },
+            { t: n('secRows') ? n('secRows').toLocaleString() + ' rows of SEC filings and figures in sec.db, now. Whatever you choose here the server clears them by itself about ten minutes after a stock leaves its last group, and reads them from the SEC again if you add ' + (one ? 'it' : 'one') + ' back.' : 'No SEC data of ' + (one ? 'its' : 'their') + ' own in sec.db' },
             { t: 'Reports are kept: ' + (one ? 'its' : 'their') + ' company reports and every report that mentions ' + (one ? 'it' : 'them') + ' stay in the reports folder.' }],
           forgetMsg: f.msg, forgetHasMsg: !!f.msg, forgetBusy: !!f.busy || !foot, forgetGo: () => this.doForget(), forgetCancel: () => this.setState({ forget: null }),
-          forgetGoLabel: f.busy ? 'Deleting…' : 'Delete', forgetKeepLabel: one ? 'Keep its data' : 'Keep their data' };
+          forgetGoLabel: f.busy ? 'Deleting…' : 'Delete', forgetKeepLabel: one ? 'Keep its notes' : 'Keep their notes' };
       })(),
       ...this.settingsView(),
       // the workspaces down the left edge, in the order research runs: a subject, then many stocks, then one company
@@ -3766,7 +4087,7 @@ class Component extends DCLogic {
       livePrice: ok(livePx) ? usd(livePx) : '', liveChg: ok(qT.pct) ? (qT.chg >= 0 ? '+' : '−') + Math.abs(qT.chg || 0).toFixed(2) + ' (' + (qT.pct >= 0 ? '+' : '−') + Math.abs(qT.pct).toFixed(2) + '%)' : '', liveColor: ok(qT.pct) ? (qT.pct >= 0 ? UP : DOWN) : 'var(--color-neutral-400)',
       tabs: SECTIONS.map(s => ({ label: s.label, go: () => this.goPage(s.id), color: s.id === page ? 'var(--color-text)' : 'var(--color-neutral-400)', line: s.id === page ? 'inset 0 -2px 0 var(--color-accent)' : 'none' })),
       noAnnualNote: R.noAnnual && !(R.fin && FIN_KEYS.some(k => (R.fin[k] || []).some(ok))) ? (shortName(R.name) || T) + ' has not filed an annual report (10-K) yet: it is newly listed, so there are no full-year figures, and the ratios below, which need them, stay empty until its first 10-K. Its quarterly reports are under Statements, set to Quarterly.' : '',
-      secKicker: (() => { const i = SECTIONS.findIndex(s => s.id === page); return 'Section 0' + i + ' of 0' + (SECTIONS.length - 1); })(), secTitle: ({ chart: 'Price chart', business: 'Understanding the business', finances: 'Understanding the finances', redflags: 'Red flags', strategy: 'Understanding the strategy', valuation: 'Stock valuation', events: 'Insiders and holders', news: 'News and lawsuits' })[page] || '',
+      secKicker: (() => { const i = SECTIONS.findIndex(s => s.id === page), two = x => String(x).padStart(2, '0'); return 'Section ' + two(i) + ' of ' + two(SECTIONS.length - 1); })(), secTitle: ({ chart: 'Price chart', minervini: 'Right stock, right time?', business: 'Understanding the business', finances: 'Understanding the finances', redflags: 'Red flags', strategy: 'Understanding the strategy', valuation: 'Stock valuation', events: 'Insiders and holders', news: 'News and lawsuits' })[page] || '',
       subChips: SECTIONS.find(s => s.id === page).subs.map(([id, label]) => ({ label, go: () => this.goSub(page, id) })), hasSubs: SECTIONS.find(s => s.id === page).subs.length > 0,
       liveNews: liveNewsSrc.map(n => { const key = n.url || n.title, logged = R.news.some(x => (n.url && x.url === n.url) || (x.headline && x.headline === n.title)), seen = !!(R.newsViewed || {})[key], markSeen = v => P(r => { r.newsViewed = r.newsViewed || {}; if (v) r.newsViewed[key] = 1; else delete r.newsViewed[key]; });
         return { title: n.title, url: n.url, date: n.date, site: n.site, logged, notLogged: !logged, titleColor: seen ? 'var(--color-neutral-400)' : 'var(--color-text)',
@@ -3787,8 +4108,6 @@ class Component extends DCLogic {
       liveInsiderNote: insDeep && insDeep.status === 'loading' ? 'Reading ' + INSIDER_YEARS + ' years of Form 4 filings, which can take a few minutes the first time…' : insDeep && insDeep.status === 'error' ? 'Older filings could not be read: ' + insDeep.msg : '',
       hasInsiderNote: !!(insDeep && (insDeep.status === 'loading' || insDeep.status === 'error')),
       needKey: !hasKey, needKeyNote: `Add a free API key to load ${T}'s statements`,
-      finSourceNote: R.live && R.live.sources ? 'Source: ' + R.live.sources.join(', ') + '.' : '',
-      priceStr: R.val.price, onPrice: setObj('val', 'price'),
       dcfPs: usd(ps), dcfMos: mosTxt,
       verdict: R.verdict, verdictTag: verdictTags[R.verdict] || 'tag tag-neutral',
       mainMax: isWide ? 'none' : page === 'events' ? '1560px' : '1320px', mainPadB: isWide ? '16px' : '75vh', chartMounted: isChart || !!this._chartSeen, chartPlace: isChart ? 'height:100%' : (r => 'position:fixed;visibility:hidden;pointer-events:none;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px')(this._chartRect || { left: 0, top: 0, width: 1000, height: 600 }), mainOverflow: 'auto', mainH: isWide ? '100%' : 'auto',
@@ -3797,7 +4116,7 @@ class Component extends DCLogic {
       railDisplay: (docked || st.railOpen) ? 'flex' : 'none', railPos: docked ? 'relative' : 'absolute', railShadow: docked ? 'none' : 'var(--shadow-lg)',
       toggleRail: () => this.setState(s => ({ railOpen: !s.railOpen })),
       mainRef: this.mainRef, chipsRef: this.chipsRef,
-      ...(() => { const ins = (st.insight || {})[T]; if (page === 'overview' && !ins) setTimeout(() => { if (!(this.state.insight || {})[T]) this.loadInsight(T); }, 0);
+      ...(() => { const ins = (st.insight || {})[T]; if ((page === 'overview' || page === 'valuation') && !ins) setTimeout(() => { if (!(this.state.insight || {})[T]) this.loadInsight(T); }, 0);
         const d = ins && ins.status === 'ok' ? ins.d : null, tiles = []; if (!d) return { hasMarketTiles: false, marketTiles: [] };
         const md = k => new Date(Date.parse(k + 'T00:00:00Z')).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }), sg = x => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(1) + '%', px = num(qT.price);
         const e = d.earnings || {}, last = e.last ? 'Last: ' + md(e.last.date) + (ok(e.last.move) ? ', shares ' + sg(e.last.move) + ' on the news' : '') : '';
@@ -3853,7 +4172,7 @@ class Component extends DCLogic {
           tvIntOpen: open, tvIntToggle: () => this.setState({ tvIntOpen: !open, tvStyleOpen: false }), tvIntClose: () => this.setState({ tvIntOpen: false }), tvIntCaret: open ? 'ph ph-caret-up' : 'ph ph-caret-down', tvIntBtnBg: open ? 'var(--color-surface)' : 'transparent', tvIntBtnColor: open ? 'var(--color-accent)' : 'var(--color-neutral-300)' }; })(),
       ...(() => { const opts = [['1', 'Candles'], ['0', 'Bars'], ['2', 'Line'], ['3', 'Area'], ['8', 'Heikin Ashi']], cur = (st.store.prefs.chart || {}).style || '1', open = !!st.tvStyleOpen;
         return { tvStyles: opts.map(([id, label]) => ({ label, value: id, bg: cur === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: cur === id ? 'var(--color-text)' : 'var(--color-neutral-300)', icon: cur === id ? 'ph ph-check' : '', pick: () => { this.setState({ tvStyleOpen: false }); this.setChart({ style: id }); } })),
-          tvStyle: cur, tvStyleLabel: (opts.find(o => o[0] === cur) || opts[0])[1], tvStyleOpen: open, tvStyleToggle: () => this.setState({ tvStyleOpen: !open }), tvStyleClose: () => this.setState({ tvStyleOpen: false }), tvStyleCaret: open ? 'ph ph-caret-up' : 'ph ph-caret-down', tvStyleBtnBg: open ? 'var(--color-surface)' : 'transparent', tvStyleBtnBorder: open ? 'var(--color-accent)' : 'var(--color-divider)' }; })(),
+          tvStyleLabel: (opts.find(o => o[0] === cur) || opts[0])[1], tvStyleOpen: open, tvStyleToggle: () => this.setState({ tvStyleOpen: !open }), tvStyleClose: () => this.setState({ tvStyleOpen: false }), tvStyleCaret: open ? 'ph ph-caret-up' : 'ph ph-caret-down', tvStyleBtnBg: open ? 'var(--color-surface)' : 'transparent', tvStyleBtnBorder: open ? 'var(--color-accent)' : 'var(--color-divider)' }; })(),
       ...(() => {
         const dT = (st.daily || {})[T], dB = (st.daily || {})[TREND_BENCH];
         if (page === 'chart') setTimeout(() => { const d = this.state.daily || {}; if (!d[T]) this.loadDaily(T); if (!d[TREND_BENCH]) this.loadDaily(TREND_BENCH); }, 0);
@@ -3864,7 +4183,7 @@ class Component extends DCLogic {
         if (dT.status === 'error') { out.ttStatus = dT.msg; return out; }
         const tt = trendTemplate(dT.closes, dB && dB.status === 'ok' ? dB.closes : null), known = tt.rows.filter(r => r.pass !== null), met = known.filter(r => r.pass).length;
         out.ttHas = true;
-        out.ttRows = tt.rows.map((r, i) => ({ n: i + 1, text: r.text, detail: r.detail, note: r.note, hasNote: !!r.note, tagText: r.pass === null ? 'No data' : r.pass ? 'Pass' : 'Fail', tagClass: r.pass === null ? 'tag tag-neutral' : r.pass ? 'tag tag-good' : 'tag tag-flag' }));
+        out.ttRows = tt.rows.map((r, i) => ({ n: i + 1, text: r.text, detail: r.detail, note: r.note, tagText: r.pass === null ? 'No data' : r.pass ? 'Pass' : 'Fail', tagClass: r.pass === null ? 'tag tag-neutral' : r.pass ? 'tag tag-good' : 'tag tag-flag' }));
         out.ttScore = met + ' of ' + tt.rows.length + ' met'; out.ttScoreShort = met + '/' + tt.rows.length; out.ttScoreClass = met === tt.rows.length ? 'tag tag-good' : met >= 6 ? 'tag tag-watch' : 'tag tag-flag';
         out.ttVerdict = known.length < tt.rows.length ? 'Some rules could not be checked, so this is not a full reading.' : met === tt.rows.length ? 'All eight rules are met: the stock is in the kind of uptrend the book looks for.' : 'The book only considers a stock when all eight are met.';
         { const dd = this.ttDaily(T), W = 16;   // a calendar of the last sixteen weeks: a column per week, a row per weekday, a square per trading day
@@ -3899,30 +4218,186 @@ class Component extends DCLogic {
 
       nav, progress, rv, checks, concerns, noConcerns: concerns.length === 0, screens,
 
+      // ---- the Minervini tab: SEPA checks on this stock, the market and the base it is in ----
+      ...(() => {
+        const sp = (st.store.prefs || {}).sepa || {};
+        const out = { spHas: false, spStatus: '', spVerdict: '', spVerdictClass: 'tag tag-neutral', spVerdictText: '', spCards: [], spKeys: [],
+          spStageLabel: '', spStageText: '', spTrendRows: [], spFundRows: [], spHasQ: false, spQCols: '', spQHead: [], spQCells: [], spQSrc: '',
+          spHasContr: false, spContr: [], spTimeRows: [], spRiskTiles: [], spRiskNote: '',
+          spAccount: sp.account || '', onSpAccount: e => this.setSepa({ account: e.target.value }), spRiskPct: sp.riskPct || '', onSpRiskPct: e => this.setSepa({ riskPct: e.target.value }),
+          spOpenChart: () => { this.setChart({ template: true, ribbon: [50, 150, 200].map(len => ({ on: true, type: 'SMA', src: 'close', len })).concat([{ on: false, type: 'SMA', src: 'close', len: 20 }]), studies: [] }); this.goPage('chart'); } };
+        if (page !== 'minervini') return out;
+        setTimeout(() => { const s2 = this.state, d = s2.daily || {};
+          if (!d[T]) this.loadDaily(T); if (!d[TREND_BENCH]) this.loadDaily(TREND_BENCH);
+          if (!(s2.insight || {})[T]) this.loadInsight(T); if (!(s2.surp || {})[T]) this.loadSurprises(T);
+          if (!(s2.stmtX || {})[T] && this.pkey('local')) this.loadStmtDetail(T);
+          const R2 = s2.store.data[T]; if (R2 && !R2.finQ && !(s2.qState || {})[T]) this.loadQuarters(T); }, 0);
+        const dT = (st.daily || {})[T], dB = (st.daily || {})[TREND_BENCH];
+        if (!dT || dT.status === 'loading') { out.spStatus = 'Loading daily prices…'; return out; }
+        if (dT.status === 'error') { out.spStatus = dT.msg; return out; }
+        const c = dT.closes, n = c.length, h = dT.highs || c, l = dT.lows || c, v = dT.vols || c.map(() => NaN), tm = dT.times || [];
+        const dayOf = i => ok(tm[i]) ? dayLabel(new Date(tm[i]).toISOString().slice(0, 10)) : '';
+        const tag = p => p === null || p === undefined ? ['No data', 'tag tag-neutral'] : p === 'watch' ? ['Watch', 'tag tag-watch'] : p === 'later' ? ['Later', 'tag tag-neutral'] : p ? ['Pass', 'tag tag-good'] : ['Fail', 'tag tag-flag'];
+        const row = (label, p, detail, tip) => { const [tagText, tagClass] = tag(p); return { label, tagText, tagClass, detail: detail || '', tip: tip || '' }; };
+        const tt = trendTemplate(c, dB && dB.status === 'ok' ? dB.closes : null), stage = sepaStage(c), vcp = sepaVcp(h, l, c, v);
+        const known = tt.rows.filter(r => r.pass !== null), met = known.filter(r => r.pass).length, price = c[n - 1];
+        out.spHas = true; out.spStageLabel = stage.label; out.spStageText = stage.text;
+
+        // relative strength line: the stock over the S&P 500, day by day; Minervini likes it at a new high, ideally ahead of the price
+        let rsHigh = null, rsDetail = 'Needs a year of daily prices for the stock and the S&P 500';
+        if (dB && dB.status === 'ok' && dB.times && tm.length) {
+          const spx = {}; dB.times.forEach((t, i) => { spx[new Date(t).toISOString().slice(0, 10)] = dB.closes[i]; });
+          const rs = []; for (let i = Math.max(0, n - 252); i < n; i++) { const b = spx[new Date(tm[i]).toISOString().slice(0, 10)]; if (ok(b)) rs.push(c[i] / b); }
+          if (rs.length >= 200) { const top = Math.max(...rs), now = rs[rs.length - 1], pxHigh = price >= Math.max(...c.slice(-252)) * 0.98; rsHigh = now >= top * 0.98;
+            rsDetail = (rsHigh ? 'At its 52-week high' + (pxHigh ? '' : ', ahead of the price: a sign of a leader') : (sgn(now / top - 1) + ' from its 52-week high')); }
+        }
+        out.spTrendRows = tt.rows.map(r => row(r.text, r.pass, r.detail, r.note)).concat([row('Relative strength line at a new high', rsHigh, rsDetail, 'The stock\'s price divided by the S&P 500\'s. When it makes a new high before the price does, the stock is outrunning the market: Minervini\'s favourite sign of a leader.')]);
+        const trendOK = known.length === tt.rows.length && met === tt.rows.length && stage.n === 2;
+
+        // earnings
+        const F = R.finQ ? sepaFund(R.finQ, R.qLabels || []) : null, qStat = (st.qState || {})[T];
+        let fundOK = null;
+        if (F) {
+          const sx2 = (st.stmtX || {})[T], oo = sx2 && sx2.status === 'ok' ? num(((sx2.q || {})[F.label] || {}).oneOff) : NaN;
+          const g3 = f => F.quarters.slice(-3).map(q => f === 'opm' ? pct(q[f], 0) : sgn(q[f], 0)).join(' → '), $e = x => ok(x) ? (x < 0 ? '−$' : '$') + Math.abs(x).toFixed(2) : '—';
+          const epsP = F.turned || F.oddLoss ? 'watch' : ok(F.epsG) ? F.epsG >= 0.25 : ok(F.eps) && F.eps <= 0 ? false : null;
+          out.spFundRows = [
+            row('EPS up 25% or more on a year earlier', epsP, F.turned ? F.label + ': turned profitable, $' + F.eps.toFixed(2) + ' against a loss of $' + Math.abs(F.epsPrev).toFixed(2) + ' a year earlier' : F.oddLoss ? F.label + ': $' + F.eps.toFixed(2) + ' against a one-quarter loss of $' + Math.abs(F.epsPrev).toFixed(2) + ' a year earlier, so the growth rate means little; compare the quarters in the table' : ok(F.epsG) ? F.label + ': $' + F.eps.toFixed(2) + ' against $' + F.epsPrev.toFixed(2) + ' a year earlier (' + sgn(F.epsG, 0) + ')' : ok(F.eps) && F.eps <= 0 ? F.label + ': still a loss ($' + F.eps.toFixed(2) + ' a share)' : 'Not enough quarters on file',
+              'Minervini looks for big earnings growth in the latest quarters; 25% is a common floor among his followers. A turn from loss to profit counts, but is less proven.'),
+            row('EPS growth speeding up', F.epsAccel, 'Last three quarters: ' + g3('epsG')),
+            row('Sales up 20% or more on a year earlier', ok(F.salesG) ? F.salesG >= 0.2 : null, ok(F.salesG) ? F.label + ': ' + sgn(F.salesG, 0) : 'Not enough quarters on file', 'Earnings growth backed by sales growth, not only by cost cuts.'),
+            row('Sales growth speeding up', F.salesAccel, 'Last three quarters: ' + g3('salesG')),
+            row('Operating margin widening', F.marginUp, 'Last three quarters: ' + g3('opm')),
+            row('Code 33: all three improving', F.epsAccel && F.salesAccel && F.marginUp, F.epsAccel && F.salesAccel && F.marginUp ? 'EPS growth, sales growth and margins all rose three quarters running' : 'Not all three of EPS growth, sales growth and margins rose three quarters running',
+              'Minervini\'s "Code 33": three quarters in a row of accelerating earnings, accelerating sales and expanding margins. Rare, and a strong sign.'),
+            (() => { const below = ok(F.ni) && ok(F.ebit) && F.ebit > 0 && F.ni > F.ebit * 1.1, one = ok(oo) && ok(F.ebit) && Math.abs(oo) > Math.abs(F.ebit) * 0.1;
+              return row('Earnings not propped up by one-offs', below || one ? 'watch' : ok(F.ni) && ok(F.ebit) ? true : null,
+                one ? F.label + ': one-off items of ' + usd(oo, 0) + 'M inside operating income (see Statements)' : below ? F.label + ': net income ' + usd(F.ni, 0) + 'M is above operating income ' + usd(F.ebit, 0) + 'M, so investment gains, interest or a tax benefit lifted it' : 'Profit comes from the business itself',
+                'One-off gains and tax benefits make EPS growth look better than the business is.'); })(),
+            (() => { const su = (st.surp || {})[T], d = su && su.status === 'ok' ? su.d || [] : null;
+              if (!d || !d.length) return row('Beat the analysts\' estimates', null, su && su.status === 'nokey' ? 'Add a free Finnhub key in Settings to check this' : su && su.status === 'loading' ? 'Loading…' : 'No estimates found');
+              const beats = d.filter(x => x.actual > x.estimate).length, last = d[0];
+              return row('Beat the analysts\' estimates', last.actual > last.estimate ? (beats >= Math.min(3, d.length) ? true : 'watch') : false, 'Beat ' + beats + ' of the last ' + d.length + '; latest $' + last.actual.toFixed(2) + ' against $' + last.estimate.toFixed(2) + (ok(last.pct) ? ' (' + (last.pct >= 0 ? '+' : '') + last.pct.toFixed(1) + '%)' : ''),
+                'Earnings surprises tend to come in runs; Minervini calls it the cockroach effect. From Finnhub, which compares the EPS analysts follow (often adjusted), so it can differ from the reported EPS in the table.'); })(),
+          ];
+          fundOK = (F.turned || (ok(F.epsG) && F.epsG >= 0.25)) && ok(F.salesG) && F.salesG >= 0.2 ? true : (ok(F.epsG) && F.epsG > 0) || F.turned ? 'watch' : false;
+          const cols = [['Quarter', 'left'], ['EPS', 'right'], ['EPS growth', 'right'], ['Sales growth', 'right'], ['Operating margin', 'right']];
+          const tone = x => !ok(x) ? 'var(--color-neutral-400)' : x >= 0.25 ? UP : x < 0 ? DOWN : 'var(--color-text)';
+          out.spHasQ = true; out.spQCols = 'minmax(90px,1fr) repeat(4, minmax(90px,1fr))'; out.spQHead = cols.map(([label, align]) => ({ label, align })); out.spQSrc = !R.qSrc || R.qSrc === 'Diligence' ? 'the SEC filings' : R.qSrc;
+          out.spQCells = [].concat(...F.quarters.map((q, i) => { const w = i === F.quarters.length - 1 ? 600 : 400;
+            return [{ v: q.label, align: 'left', color: 'var(--color-text)', weight: w }, { v: $e(q.eps), align: 'right', color: 'var(--color-text)', weight: w },
+              { v: sgn(q.epsG, 0), align: 'right', color: tone(q.epsG), weight: w }, { v: sgn(q.salesG, 0), align: 'right', color: tone(q.salesG), weight: w }, { v: pct(q.opm, 1), align: 'right', color: 'var(--color-text)', weight: w }]; }));
+        } else out.spFundRows = [row('Quarterly earnings', null, qStat === 'loading' ? 'Loading the quarterly statements…' : 'No quarterly statements for ' + T + ' from your connected sources')];
+
+        // the market: Minervini mostly sits out when the general market is falling
+        let mktP = null, mktLine = 'No S&P 500 prices', mktShort = 'No S&P 500 prices';
+        if (dB && dB.status === 'ok') { const mt = trendTemplate(dB.closes, null), up200 = mt.rows[2].pass, above50 = mt.price > mt.m50, above200 = mt.price > mt.m200;
+          mktP = above50 && above200 && up200 ? true : above200 ? 'watch' : false;
+          mktShort = mktP === true ? 'Uptrend: above its 50-day and a rising 200-day average' : mktP === 'watch' ? 'Correction: above its 200-day average but below its 50-day' : 'Downtrend: below its 200-day average';
+          mktLine = 'S&P 500 ' + usd(mt.price) + ' · 50-day ' + usd(mt.m50) + ' · 200-day ' + usd(mt.m200) + '. ' + mktShort; }
+
+        // the base and its pullbacks
+        const ext50 = ok(tt.m50) ? price / tt.m50 - 1 : NaN;
+        const ins = (st.insight || {})[T], nx = ins && ins.status === 'ok' && ins.d && ins.d.earnings ? ins.d.earnings.next : null;
+        const daysTo = nx ? Math.round((Date.parse(nx.date + 'T00:00:00Z') - Date.now()) / 864e5) : NaN;
+        let timing = 'none';
+        if (vcp) {
+          const cs = vcp.contractions;
+          out.spHasContr = cs.length > 0;
+          out.spContr = cs.map((x, k) => ({ depth: '−' + (x.depth * 100).toFixed(1) + '%', when: dayOf(x.hiI) + (x.open ? ', still going' : ''), color: k && x.depth > cs[k - 1].depth * 1.1 ? DOWN : 'var(--color-text)', border: k === cs.length - 1 ? 'var(--color-accent)' : 'transparent',
+            tip: 'From ' + usd(x.hi) + (dayOf(x.hiI) ? ' on ' + dayOf(x.hiI) : '') + ' down to ' + usd(x.lo) + (dayOf(x.loI) ? ' on ' + dayOf(x.loI) : '') }));
+          const vp = vcp.vsPivot, atHigh = price >= vcp.topHi;
+          timing = !cs.length ? 'none' : vp > 0.05 || ext50 > 0.25 ? 'extended' : vcp.shrinking && vcp.lastDepth <= 0.1 && vp >= 0 ? 'buy' : vcp.shrinking && vp >= -0.1 ? 'setup' : 'none';
+          out.spTimeRows = [
+            row('The market is in an uptrend', mktP, mktLine, 'Three out of four stocks follow the general market. Minervini buys less, or nothing, while it falls.'),
+            atHigh && !cs.length ? row('A base to buy from', false, 'At a new high with no base behind it: nothing to buy from yet') :
+              row('A base of sensible depth', vcp.baseLen < 15 ? 'watch' : vcp.baseDepth <= 0.35 ? true : vcp.baseDepth <= 0.5 ? 'watch' : false, 'From ' + usd(vcp.topHi) + (dayOf(vcp.top) ? ' on ' + dayOf(vcp.top) : '') + ': ' + vcp.baseLen + ' trading days, down ' + pct(vcp.baseDepth, 0) + ' at the lowest',
+                'Most of his bases run from 3 weeks to a year, and fall 10% to 35% (up to about 50% in a weak market). Deeper ones take longer to repair.'),
+            row('Each pullback shallower than the last', cs.length < 2 ? (cs.length ? 'watch' : false) : vcp.shrinking, cs.length < 2 ? (cs.length ? 'Only one pullback so far; a VCP has two or more, each smaller' : 'No pullbacks found') : cs.map(x => '−' + (x.depth * 100).toFixed(0) + '%').join(' → '),
+              'The volatility contraction pattern: sellers run out at each step, so each dip is smaller. Two to four contractions is typical.'),
+            row('The last pullback is tight (10% or less)', ok(vcp.lastDepth) ? (vcp.lastDepth <= 0.1 ? true : vcp.lastDepth <= 0.15 ? 'watch' : false) : null, ok(vcp.lastDepth) ? '−' + (vcp.lastDepth * 100).toFixed(1) + '%' : ''),
+            row('Volume drying up', ok(vcp.volDry) ? (vcp.volDry <= 0.85 ? true : vcp.volDry <= 1 ? 'watch' : false) : null, ok(vcp.volDry) ? 'Last 10 days averaged ' + pct(vcp.volDry, 0) + ' of the 50 days before' : 'No volume figures (moomoo has them)',
+              'Quiet trading late in the base means few sellers are left.'),
+            row('Price near the buy point', vp > 0.05 ? false : vp >= 0 ? true : vp >= -0.1 ? 'watch' : false, vp > 0.05 ? sgn(vp) + ' above the pivot ' + usd(vcp.pivot) + ': extended, he does not chase past about 5%' : vp >= 0 ? 'In the buy range: ' + sgn(vp) + ' above the pivot ' + usd(vcp.pivot) : sgn(vp) + ' below the pivot ' + usd(vcp.pivot) + (vp >= -0.1 ? ': set an alert there' : ': not ready'),
+              'The pivot is the top of the last pullback. The buy range runs up to about 5% above it.'),
+            vp >= 0 && vp <= 0.05 ? row('Breakout on heavy volume', ok(vcp.volToday) ? (vcp.volToday >= 1.4 ? true : vcp.volToday >= 1 ? 'watch' : false) : null, ok(vcp.volToday) ? 'Latest day ' + pct(vcp.volToday, 0) + ' of normal volume (looking for 140%+)' : '',
+                'A breakout on light volume often fails: big buyers are not behind it.')
+              : row('Breakout on heavy volume', 'later', 'When the price clears ' + usd(vcp.pivot) + ', volume that day should be at least 40% above normal'),
+            row('Not stretched far above the 50-day average', ok(ext50) ? (ext50 > 0.25 ? false : ext50 < 0 ? 'watch' : true) : null, ok(ext50) ? sgn(ext50) + ' from the 50-day average ' + usd(tt.m50) + (ext50 > 0.25 ? ': extended' : ext50 < 0 ? ': below it' : '') : '',
+              'A stock far above its 50-day average has run a long way; buying there is chasing.'),
+            row('No results due in the next two weeks', ok(daysTo) ? (daysTo > 14 ? true : 'watch') : null, nx ? 'Next results ' + dayLabel(nx.date) + (nx.when ? ', ' + nx.when : '') + (ok(daysTo) ? ' (in ' + daysTo + ' days)' : '') : 'No date announced (from moomoo)',
+              'A breakout just before results can gap either way. He waits, or buys a smaller position.'),
+          ];
+        }
+
+        // the verdict
+        const verdict = !trendOK ? ['Not a candidate', 'tag tag-flag', stage.n !== 2 ? stage.label + '. Minervini only buys in Stage 2.' : (tt.rows.length - met) + ' of the trend template\'s eight rules not met. He only considers stocks that pass all eight.']
+          : fundOK !== true ? ['Chart only', 'tag tag-watch', 'The chart qualifies, but the earnings do not show the fast growth he looks for. Check the earnings rows below.']
+          : timing === 'buy' ? (mktP === true ? ['Buy zone', 'tag tag-good', 'A leader breaking out of a tightening base. Buy near ' + usd(vcp.pivot) + ', up to ' + usd(vcp.pivot * 1.05) + ', with the stop below.'] : ['Buy zone, weak market', 'tag tag-watch', 'The setup is there, but the market is not in an uptrend. He would buy a smaller position or wait.'])
+          : timing === 'setup' ? ['Setting up', 'tag tag-watch', 'A leader tightening up below its buy point. Set an alert at ' + usd(vcp.pivot) + ' and buy only if it clears it on heavy volume.']
+          : timing === 'extended' ? ['Extended', 'tag tag-watch', 'A leader, but already too far above its buy point. Wait for a pullback or a new base.']
+          : ['No setup yet', 'tag tag-watch', 'A leader without a tight base to buy from. Wait for the pullbacks to narrow.'];
+        [out.spVerdict, out.spVerdictClass, out.spVerdictText] = verdict;
+        const cardTag = p => tag(p);
+        out.spCards = [
+          { title: 'Right stock', ...(([a, b]) => ({ tagText: a, tagClass: b }))(cardTag(trendOK && fundOK === true ? true : trendOK || fundOK === true ? 'watch' : false)),
+            line: stage.label.split(':')[0] + ' · trend template ' + met + '/' + tt.rows.length + (F ? ' · EPS ' + (F.turned ? 'turned profitable' : F.oddLoss ? 'up from a one-off loss' : sgn(F.epsG, 0)) + ', sales ' + sgn(F.salesG, 0) : '') },
+          { title: 'Right time', ...(([a, b]) => ({ tagText: a, tagClass: b }))(cardTag(timing === 'buy' ? true : timing === 'setup' ? 'watch' : false)),
+            line: vcp ? ({ buy: 'In the buy range', setup: 'Setting up below the pivot', extended: 'Extended past the buy point', none: 'No tight base' })[timing] + ' · pivot ' + usd(vcp.pivot) + ' · price ' + sgn(vcp.vsPivot) : 'Not enough prices' },
+          { title: 'Market', ...(([a, b]) => ({ tagText: a, tagClass: b }))(cardTag(mktP)), line: mktShort },
+        ];
+
+        // the buy point, stop and size
+        if (vcp) {
+          const inRange = vcp.vsPivot >= 0 && vcp.vsPivot <= 0.05, entry = inRange ? price : vcp.pivot;
+          const raw = vcp.stopLow * 0.995, stop = Math.max(raw, entry * 0.9), capped = raw < entry * 0.9, rps = entry - stop;
+          const acct = num(sp.account), rp = ok(num(sp.riskPct)) ? num(sp.riskPct) : 1, shares = ok(acct) && rps > 0 ? Math.floor(acct * rp / 100 / rps) : NaN, val = shares * entry;
+          out.spKeys = [
+            { label: 'Buy point (pivot)', value: usd(vcp.pivot), sub: 'Top of the last pullback' + (dayOf(vcp.pivotI) ? ', ' + dayOf(vcp.pivotI) : ''), tip: '' },
+            { label: 'Buy up to', value: usd(vcp.pivot * 1.05), sub: '5% above the pivot', tip: '' },
+            { label: 'Stop', value: usd(stop), sub: '−' + pct(rps / entry, 1) + (capped ? ', capped at 10%' : ', under the last low'), tip: '' },
+            { label: 'Price now', value: usd(price), sub: sgn(vcp.vsPivot) + ' against the pivot', tip: '' },
+            { label: 'Next results', value: nx ? dayLabel(nx.date).replace(/, \d{4}$/, '') : '—', sub: ok(daysTo) ? 'in ' + daysTo + ' days' : 'not announced', tip: '' },
+          ];
+          out.spRiskTiles = [
+            { label: 'Entry', value: usd(entry), sub: inRange ? 'Today\'s price, in the buy range' : 'At the pivot, once it breaks out', tip: '' },
+            { label: 'Stop', value: usd(stop), sub: '−' + pct(rps / entry, 1) + ' · ' + usd(rps) + ' a share', tip: '' },
+            { label: 'Shares', value: ok(shares) ? shares.toLocaleString('en-US') : '—', sub: ok(shares) ? 'Risking ' + usd(acct * rp / 100, 0) + ' (' + rp + '% of the account)' : 'Enter the account size above', tip: '' },
+            { label: 'Position', value: ok(val) ? usd(val, 0) : '—', sub: ok(val) ? pct(val / acct, 1) + ' of the account' : '', tip: '' },
+            { label: 'Target at 2× risk', value: usd(entry + 2 * rps), sub: '+' + pct(2 * rps / entry, 1), tip: 'Where many traders take some profit or raise the stop to break even' },
+            { label: 'Target at 3× risk', value: usd(entry + 3 * rps), sub: '+' + pct(3 * rps / entry, 1), tip: '' },
+          ];
+          out.spRiskNote = [capped ? 'The last pullback\'s low is ' + pct(1 - raw / entry, 1) + ' below the entry, more than the 10% he allows, so the stop is set at 10%. A wide stop usually means the base is not tight enough yet.' : '',
+            ok(val) && val / acct > 0.25 ? 'That is over a quarter of the account in one stock; many of his followers cap a position at 20–25%.' : ''].filter(Boolean).join(' ');
+        }
+        return out;
+      })(),
       tiles: [
         { label: 'Revenue growth', value: pct(cagr(c.revenue, 10)), sub: '10-yr CAGR' },
         { label: 'FCF growth', value: pct(cagr(c.fcf, 10)), sub: '10-yr CAGR' },
-        { label: 'ROIC', value: pct(avgN(c.roic, 10)), sub: '10-yr average' },
+        { label: 'ROIC', value: pct(avgN(c.roic, 10)), sub: '10-yr average' + (ooRoic.length ? ' · incl. one-offs' : ''), tip: ooTip(ooRoic, 'ROIC', pct(roicEx)) },
         { label: 'FCF conversion', value: pct(conv5, 0), sub: 'FCF / net income, 5-yr avg' },
-        { label: 'Net debt / EBITDA', value: times(c.ndEbitda[L]), sub: `${Y[L]}` },
+        { label: 'Net debt / EBITDA', value: times(c.ndEbitda[L]), sub: `${Y[L]}` + (ooAt(L) ? ' · incl. one-offs' : ''), tip: ooTip(ooAt(L) ? [L] : [], 'Net debt / EBITDA', times(div(c.netDebt[L], c.ebitda[L] - ooAt(L)))) },
         { label: 'Share count', value: sgn(div(c.shares[L], c.shares[L - 10]) - 1), sub: 'change over 10 years' },
-        { label: 'P/E', value: times(peTtm), sub: `trailing 12 months${ttm.from ? ' (' + ttm.from + ')' : ''} · ${times(peFwd)} forward` },
+        { label: 'P/E LFY', value: times(div(price, c.eps[L])), sub: '', tip: 'Price over earnings per share of the last fiscal year, FY' + Y[L] },
+        { label: 'P/E TTM', value: times(ok(num(ttm.eps)) ? div(price, num(ttm.eps)) : NaN), sub: '', tip: 'Price over earnings per share of the last twelve months' + (ttm.from ? ', ' + ttm.from : '') },
+        { label: 'P/E FWD', value: times(peFwd), sub: '', tip: ok(mmFwd) ? 'From moomoo: price over the earnings per share analysts expect' + (mmPe.updated ? ', updated ' + mmPe.updated.slice(0, 10) : '') : 'Price over the forward earnings per share on the Valuation tab' + (ok(num(R.val.fwdEps)) ? '' : ', which is empty: start moomoo OpenD, add an FMP key for analyst estimates, or type one in') },
         { label: 'DCF value', value: usd(ps), sub: ok(mos) ? mosTxt : 'per share' },
-      ],
+      ].map(t => Object.assign({ tip: '' }, t)),
       verdicts: ['Undecided', 'Pass', 'Watch', 'Buy'].map(v => ({ label: v, on: R.verdict === v, pick: () => P(r => { r.verdict = v; }) })),
       thesis: R.thesis, onThesis: setR('thesis'), wrong: R.wrong, onWrong: setR('wrong'), buyBelow: R.buyBelow, onBuyBelow: setR('buyBelow'),
       buyBelowNote: ok(bb) && ok(price) ? (price <= bb ? `Price ${usd(price)} is at or below your level` : `Price ${usd(price)} is ${pct(price / bb - 1, 0)} above your level`) : ok(ps) ? `DCF value is ${usd(ps)}` : '',
 
       ...(() => {
-        const segPer = st.segPeriod === 'q' ? 'q' : 'a', sq = (st.segQ || {})[T];
+        const sq = (st.segQ || {})[T], segPer = st.segPeriod ? (st.segPeriod === 'q' ? 'q' : 'a') : !this.pkey('local') || (sq && sq.status === 'error') ? 'a' : 'q';
         if ((segPer === 'q' || page === 'business') && !sq && this.pkey('local')) setTimeout(() => { if (!(this.state.segQ || {})[T]) this.loadSegmentsQ(T); }, 0);
         const sdA = R.segData || {}, sd = segPer === 'q' ? Object.assign({ src: 'SEC filings' }, sq && sq.status === 'ok' ? sq.d : {}) : sdA, ss = (st.segState || {})[T], kinds = { segment: 'business segment', product: 'product', geo: 'region' };
         const view = (st.segViewFor === T && st.segView) || Object.keys(kinds).find(v => sd[v]) || 'segment', hasD = !!sd[view];
         const canLoad = !!(this.pkey('local') || this.pkey('fmp'));
-        if ((R.segData === undefined || R.segVer !== 3) && !ss && canLoad) setTimeout(() => this.loadSegments(T), 0);
+        if (this._figReady && (R.segData === undefined || R.segVer !== 3) && !ss && canLoad) setTimeout(() => this.loadSegments(T), 0);
         const status = segPer === 'q' && !this.pkey('local') ? 'Quarterly segment figures come from the Diligence server.' : segPer === 'q' && (!sq || sq.status === 'loading') ? 'Reading segment figures from the quarterly reports… the first time can take up to a minute.' : segPer === 'q' && sq.status === 'error' ? 'Could not be read: ' + sq.msg : ss === 'loading' ? 'Reading segment figures from the annual reports… the first time takes about 10 seconds.' : !canLoad || ss === 'nokey' ? 'Segment figures come from the Diligence server. Start it with python3 sec_db.py serve.' : ss && ss.startsWith('err:') && !hasD ? ss.slice(4) : (segPer === 'q' ? sq && sq.status === 'ok' : R.segData) && !hasD ? T + ' reports no ' + (segPer === 'q' ? 'quarterly ' : '') + 'breakdown by ' + kinds[view] + '.' : hasD ? (sd.filings || (sq && sq.status === 'ok' && sq.d && sq.d.filings) ? '' : 'From ' + (sd.src || 'filings')) : '';
         const lagS = segPer === 'q' ? 4 : 1;
-        const out = { segPeriodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: segPer === id, pick: () => this.setState({ segPeriod: id }) })), segViewTabs: [['segment', 'By segment'], ['product', 'By product'], ['geo', 'By region']].map(([id, label]) => ({ label, on: view === id, pick: () => this.setState({ segView: id, segViewFor: T }) })), reloadSegments: () => this.loadSegments(T), segStatus: status, segSources: [], segFrom: (() => { if (!hasD) return ''; const fa = sdA.filings, fq = sq && sq.status === 'ok' && sq.d ? sq.d.filings : null, name = f => (f.forms || []).join(', '); return segPer === 'q' ? (fq ? 'From quarterly reports (' + name(fq) + ')' : '') : fa ? 'From annual reports (' + name(fa) + ')' + (fq ? ' · TTM from quarterly reports (' + name(fq) + ')' : '') : ''; })(), segChartNote: '', hasSegHist: hasD, segYears: [], segHist: [], segCols: '', segHistNote: '', hasSegOp: false, hasSegOld: false, segOldLabel: '', toggleSegOld: () => this.setState(s => ({ segOld: !s.segOld })) };
+        const out = { segPeriodTabs: [['q', 'Quarterly'], ['a', 'Annual']].map(([id, label]) => ({ label, on: segPer === id, pick: () => this.setState({ segPeriod: id }) })), segViewTabs: [['segment', 'By segment'], ['product', 'By product'], ['geo', 'By region']].map(([id, label]) => ({ label, on: view === id, pick: () => this.setState({ segView: id, segViewFor: T }) })), reloadSegments: () => this.loadSegments(T), segStatus: status, segFrom: (() => { if (!hasD) return ''; const fa = sdA.filings, fq = sq && sq.status === 'ok' && sq.d ? sq.d.filings : null, name = f => (f.forms || []).join(', '); return segPer === 'q' ? (fq ? 'From quarterly reports (' + name(fq) + ')' : '') : fa ? 'From annual reports (' + name(fa) + ')' + (fq ? ' · TTM from quarterly reports (' + name(fq) + ')' : '') : ''; })(), segChartNote: '', hasSegHist: hasD, segYears: [], segHist: [], segCols: '', segHistNote: '', hasSegOp: false, hasSegOld: false, segOldLabel: '', toggleSegOld: () => this.setState(s => ({ segOld: !s.segOld })) };
         const D0 = sd[view];
         if (!D0) return out;
         // Lines with no figure at all are dropped. Lines the company stopped reporting only have
@@ -4056,9 +4531,9 @@ class Component extends DCLogic {
       })(),
       ...(() => {
         // The three statements as flow diagrams for one fiscal year or one quarter
-        const fPer = st.flowPeriod === 'q' && R.finQ && R.finQ.revenue ? 'q' : 'a', FQ2 = fPer === 'q' ? R.finQ : null, QL2 = R.qLabels || [];
+        const fPer = (st.flowPeriod || 'q') === 'q' && R.finQ && R.finQ.revenue ? 'q' : 'a', FQ2 = fPer === 'q' ? R.finQ : null, QL2 = R.qLabels || [];
         const years = []; if (fPer === 'q') { for (let k = FQ2.revenue.length - 1; k >= 0 && years.length < 8; k--) if (ok(num(FQ2.revenue[k])) || ok(num(FQ2.assets[k]))) years.push(k); } else for (let k = L; k >= 0 && years.length < 8; k--) if (ok(c.revenue[k]) || ok(c.assets[k])) years.push(k);   // a company with no sales yet still has a balance sheet and cash flow
-        const out = { hasFlows: years.length > 0 || !!R.finQ, flowYears: [], flowTabs: [], flows: [], flowNote: '', flowPeriodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: fPer === id, pick: () => { this.setState({ flowPeriod: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })) };
+        const out = { hasFlows: years.length > 0 || !!R.finQ, flowYears: [], flowTabs: [], flows: [], flowNote: '', flowPeriodTabs: [['q', 'Quarterly'], ['a', 'Annual']].map(([id, label]) => ({ label, on: fPer === id, pick: () => { this.setState({ flowPeriod: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })) };
         if (!years.length) return out;
         // the last twelve months, as the newest choice of the annual view
         const TF = fPer === 'a' ? ttmColumn(R, sx, ok(taxN) ? taxN / 100 : 0.21) : null; if (TF) years.unshift('ttm');
@@ -4066,7 +4541,7 @@ class Component extends DCLogic {
         const core = k => isT ? TF.c[k][TF.i] : fPer === 'q' ? num(FQ2[k][yi]) : c[k][yi], perLabel = isT ? 'last twelve months to ' + TF.label : fPer === 'q' ? QL2[yi] : 'fiscal ' + Y[yi];
         const x = (isT ? TF.x : sx && sx.status === 'ok' ? (fPer === 'q' ? sx.q[QL2[yi]] : sx.a[String(Y[yi])]) : null) || {}, g = f => ok(x[f]) ? x[f] : NaN, P = v => ok(v) && v > 0;
         out.flowYears = years.slice().reverse().map(k => ({ label: k === 'ttm' ? 'TTM' : fPer === 'q' ? QL2[k] : 'FY' + String(Y[k]).slice(2), on: k === yi, pick: () => this.setState(fPer === 'q' ? { flowQ: k } : { flowYear: k }) }));
-        const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MID = 'var(--color-neutral-400)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)';
+        const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)', RDC = 'oklch(0.74 0.12 300)';
         // a total split into named parts, with whatever is left over as "Other"; parts that overshoot are scaled to fit
         const split = (total, parts, otherLabel) => { const known = parts.filter(q => P(q[1])), sum = known.reduce((a, q) => a + q[1], 0), f = sum > total ? total / sum : 1, list = known.map(q => ({ label: q[0], v: q[1] * f, raw: q[1] })); if (total - sum > total * 0.004) list.push({ label: otherLabel, v: total - sum }); return list; };
         const N = (id, label, v, col, bold, raw) => ({ id, label, v, c: col, bold: !!bold, raw });
@@ -4100,7 +4575,10 @@ class Component extends DCLogic {
         // theirs into current and non-current, so for them the parts connect straight to the totals.
         (() => { const ta = core('assets'), ca = core('curAssets'), cl = core('curLiab'), eq0 = core('equity'), lt = g('liabTotal'), title = 'Snapshot of ' + T + '\'s balance sheet', fin = !!POS_RULES[posGroup(R.profile)].none;
           if (!P(ta) || !(ok(eq0) || ok(lt))) { out.flows.push({ title, sub: 'Balance sheet, ' + perLabel, has: false, msg: 'No balance sheet is on file for this period.' }); return; }
-          const eq = ok(eq0) ? eq0 : ta - lt, tl = ok(lt) ? lt : ta - eq, nci = ta - tl - eq, neg = eq <= 0, gap = neg ? tl - ta : 0;   // with negative equity, liabilities exceed assets by the gap
+          // redeemable stock and minority interests sit between liabilities and equity (drawn when they are more than a sliver)
+          // (a sliver is not drawn, but is still kept out of the minority interests)
+          const rdAll = P(g('redeemable')) ? g('redeemable') : 0, rd = rdAll > ta * 0.002 ? rdAll : 0;
+          const eq = ok(eq0) ? eq0 : ta - lt - rdAll, tl = ok(lt) ? lt : ta - eq - rdAll, nci = ta - tl - rdAll - eq, neg = eq <= 0, gap = neg ? tl + rd - ta : 0;   // with negative equity, what is owed exceeds assets by the gap
           if (!P(tl) || (neg && !P(gap))) { out.flows.push({ title, sub: 'Balance sheet, ' + perLabel, has: false, msg: 'The balance sheet on file for this period is incomplete.' }); return; }
           const classA = P(ca) && ca < ta, classL = P(cl) && cl < tl, nca = ta - ca, ncl = tl - cl, links = [], c0 = [], cA = [], cL = [], c5 = [];
           const pick = (total, keys, labels) => { const kept = fitParts(total, keys.map(k => [k, val(k)])); return keys.filter(k => kept.has(k)).map(k => [labels[k], val(k)]); };
@@ -4109,7 +4587,12 @@ class Component extends DCLogic {
             split(nca, fitted('nca', nca, AL), 'Not itemised').forEach((q, i) => { c0.push(N('a2' + i, q.label, q.v, GOOD, 0, q.raw)); links.push({ s: 'a2' + i, t: 'nca', v: q.v, c: GOOD }); });
             cA.push(N('ca', 'Current assets', ca, GOOD, 1), N('nca', 'Non-current assets', nca, GOOD, 1)); links.push({ s: 'ca', t: 'ta', v: ca, c: GOOD }, { s: 'nca', t: 'ta', v: nca, c: GOOD }); }
           else split(ta, pick(ta, ['cash', 'sti', 'receivables', 'ppe', 'ltInvest', 'goodwill', 'intangibles'], AL), fin ? 'Loans, securities and other assets' : 'Other assets').forEach((q, i) => { c0.push(N('a0' + i, q.label, q.v, GOOD, 0, q.raw)); links.push({ s: 'a0' + i, t: 'ta', v: q.v, c: GOOD }); });
-          links.push({ s: 'ta', t: 'tl', v: neg ? ta : tl, c: BAD }, neg ? { s: 'def', t: 'tl', v: gap, c: BAD } : { s: 'ta', t: 'eq', v: eq, c: GOOD });
+          // assets pay for the liabilities first, then the redeemable interests, then equity; a deficit makes up what they do not cover
+          const toTl = neg ? Math.min(ta, tl) : tl, toRd = neg ? Math.max(0, Math.min(rd, ta - tl)) : rd;
+          links.push({ s: 'ta', t: 'tl', v: toTl, c: BAD });
+          if (rd) links.push({ s: 'ta', t: 'rd', v: toRd, c: RDC });
+          links.push(neg ? { s: 'def', t: 'tl', v: tl - toTl, c: BAD } : { s: 'ta', t: 'eq', v: eq, c: GOOD });
+          if (neg && rd) links.push({ s: 'def', t: 'rd', v: rd - toRd, c: RDC });
           if (classL) { cL.push(N('cl', 'Current liabilities', cl, BAD, 1)); links.push({ s: 'tl', t: 'cl', v: cl, c: BAD }); if (P(ncl)) { cL.push(N('ncl', 'Non-current liabilities', ncl, BAD, 1)); links.push({ s: 'tl', t: 'ncl', v: ncl, c: BAD }); }
             split(cl, fitted('cl', cl, { ap: 'Accounts payable', taxPayable: 'Taxes payable', accrued: 'Accrued and other liabilities', stDebt: 'Short-term debt', leaseLiabCur: 'Current lease liabilities', deferredRev: 'Deferred revenue' }), 'Other current liabilities').forEach((q, i) => { c5.push(N('l1' + i, q.label, q.v, BAD, 0, q.raw)); links.push({ s: 'cl', t: 'l1' + i, v: q.v, c: BAD }); });
             if (P(ncl)) split(ncl, fitted('ncl', ncl, { ltDebt: 'Long-term debt', leaseLiab: 'Lease liabilities', deferredRevNC: 'Deferred revenue, long-term', deferredTax: 'Deferred tax', otherNCLr: 'Other non-current liabilities' }), 'Not itemised').forEach((q, i) => { c5.push(N('l2' + i, q.label, q.v, BAD, 0, q.raw)); links.push({ s: 'ncl', t: 'l2' + i, v: q.v, c: BAD }); }); }
@@ -4117,10 +4600,10 @@ class Component extends DCLogic {
           // equity is only split when every part is positive (an accumulated deficit cannot be drawn as a band)
           const re = g('retained'), pic = g('paidIn'); if (!neg && P(re) && re <= eq * 1.001) split(eq, [['Retained earnings', re], ['Paid-in capital', P(pic) && pic + re <= eq * 1.02 ? pic : NaN]], 'Other equity').forEach((q, i) => { (classL ? c5 : c5).push(N('e' + i, q.label, q.v, GOOD, 0, q.raw)); links.push({ s: 'eq', t: 'e' + i, v: q.v, c: GOOD }); });
           const showNci = !neg && nci > ta * 0.002; if (showNci) links.push({ s: 'ta', t: 'nci', v: nci, c: SOFT });
-          const mid = [N('tl', 'Total liabilities', tl, BAD, 1)].concat(neg ? [] : [N('eq', 'Shareholders\' equity', eq, GOOD, 1)]).concat(showNci ? [N('nci', 'Noncontrolling interests', nci, SOFT)] : []);
+          const mid = [N('tl', 'Total liabilities', tl, BAD, 1)].concat(rd ? [N('rd', 'Redeemable interests', rd, RDC)] : []).concat(neg ? [] : [N('eq', 'Shareholders\' equity', eq, GOOD, 1)]).concat(showNci ? [N('nci', 'Noncontrolling interests', nci, SOFT)] : []);
           // without the current / non-current step the breakdown sits one column closer, so equity's parts stay in line
           const cols = [c0, cA, [N('ta', 'Total assets', ta, MAIN, 1)].concat(neg ? [N('def', 'Shareholders\' deficit', gap, BAD, 0)] : []), mid, cL, c5].filter(x => x.length);
-          out.flows.push({ title, sub: 'Balance sheet at the end of ' + perLabel + ' · percentages are of total assets' + (neg ? ' · shareholders\' equity is negative: the company owes ' + big(gap) + ' more than it owns' : '') + (!classA ? ' · this company does not split its balance sheet into current and non-current' : ''), has: true, svg: this.flowChart(cols, links, ta, 'Balance sheet flow for ' + T) }); })();
+          out.flows.push({ title, sub: 'Balance sheet at the end of ' + perLabel + ' · percentages are of total assets' + (neg ? ' · shareholders\' equity is negative: the company owes ' + big(gap) + ' more than it owns' + (rd ? ', counting its redeemable interests' : '') : '') + (!classA ? ' · this company does not split its balance sheet into current and non-current' : ''), has: true, svg: this.flowChart(cols, links, ta, 'Balance sheet flow for ' + T) }); })();
         // cash flow: where the year's cash came from and where it went
         (() => { const cfo = core('cfo'), capex = core('capex'), cfi = g('cfi'), cff = g('cff'), acq = Z0(g('acquisitions')), div = Z0(g('dividends')), buy = Z0(g('buybacks')), iss = Z0(g('debtIssued')), rep = Z0(g('debtRepaid'));
           if (!(ok(cfo) && ok(cfi) && ok(cff))) {
@@ -4180,14 +4663,13 @@ class Component extends DCLogic {
           pos('Equity / assets', lv(c.eqAssets), pct, 'Share of assets funded by owners', ''),
         ] },
       ]; })(),
-      lastYear: Y[L], yearRange: `${Y[0]}–${Y[L]}`,
-      growthRows: [['Sales', c.revenue], ['Costs (sales − EBIT)', c.costs], ['Assets', c.assets], ['Liabilities', c.liab], ['Operating cash flow', c.cfo], ['Free cash flow', c.fcf], ['Share count', c.shares]].map(([label, a]) => ({ label, c5: pct(cagr(a, 5)), c10: pct(cagr(a, 10)), c15: pct(cagr(a, 15)), bars: spark(a) })),
+      yearRange: `${Y[0]}–${Y[L]}`,
       growthNote,
       stmtTabs: Object.keys(STMT).map(k => ({ label: STMT[k].label, on: st.tab === k, pick: () => this.setState({ tab: k }) })),
       taxRate: R.taxRate, onTax: setR('taxRate'),
       years: isQ ? R.qLabels.map(label => ({ label })) : Y.map(y => ({ label: y })).concat(TT ? [{ label: 'TTM' }] : []), stmtCols: '300px repeat(' + (isQ ? R.qLabels.length : Y.length + (TT ? 1 : 0)) + ',' + (unitId === 'K' && unitAuto !== 'K' ? 112 : 84) + 'px)', stmtRows, unitTabs: [['K', 'Thousands'], ['M', 'Millions'], ['B', 'Billions']].map(([id, label]) => ({ label, bg: unitId === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: unitId === id ? 'var(--color-text)' : 'var(--color-neutral-300)', icon: unitId === id ? 'ph ph-check' : '', pick: () => this.setState(s0 => ({ unitOpen: false, unitBy: Object.assign({}, s0.unitBy, { [T]: id }) })) })),
       unitLabel: { K: 'Thousands', M: 'Millions', B: 'Billions' }[unitId], unitOpen: !!st.unitOpen, unitToggle: () => this.setState({ unitOpen: !st.unitOpen }), unitClose: () => this.setState({ unitOpen: false }), unitCaret: st.unitOpen ? 'ph ph-caret-up' : 'ph ph-caret-down', unitBtnBg: st.unitOpen ? 'var(--color-surface)' : 'transparent', unitBtnBorder: st.unitOpen ? 'var(--color-accent)' : 'var(--color-divider)', stmtToggleAll, stmtAllLabel: allOpen ? 'Collapse all' : 'Expand all', stmtAllIcon: allOpen ? 'ph ph-arrows-in-line-vertical' : 'ph ph-arrows-out-line-vertical', stmtNote, stmtUnit: U.name + (isQ ? ' · quarter' : ''), stmtUnitWords: U.words, segUnit: U.name,
-      periodTabs: [['a', 'Annual'], ['q', 'Quarterly']].map(([id, label]) => ({ label, on: (st.period || (R.noAnnual ? 'q' : 'a')) === id, pick: () => { this.setState({ period: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })),
+      periodTabs: [['q', 'Quarterly'], ['a', 'Annual']].map(([id, label]) => ({ label, on: stPer === id, pick: () => { this.setState({ period: id }); if (id === 'q' && (!R.finQ || R.qVer !== Q_VER) && (st.qState || {})[T] !== 'loading') this.loadQuarters(T); } })),
       cmpTabs: [['yoy', 'YoY'], ['qoq', 'QoQ']].map(([id, label]) => ({ label, on: (st.cmp || 'yoy') === id, pick: () => this.setState({ cmp: id }) })),
       isQuarterly: wantQ, showChg, showHeat, toggleChg: () => this.setState({ showChg: !showChg }), toggleHeat: () => this.setState({ heat: !showHeat }),
       csYears: cy.map(i => ({ label: Y[i] })),
@@ -4242,16 +4724,6 @@ class Component extends DCLogic {
       sensHead: [tg - 0.005, tg, tg + 0.005].map(t => ({ t: pct(t) })),
       sens: [wacc - 0.01, wacc, wacc + 0.01].map((r, ri) => ({ label: pct(r), cells: [tg - 0.005, tg, tg + 0.005].map((t, ti) => { const x = dcfAt(r, t); const center = ri === 1 && ti === 1; return { t: x ? usd(x.ps) : '—', bg: center ? 'var(--color-accent-900)' : 'var(--color-surface)', color: x && ok(price) && x.ps >= price ? 'var(--color-accent-200)' : 'var(--color-text)' }; }) })),
 
-      insiderHead: [['Date', 'left'], ['Insider', 'left'], ['Role', 'left'], ['Type', 'left'], ['Shares', 'right'], ['Price', 'right'], ['Value', 'right']].map(([label, align]) => ({ label, align })),
-      insiders: byDate(R.insiders).map(([x, i]) => ({ date: x.date, who: x.who, role: x.role, type: x.type, shares: x.shares, price: x.price, value: usd(insVal(x), 0), onDate: fld('insiders', i, 'date'), onWho: fld('insiders', i, 'who'), onRole: fld('insiders', i, 'role'), onType: fld('insiders', i, 'type'), onShares: fld('insiders', i, 'shares'), onPrice: fld('insiders', i, 'price'), remove: del('insiders', i) })),
-      noInsiders: R.insiders.length === 0,
-      // Totals of the open-market trades read from the filings; your own log is only used when there are none
-      insiderFacts: (() => {
-        if (!insTrades.length) return [{ label: 'Bought', v: usd(buys, 0) }, { label: 'Sold', v: usd(sells, 0) }, { label: 'Transactions', v: String(R.insiders.length) }];
-        const val = x => ok(x.value) ? x.value : ok(x.shares) && ok(x.price) ? x.shares * x.price : 0, sum = f => insTrades.filter(f).reduce((a, x) => a + val(x), 0);
-        return [{ label: 'Bought', v: usd(sum(isBuy), 0) }, { label: 'Sold', v: usd(sum(x => !isBuy(x)), 0) }, { label: 'Transactions', v: String(insTrades.length) }];
-      })(),
-      addInsider: () => P(r => { r.insiders.push({ date: '', who: '', role: '', type: 'Buy', shares: '', price: '' }); }),
       news: byDate(R.news).map(([x, i]) => ({ date: x.date, headline: x.headline, url: x.url, impact: x.impact, onDate: fld('news', i, 'date'), onHeadline: fld('news', i, 'headline'), onUrl: fld('news', i, 'url'), onImpact: fld('news', i, 'impact'), remove: del('news', i) })),
       noNews: R.news.length === 0,
       addNews: () => P(r => { r.news.unshift({ date: new Date().toISOString().slice(0, 10), headline: '', url: '', impact: 'Neutral' }); }),

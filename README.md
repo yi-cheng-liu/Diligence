@@ -75,6 +75,12 @@ Then open **http://localhost:8765/** in your browser. The first time you open a 
 downloaded from the SEC (about 10 to 30 seconds); after that it loads instantly. A company saved more
 than 12 hours ago opens straight away from what is saved and is brought up to date in the background.
 
+New results come in by themselves. While the server runs, it checks every stock in your lists with the
+SEC every 15 minutes, and downloads a new 10-Q or 10-K as soon as it is filed. An open page picks up
+the new figures within two minutes, without a reload. The figures arrive with the 10-Q, which is often
+a few days after the earnings announcement. Companies outside the US that report their quarters on
+Form 6-K get only their annual figures from the SEC.
+
 The same program also works from the terminal:
 
 ```
@@ -88,6 +94,19 @@ python3 sec_db.py export MSFT           # exports/MSFT.json, for a website or sp
 ```
 
 On Windows use `python` instead of `python3`. A company takes about 5 to 30 seconds.
+
+**`sec.db` holds what your groups need, and no more.** While the server runs it looks every two minutes and deletes
+what is no longer needed:
+
+- A company that has been in none of your groups for ten minutes (taken out of a moomoo list, its group deleted, or
+  only looked up once) is deleted from `sec.db`. The company open on the page is kept, and so is one downloaded in the
+  last hour, so a company you just searched for or fetched from the terminal is not removed while you look at it.
+- The freed space is given back to the disk, and Macro series nobody has asked for in two days are dropped.
+- Nothing is lost by this: a company is read from the SEC again (10 to 30 seconds) when it comes back. Your notes and
+  reports are never touched.
+- To keep companies that are in no group, list them in `settings.json`: `"keep": ["CAT", "KO"]`. To switch the
+  deleting off altogether: `"tidy": false`. A database that is only used from the terminal, with no page ever opened,
+  keeps everything.
 
 ## The Diligence page
 **Groups and moomoo.** With moomoo OpenD running, every moomoo watchlist group is a group in Diligence too, and they
@@ -115,15 +134,27 @@ contact, FRED key and reports folder are saved to `settings.json`; data-provider
 
 Your theses, checklists, notes and lists are saved in the browser and, a few seconds after each change,
 copied to `notes/desk.json` in this folder. A browser
-that has none, or an older copy, picks them up from there. **Export notes** and **Import notes** in
+that has none, or an older copy, picks them up from there, when the page opens and again whenever you come back to
+its tab, so a tab left open does not save its old copy over newer notes. **Export notes** and **Import notes** in
 Settings save them to a file and load them back, to keep a copy elsewhere or move to another computer.
 API keys are never in these copies.
 
-When a stock is in none of your groups any more (you removed it, or deleted its group), Diligence asks whether
-to delete the data kept about it: your notes and the figures the page saved, and its SEC data in `sec.db`.
-Reports are never deleted: its company reports and every report that mentions it stay. SEC data shared with a
-ticker still in a group (GOOG and GOOGL) stays too.
-Stocks that left with a moomoo list are not asked about one by one: Settings → Stocks in no group lists them.
+Older copies of your notes are kept in `notes/backups`, and **Import notes** loads any of them back:
+
+- `desk-2026-11-13.json`: the notes as last saved that day, for the last 30 days on which they changed.
+- `desk-2026-11-13-101502-before.json`: the copy a save replaced, set aside when that save came from a tab that had
+  not seen it (two tabs or browsers open at once) or made the notes much smaller. The newest 20 are kept.
+
+The figures the page downloads for each stock (statements, segments, news) are about thirty times the size of your
+notes and can always be downloaded again, so they are kept apart from them: in the browser's IndexedDB, not in
+`notes/desk.json` or its backups. If the browser cannot save your notes (its storage is full or blocked), the page
+says so at the bottom of the window.
+
+A stock that is in none of your groups any more (you removed it, its group was deleted, or it left a moomoo list)
+is cleared by itself about ten minutes later: the figures the page saved for it, and its SEC data in `sec.db`.
+What you wrote about it is different. Diligence asks before deleting notes, and a stock whose notes you keep stays
+listed under Settings → Stocks in no group. Reports are never deleted: its company reports and every report that
+mentions it stay. SEC data shared with a ticker still in a group (GOOG and GOOGL) stays too.
 
 ### Workspaces
 The strip down the left edge switches between **Macro** (the economy), **Themes** (deep research on a
@@ -248,6 +279,9 @@ into the window, to pick up new ones.
   community. That second label is the top-level folder a report sits in (`Company/`,
   `Industry-theme/`, `Screens-pools/` and so on); the names are listed under
   `"category_folders"` in the reports folder's `_index/config.json`.
+- A report is shown as text, tables, links and pictures only. Themes reports are written from pages read on the web,
+  so anything in a report that could run as a program in the page (scripts, `onerror=` and the like, `javascript:`
+  links, forms, frames) is taken out before it is shown.
 - Charts and diagrams are drawn as each report opens, so every report gets them, old ones included.
   A table of figures gets a chart above it: years as a line or bars (years across the top work too),
   shares of a whole as a donut, and companies or segments as sorted bars. Totals are left out, and a
@@ -263,7 +297,9 @@ into the window, to pick up new ones.
   `http://localhost:8765/desk/reports.html`.
 
 ## Using it from another page or program
-The same server is a JSON API. If you ask for a company that isn't saved yet, it downloads it first.
+The same server is a JSON API. If you ask for a company that isn't saved yet, it downloads it first. A company
+that is in none of the page's groups is deleted again after an hour (see "Use"); name it under `"keep"` in
+`settings.json` to hold on to it.
 
 Only this computer may use it. Programs on this computer (curl, Python scripts) can call it freely. In a
 browser, only pages served from `localhost`, `127.0.0.1` or `[::1]` (any port) can read its answers, so a
@@ -299,11 +335,17 @@ Two checks, both with nothing to install:
   also run on GitHub for every push, on Linux, macOS and Windows (`.github/workflows/tests.yml`).
 - `python3 check.py` checks real figures in your own `sec.db`.
 
+The tests include five whole companies whose figures took special handling (Caterpillar, NextEra, Nebius,
+McDonald's, Nike), kept in `tests/fixtures` as what they filed with the SEC. Each is built again from that and every
+figure compared with what it was, so a change that moves any of them fails. When a change is meant to move them,
+`python3 tests/make_fixtures.py --expected` records the new figures; `python3 tests/make_fixtures.py TICKER` adds a
+company from your `sec.db`.
+
 Run both after any change to `sec_db.py`. `check.py` reads a few companies from `sec.db`
 (no server or internet needed) and checks figures that have gone wrong before, that every
 company's latest balance sheet adds up, and, if moomoo OpenD is running, the chart's price feed.
-It ends with a count of what passed, failed and was skipped. A company missing from `sec.db`, or OpenD not
-running or not logged in, shows as skipped, never as passed. It exits with an error when a check fails or
+It ends with a count of what passed, failed and was skipped. A company missing from `sec.db` (it only holds the
+stocks in your groups), or OpenD not running or not logged in, shows as skipped, never as passed. It exits with an error when a check fails or
 when no database check could run, for example with an empty `sec.db`.
 
 ## Looking inside the database
@@ -326,6 +368,9 @@ and filings the company facts leave out.
   reports them on the same line as its debt (Delta).
 - **Cash** for net debt, enterprise value, return on invested capital and the cash ratio includes short-term
   investments.
+- **Redeemable interests** (stock the holder can make the company buy back, and minority holders' shares of that
+  kind) are shown on their own line between liabilities and equity, as the balance sheet itself puts them. They are
+  in neither total, so shareholders' equity and the ratios built on it are unchanged (Lunar's $958M, AXT's $38M).
 - **Stock splits** are applied to every earlier share count and per-share figure.
 - **Operating income** is the company's own line. Without one it is worked out from operating figures (gross profit
   less operating expenses, or pre-tax income less non-operating items); banks, brokers and insurers get none.

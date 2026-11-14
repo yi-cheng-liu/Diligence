@@ -501,7 +501,6 @@ const PAL = ['#8ab4f8', '#f28b82', '#81c995', '#fdd663', '#c58af9', '#78d9ec', '
 const UPC = 'oklch(0.78 0.14 155)', DOWNC = 'oklch(0.72 0.16 25)';
 const addM = (k, n) => { let [y, m] = k.split('-').map(Number); m += n; y += Math.floor((m - 1) / 12); m = (((m - 1) % 12) + 12) % 12 + 1; return y + '-' + String(m).padStart(2, '0'); };
 const monthsBetween = (a, b) => { const out = []; if (!a || !b) return out; for (let k = a; k <= b && out.length < 2000; k = addM(k, 1)) out.push(k); return out; };
-const nowMonth = () => new Date().toISOString().slice(0, 7);
 const getJSON = url => fetch(url).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
 const postJSON = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
 const loadScript = src => new Promise((ok, fail) => { if (document.querySelector('script[data-src="' + src + '"]')) return ok(); const s = document.createElement('script'); s.src = src; s.dataset.src = src; s.onload = ok; s.onerror = () => fail(new Error('could not load ' + src)); document.head.appendChild(s); });
@@ -776,12 +775,12 @@ class Component extends DCLogic {
     presetTopic: lsGet('diligence.macro.topic', 'classic'),
     keyOpen: false, keyDraft: '', keyMsg: '', toast: null, status: null, dataVer: 0, libs: false,
     fred: { q: '', results: [], loading: false, needsKey: false, error: '' }, explain: null,
-    rel: { sel: null, start: null, dir: 1, fb: false }, relW: 0, recent: lsGet('diligence.macro.recent', []), chartW: 800,
+    rel: { sel: null, start: null, dir: 1, fb: false }, relW: 0, recent: lsGet('diligence.macro.recent', []),
   };
 
   componentDidMount() {
     // Recharts needs React (already on the page) and PropTypes, loaded in order; marked turns explanations into HTML
-    const libs = ['vendor/prop-types-15.8.1.min.js', 'vendor/recharts-2.12.7.js', 'vendor/marked-12.0.2.min.js'];
+    const libs = ['vendor/prop-types-15.8.1.min.js', 'vendor/recharts-2.12.7.js', 'vendor/marked-12.0.2.min.js', 'md-extras.js'];
     libs.reduce((p, src) => p.then(() => loadScript(src)), Promise.resolve()).then(() => this.setState({ libs: true }), e => this.toast(e.message));
     getJSON('/api/macro/status').then(st => this.setState({ status: st }), () => this.setState({ status: { error: true } }));
     const v = lsGet('diligence.macro.view', null);
@@ -1336,7 +1335,8 @@ class Component extends DCLogic {
     v.links = EDGES.filter(e => onChart.has(e.from) && onChart.has(e.to)).map(e => ({ name: NODE[e.from].label + ' → ' + NODE[e.to].label, sign: e.signal ? '!' : e.sign > 0 ? '+' : '−', cls: e.signal ? 'dim' : e.sign > 0 ? 'up' : 'down', detail: e.why + ' · ' + e.lag })); v.noLinks = !v.links.length;
     const ex = st.explain; v.explainBusy = !!(ex && ex.loading) || !M || !M.have.length; v.explainLabel = ex && ex.loading ? 'Thinking…' : ex && ex.text ? 'Again' : 'Explain';
     v.explainEmpty = !ex; v.onExplain = () => this.explain(M, type);
-    v.explainEl = ex && ex.text && window.marked ? h('div', { className: 'md', dangerouslySetInnerHTML: { __html: window.marked.parse(ex.text.replace(/</g, '&lt;')) } }) : ex && ex.error ? h('p', { className: 'note', style: { color: 'var(--down)' } }, ex.error) : ex && ex.loading ? h('p', { className: 'note' }, 'Reading the chart…') : null;
+    // filled by safeMarkdown, which keeps only plain formatting (no scripts, no javascript: links)
+    v.explainEl = ex && ex.text && window.safeMarkdown ? h('div', { className: 'md', key: ex.text, ref: el => { if (el && !el.firstChild) window.safeMarkdown(el, ex.text); } }) : ex && ex.error ? h('p', { className: 'note', style: { color: 'var(--down)' } }, ex.error) : ex && ex.loading ? h('p', { className: 'note' }, 'Reading the chart…') : null;
     v.edNotes = ed.notes || ''; v.onNotes = e => this.updEditor({ notes: e.target.value }); v.notesHint = ed.savedId ? 'Kept with this chart when you press Update.' : 'Save the chart to keep these notes.';
     // modals
     v.catalogOpen = st.catalogOpen; v.openCatalog = () => this.setState({ catalogOpen: true, search: '' }); v.closeCatalog = () => this.setState({ catalogOpen: false });
