@@ -2160,7 +2160,7 @@ const pick = (arr, names) => { const m = {}; (arr || []).forEach(x => { m[String
         };
   const o = {}; Object.keys(v).forEach(key => { if (ok(v[key])) o[key] = v[key] / 1e6; }); return o;
 }
-const FLOW_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'cfo', 'capex'], CF_FLOW = { cfo: 1, capex: 1, da: 1 };
+const FLOW_KEYS = ['revenue', 'cogs', 'ebit', 'interest', 'netIncome', 'da', 'cfo', 'capex'];
 // The last twelve months as one more column after the fiscal years, for the statements and their flow diagrams.
 // Income and cash-flow lines are the newest four quarters added up (share counts averaged); balance-sheet lines are
 // the newest quarter's. Only when four quarters in a row run past the last fiscal year: otherwise TTM is that year.
@@ -2544,7 +2544,7 @@ const mondayOf = t => { if (!ok(t)) return NaN; const d = new Date(t); d.setUTCH
 function loadQuotesCache() { try { return JSON.parse(localStorage.getItem(Q_KEY)) || {}; } catch (e) { return {}; } }
 
 class Component extends DCLogic {
-  state = { store: loadStore(), quotes: loadQuotesCache(), fetchState: {}, quoting: false, page: 'overview', tab: 'is', w: window.innerWidth, railOpen: false, drafts: {}, newSymbol: '', newGroup: '', groupMenu: false, keyDraft: '', keyDrafts: {}, roleDrafts: {}, keyTests: {}, showKey: {}, conn: { status: 'idle' }, keyTest: null, addingSource: false, srcLabel: '', srcUrl: '' };
+  state = { store: loadStore(), quotes: loadQuotesCache(), fetchState: {}, quoting: false, page: 'overview', tab: 'is', w: window.innerWidth, railOpen: false, drafts: {}, newSymbol: '', newGroup: '', groupMenu: false, keyDrafts: {}, roleDrafts: {}, keyTests: {}, showKey: {}, conn: { status: 'idle' }, addingSource: false, srcLabel: '', srcUrl: '' };
   mainRef = React.createRef();
   chipsRef = el => { const first = !this._chipsEl && !!el; this._chipsEl = el; if (first && el.clientWidth && el.clientWidth !== 242) this.forceUpdate(); };   // the row of group buttons, measured to see how many fit
   segScrollRef = el => { if (el) requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; }); };
@@ -3854,9 +3854,6 @@ class Component extends DCLogic {
 
     const bb = num(R.buyBelow);
     const verdictTags = { Buy: 'tag tag-accent', Watch: 'tag tag-outline', Pass: 'tag tag-neutral', Undecided: 'tag tag-neutral' };
-    const insVal = x => num(x.shares) * num(x.price);
-    const buys = R.insiders.filter(x => x.type !== 'Sell').reduce((s, x) => s + (ok(insVal(x)) ? insVal(x) : 0), 0);
-    const sells = R.insiders.filter(x => x.type === 'Sell').reduce((s, x) => s + (ok(insVal(x)) ? insVal(x) : 0), 0);
     const curLabel = SECTIONS.find(s => s.id === page).label;
     const hasKey = this.anyKey(), priceSrc = !!this.roleProvider('prices');
     const mmOn = !!(st.mmLive && Date.now() - st.mmLive.at < 90000);
@@ -3937,7 +3934,6 @@ class Component extends DCLogic {
     };
     const insTable = (id, title, note, priceHead, list) => { const n = insShown[id] || 15; return { note, priceHead, cols: '84px minmax(90px,1.6fr) ' + (id === 'trades' ? '58px' : 'minmax(104px,1fr)') + ' minmax(58px,0.55fr) minmax(68px,0.6fr) minmax(84px,0.9fr) minmax(104px,0.7fr)', minW: id === 'trades' ? '592px' : '628px', rows: weekRows(id, list, n), empty: !list.length, hasMore: list.length > n, moreLabel: 'Show ' + Math.min(25, list.length - n) + ' more', more: () => this.setState(s => ({ insShown: Object.assign({}, s.insShown, { [id]: n + 25 }) })) }; };
     const insTrades = liveInsSrc.filter(isOpenMarket), insOther = liveInsSrc.filter(x => !isOpenMarket(x));
-    const liveBuys = insTrades.filter(isBuy).length, liveSells = insTrades.length - liveBuys;
     const priceHist = (st.priceHist || {})[T], insYears = st.insYears || 2;
     const hold = (st.holders || {})[T];
     if (page === 'events' && !hold && this.pkey('local')) setTimeout(() => { if (!(this.state.holders || {})[T]) this.loadHolders(T); }, 0);
@@ -4027,7 +4023,6 @@ class Component extends DCLogic {
       searchOpen: !!st.search, searchMsg: st.search ? st.search.msg : '',
       searchResults: (st.search ? st.search.results : []).map((x, i) => ({ symbol: x.symbol, name: x.name, meta: x.meta, bg: i === st.search.sel ? 'var(--color-neutral-800)' : 'transparent', pick: e => { e.preventDefault(); this.addSymbol(x.symbol); } })),
       stmtScrollRef: this.stmtScrollRef,
-      refreshQuotes: () => (hasKey ? this.loadQuotes(true) : this.openSettings()), refreshIcon: st.quoting ? 'ph ph-spinner-gap' : 'ph ph-arrows-clockwise',
       saveWarn: !!st.saveFailed,
       saveWarnText: !st.saveFailed ? '' : LOCAL_DB === location.origin && !st.diskFailed
         ? 'This browser could not save your notes: its storage is full or blocked. They are still being copied to notes/desk.json, so nothing is lost while the Diligence server runs.'
@@ -4111,8 +4106,6 @@ class Component extends DCLogic {
       liveInsiderNote: insDeep && insDeep.status === 'loading' ? 'Reading ' + INSIDER_YEARS + ' years of Form 4 filings, which can take a few minutes the first time…' : insDeep && insDeep.status === 'error' ? 'Older filings could not be read: ' + insDeep.msg : '',
       hasInsiderNote: !!(insDeep && (insDeep.status === 'loading' || insDeep.status === 'error')),
       needKey: !hasKey, needKeyNote: `Add a free API key to load ${T}'s statements`,
-      finSourceNote: R.live && R.live.sources ? 'Source: ' + R.live.sources.join(', ') + '.' : '',
-      priceStr: R.val.price, onPrice: setObj('val', 'price'),
       dcfPs: usd(ps), dcfMos: mosTxt,
       verdict: R.verdict, verdictTag: verdictTags[R.verdict] || 'tag tag-neutral',
       mainMax: isWide ? 'none' : page === 'events' ? '1560px' : '1320px', mainPadB: isWide ? '16px' : '75vh', chartMounted: isChart || !!this._chartSeen, chartPlace: isChart ? 'height:100%' : (r => 'position:fixed;visibility:hidden;pointer-events:none;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px')(this._chartRect || { left: 0, top: 0, width: 1000, height: 600 }), mainOverflow: 'auto', mainH: isWide ? '100%' : 'auto',
@@ -4177,7 +4170,7 @@ class Component extends DCLogic {
           tvIntOpen: open, tvIntToggle: () => this.setState({ tvIntOpen: !open, tvStyleOpen: false }), tvIntClose: () => this.setState({ tvIntOpen: false }), tvIntCaret: open ? 'ph ph-caret-up' : 'ph ph-caret-down', tvIntBtnBg: open ? 'var(--color-surface)' : 'transparent', tvIntBtnColor: open ? 'var(--color-accent)' : 'var(--color-neutral-300)' }; })(),
       ...(() => { const opts = [['1', 'Candles'], ['0', 'Bars'], ['2', 'Line'], ['3', 'Area'], ['8', 'Heikin Ashi']], cur = (st.store.prefs.chart || {}).style || '1', open = !!st.tvStyleOpen;
         return { tvStyles: opts.map(([id, label]) => ({ label, value: id, bg: cur === id ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent', color: cur === id ? 'var(--color-text)' : 'var(--color-neutral-300)', icon: cur === id ? 'ph ph-check' : '', pick: () => { this.setState({ tvStyleOpen: false }); this.setChart({ style: id }); } })),
-          tvStyle: cur, tvStyleLabel: (opts.find(o => o[0] === cur) || opts[0])[1], tvStyleOpen: open, tvStyleToggle: () => this.setState({ tvStyleOpen: !open }), tvStyleClose: () => this.setState({ tvStyleOpen: false }), tvStyleCaret: open ? 'ph ph-caret-up' : 'ph ph-caret-down', tvStyleBtnBg: open ? 'var(--color-surface)' : 'transparent', tvStyleBtnBorder: open ? 'var(--color-accent)' : 'var(--color-divider)' }; })(),
+          tvStyleLabel: (opts.find(o => o[0] === cur) || opts[0])[1], tvStyleOpen: open, tvStyleToggle: () => this.setState({ tvStyleOpen: !open }), tvStyleClose: () => this.setState({ tvStyleOpen: false }), tvStyleCaret: open ? 'ph ph-caret-up' : 'ph ph-caret-down', tvStyleBtnBg: open ? 'var(--color-surface)' : 'transparent', tvStyleBtnBorder: open ? 'var(--color-accent)' : 'var(--color-divider)' }; })(),
       ...(() => {
         const dT = (st.daily || {})[T], dB = (st.daily || {})[TREND_BENCH];
         if (page === 'chart') setTimeout(() => { const d = this.state.daily || {}; if (!d[T]) this.loadDaily(T); if (!d[TREND_BENCH]) this.loadDaily(TREND_BENCH); }, 0);
@@ -4188,7 +4181,7 @@ class Component extends DCLogic {
         if (dT.status === 'error') { out.ttStatus = dT.msg; return out; }
         const tt = trendTemplate(dT.closes, dB && dB.status === 'ok' ? dB.closes : null), known = tt.rows.filter(r => r.pass !== null), met = known.filter(r => r.pass).length;
         out.ttHas = true;
-        out.ttRows = tt.rows.map((r, i) => ({ n: i + 1, text: r.text, detail: r.detail, note: r.note, hasNote: !!r.note, tagText: r.pass === null ? 'No data' : r.pass ? 'Pass' : 'Fail', tagClass: r.pass === null ? 'tag tag-neutral' : r.pass ? 'tag tag-good' : 'tag tag-flag' }));
+        out.ttRows = tt.rows.map((r, i) => ({ n: i + 1, text: r.text, detail: r.detail, note: r.note, tagText: r.pass === null ? 'No data' : r.pass ? 'Pass' : 'Fail', tagClass: r.pass === null ? 'tag tag-neutral' : r.pass ? 'tag tag-good' : 'tag tag-flag' }));
         out.ttScore = met + ' of ' + tt.rows.length + ' met'; out.ttScoreShort = met + '/' + tt.rows.length; out.ttScoreClass = met === tt.rows.length ? 'tag tag-good' : met >= 6 ? 'tag tag-watch' : 'tag tag-flag';
         out.ttVerdict = known.length < tt.rows.length ? 'Some rules could not be checked, so this is not a full reading.' : met === tt.rows.length ? 'All eight rules are met: the stock is in the kind of uptrend the book looks for.' : 'The book only considers a stock when all eight are met.';
         { const dd = this.ttDaily(T), W = 16;   // a calendar of the last sixteen weeks: a column per week, a row per weekday, a square per trading day
@@ -4402,7 +4395,7 @@ class Component extends DCLogic {
         if (this._figReady && (R.segData === undefined || R.segVer !== 3) && !ss && canLoad) setTimeout(() => this.loadSegments(T), 0);
         const status = segPer === 'q' && !this.pkey('local') ? 'Quarterly segment figures come from the Diligence server.' : segPer === 'q' && (!sq || sq.status === 'loading') ? 'Reading segment figures from the quarterly reports… the first time can take up to a minute.' : segPer === 'q' && sq.status === 'error' ? 'Could not be read: ' + sq.msg : ss === 'loading' ? 'Reading segment figures from the annual reports… the first time takes about 10 seconds.' : !canLoad || ss === 'nokey' ? 'Segment figures come from the Diligence server. Start it with python3 sec_db.py serve.' : ss && ss.startsWith('err:') && !hasD ? ss.slice(4) : (segPer === 'q' ? sq && sq.status === 'ok' : R.segData) && !hasD ? T + ' reports no ' + (segPer === 'q' ? 'quarterly ' : '') + 'breakdown by ' + kinds[view] + '.' : hasD ? (sd.filings || (sq && sq.status === 'ok' && sq.d && sq.d.filings) ? '' : 'From ' + (sd.src || 'filings')) : '';
         const lagS = segPer === 'q' ? 4 : 1;
-        const out = { segPeriodTabs: [['q', 'Quarterly'], ['a', 'Annual']].map(([id, label]) => ({ label, on: segPer === id, pick: () => this.setState({ segPeriod: id }) })), segViewTabs: [['segment', 'By segment'], ['product', 'By product'], ['geo', 'By region']].map(([id, label]) => ({ label, on: view === id, pick: () => this.setState({ segView: id, segViewFor: T }) })), reloadSegments: () => this.loadSegments(T), segStatus: status, segSources: [], segFrom: (() => { if (!hasD) return ''; const fa = sdA.filings, fq = sq && sq.status === 'ok' && sq.d ? sq.d.filings : null, name = f => (f.forms || []).join(', '); return segPer === 'q' ? (fq ? 'From quarterly reports (' + name(fq) + ')' : '') : fa ? 'From annual reports (' + name(fa) + ')' + (fq ? ' · TTM from quarterly reports (' + name(fq) + ')' : '') : ''; })(), segChartNote: '', hasSegHist: hasD, segYears: [], segHist: [], segCols: '', segHistNote: '', hasSegOp: false, hasSegOld: false, segOldLabel: '', toggleSegOld: () => this.setState(s => ({ segOld: !s.segOld })) };
+        const out = { segPeriodTabs: [['q', 'Quarterly'], ['a', 'Annual']].map(([id, label]) => ({ label, on: segPer === id, pick: () => this.setState({ segPeriod: id }) })), segViewTabs: [['segment', 'By segment'], ['product', 'By product'], ['geo', 'By region']].map(([id, label]) => ({ label, on: view === id, pick: () => this.setState({ segView: id, segViewFor: T }) })), reloadSegments: () => this.loadSegments(T), segStatus: status, segFrom: (() => { if (!hasD) return ''; const fa = sdA.filings, fq = sq && sq.status === 'ok' && sq.d ? sq.d.filings : null, name = f => (f.forms || []).join(', '); return segPer === 'q' ? (fq ? 'From quarterly reports (' + name(fq) + ')' : '') : fa ? 'From annual reports (' + name(fa) + ')' + (fq ? ' · TTM from quarterly reports (' + name(fq) + ')' : '') : ''; })(), segChartNote: '', hasSegHist: hasD, segYears: [], segHist: [], segCols: '', segHistNote: '', hasSegOp: false, hasSegOld: false, segOldLabel: '', toggleSegOld: () => this.setState(s => ({ segOld: !s.segOld })) };
         const D0 = sd[view];
         if (!D0) return out;
         // Lines with no figure at all are dropped. Lines the company stopped reporting only have
@@ -4546,7 +4539,7 @@ class Component extends DCLogic {
         const core = k => isT ? TF.c[k][TF.i] : fPer === 'q' ? num(FQ2[k][yi]) : c[k][yi], perLabel = isT ? 'last twelve months to ' + TF.label : fPer === 'q' ? QL2[yi] : 'fiscal ' + Y[yi];
         const x = (isT ? TF.x : sx && sx.status === 'ok' ? (fPer === 'q' ? sx.q[QL2[yi]] : sx.a[String(Y[yi])]) : null) || {}, g = f => ok(x[f]) ? x[f] : NaN, P = v => ok(v) && v > 0;
         out.flowYears = years.slice().reverse().map(k => ({ label: k === 'ttm' ? 'TTM' : fPer === 'q' ? QL2[k] : 'FY' + String(Y[k]).slice(2), on: k === yi, pick: () => this.setState(fPer === 'q' ? { flowQ: k } : { flowYear: k }) }));
-        const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MID = 'var(--color-neutral-400)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)';
+        const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)';
         // a total split into named parts, with whatever is left over as "Other"; parts that overshoot are scaled to fit
         const split = (total, parts, otherLabel) => { const known = parts.filter(q => P(q[1])), sum = known.reduce((a, q) => a + q[1], 0), f = sum > total ? total / sum : 1, list = known.map(q => ({ label: q[0], v: q[1] * f, raw: q[1] })); if (total - sum > total * 0.004) list.push({ label: otherLabel, v: total - sum }); return list; };
         const N = (id, label, v, col, bold, raw) => ({ id, label, v, c: col, bold: !!bold, raw });
@@ -4660,8 +4653,7 @@ class Component extends DCLogic {
           pos('Equity / assets', lv(c.eqAssets), pct, 'Share of assets funded by owners', ''),
         ] },
       ]; })(),
-      lastYear: Y[L], yearRange: `${Y[0]}–${Y[L]}`,
-      growthRows: [['Sales', c.revenue], ['Costs (sales − EBIT)', c.costs], ['Assets', c.assets], ['Liabilities', c.liab], ['Operating cash flow', c.cfo], ['Free cash flow', c.fcf], ['Share count', c.shares]].map(([label, a]) => ({ label, c5: pct(cagr(a, 5)), c10: pct(cagr(a, 10)), c15: pct(cagr(a, 15)), bars: spark(a) })),
+      yearRange: `${Y[0]}–${Y[L]}`,
       growthNote,
       stmtTabs: Object.keys(STMT).map(k => ({ label: STMT[k].label, on: st.tab === k, pick: () => this.setState({ tab: k }) })),
       taxRate: R.taxRate, onTax: setR('taxRate'),
@@ -4722,16 +4714,6 @@ class Component extends DCLogic {
       sensHead: [tg - 0.005, tg, tg + 0.005].map(t => ({ t: pct(t) })),
       sens: [wacc - 0.01, wacc, wacc + 0.01].map((r, ri) => ({ label: pct(r), cells: [tg - 0.005, tg, tg + 0.005].map((t, ti) => { const x = dcfAt(r, t); const center = ri === 1 && ti === 1; return { t: x ? usd(x.ps) : '—', bg: center ? 'var(--color-accent-900)' : 'var(--color-surface)', color: x && ok(price) && x.ps >= price ? 'var(--color-accent-200)' : 'var(--color-text)' }; }) })),
 
-      insiderHead: [['Date', 'left'], ['Insider', 'left'], ['Role', 'left'], ['Type', 'left'], ['Shares', 'right'], ['Price', 'right'], ['Value', 'right']].map(([label, align]) => ({ label, align })),
-      insiders: byDate(R.insiders).map(([x, i]) => ({ date: x.date, who: x.who, role: x.role, type: x.type, shares: x.shares, price: x.price, value: usd(insVal(x), 0), onDate: fld('insiders', i, 'date'), onWho: fld('insiders', i, 'who'), onRole: fld('insiders', i, 'role'), onType: fld('insiders', i, 'type'), onShares: fld('insiders', i, 'shares'), onPrice: fld('insiders', i, 'price'), remove: del('insiders', i) })),
-      noInsiders: R.insiders.length === 0,
-      // Totals of the open-market trades read from the filings; your own log is only used when there are none
-      insiderFacts: (() => {
-        if (!insTrades.length) return [{ label: 'Bought', v: usd(buys, 0) }, { label: 'Sold', v: usd(sells, 0) }, { label: 'Transactions', v: String(R.insiders.length) }];
-        const val = x => ok(x.value) ? x.value : ok(x.shares) && ok(x.price) ? x.shares * x.price : 0, sum = f => insTrades.filter(f).reduce((a, x) => a + val(x), 0);
-        return [{ label: 'Bought', v: usd(sum(isBuy), 0) }, { label: 'Sold', v: usd(sum(x => !isBuy(x)), 0) }, { label: 'Transactions', v: String(insTrades.length) }];
-      })(),
-      addInsider: () => P(r => { r.insiders.push({ date: '', who: '', role: '', type: 'Buy', shares: '', price: '' }); }),
       news: byDate(R.news).map(([x, i]) => ({ date: x.date, headline: x.headline, url: x.url, impact: x.impact, onDate: fld('news', i, 'date'), onHeadline: fld('news', i, 'headline'), onUrl: fld('news', i, 'url'), onImpact: fld('news', i, 'impact'), remove: del('news', i) })),
       noNews: R.news.length === 0,
       addNews: () => P(r => { r.news.unshift({ date: new Date().toISOString().slice(0, 10), headline: '', url: '', impact: 'Neutral' }); }),
