@@ -103,10 +103,12 @@ def main(argv):
         for path in paths():
             data = read(path)
             new = built(data)
-            changed = sum(a != b for a, b in zip(new, data["expected"])) + abs(len(new) - len(data["expected"]))
+            was, now = ({tuple(r[:5]): r[5] for r in rows} for rows in (data["expected"], new))
+            added, gone = len(now.keys() - was.keys()), len(was.keys() - now.keys())
+            changed = sum(1 for k in now.keys() & was.keys() if now[k] != was[k])
             data["expected"] = new
             write(path, data)
-            print(f"{os.path.basename(path)}: {len(new)} figures, {changed} changed")
+            print(f"{os.path.basename(path)}: {len(new)} figures; {added} new, {gone} gone, {changed} changed")
         return
     if not argv or argv[0].startswith("-"):
         sys.exit(__doc__)

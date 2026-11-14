@@ -208,7 +208,7 @@ FLOW_METRICS = {
                     "ProceedsFromIssuanceOfSeniorLongTermDebt"],
     "debt_repaid": ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt", "RepaymentsOfSeniorDebt"],
 }
-METRICS_VERSION = "22"   # raise when the lists of metrics change, so stored companies are rebuilt
+METRICS_VERSION = "23"   # raise when the lists of metrics change, so stored companies are rebuilt
 SEGMENTS_VERSION = "2"   # raise when the segment parser reads more, so each company's reports are read again when opened
 # Per-share and share-count figures can't be added up across quarters.
 NON_ADDITIVE = {"eps_basic", "eps_diluted", "shares_diluted", "eps_basic_shares"}
@@ -244,6 +244,9 @@ INSTANT_METRICS = {
     # short_term_debt, long_term_debt, total_debt and short_term_investments are then worked out again from every
     # debt and investment line the company reports (see debt_from_tags and the presented balance sheet)
     "total_debt": [],
+    # redeemable stock and redeemable minority interests, shown between liabilities and equity: worked out from
+    # REDEEMABLE_TAGS (see build_metrics). Shareholders' equity does not include them.
+    "redeemable_interests": [],
     "total_liabilities": ["Liabilities"],
     "equity": ["StockholdersEquity",
                "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
@@ -272,6 +275,29 @@ INSTANT_METRICS = {
     "deferred_revenue_noncurrent": ["ContractWithCustomerLiabilityNoncurrent", "DeferredRevenueNoncurrent"],
 }
 METRICS = list(FLOW_METRICS) + list(INSTANT_METRICS)
+
+# "Temporary" or "mezzanine" equity: shares the holder can make the company buy back (Lunar's redeemable minority
+# interests, $951M; Tesla's, $58M). Balance sheets put them between liabilities and equity, so
+# without them a balance sheet does not add up. The company's own and its minority holders' parts are added, unless
+# the company gives their total.
+REDEEMABLE_TOTAL = "TemporaryEquityCarryingAmountIncludingPortionAttributableToNoncontrollingInterests"
+REDEEMABLE_PARENT = ("TemporaryEquityCarryingAmountAttributableToParent", "TemporaryEquityCarryingAmount")
+REDEEMABLE_NCI = "RedeemableNoncontrollingInterestEquityCarryingAmount"
+REDEEMABLE_NCI_PARTS = ("RedeemableNoncontrollingInterestEquityCommonCarryingAmount",
+                        "RedeemableNoncontrollingInterestEquityPreferredCarryingAmount",
+                        "RedeemableNoncontrollingInterestEquityOtherCarryingAmount")
+REDEEMABLE_TAGS = {REDEEMABLE_TOTAL, REDEEMABLE_NCI, *REDEEMABLE_PARENT, *REDEEMABLE_NCI_PARTS}
+
+
+def redeemable_from_tags(v):
+    """Redeemable interests from one date's tag values ({concept: value}), or None when the company reports none."""
+    if v.get(REDEEMABLE_TOTAL) is not None:
+        return v[REDEEMABLE_TOTAL]
+    parent = next((v[c] for c in REDEEMABLE_PARENT if v.get(c) is not None), None)
+    nci = v.get(REDEEMABLE_NCI)
+    if nci is None and any(v.get(c) is not None for c in REDEEMABLE_NCI_PARTS):
+        nci = sum(v.get(c) or 0 for c in REDEEMABLE_NCI_PARTS)
+    return None if parent is None and nci is None else (parent or 0) + (nci or 0)
 
 # Companies that report under IFRS (TSMC, Nokia) use the ifrs-full vocabulary instead.
 IFRS_FLOW = {
@@ -824,12 +850,17 @@ def connect():
     except sqlite3.OperationalError:
         pass  # FTS5 not compiled in; search falls back to LIKE
     create_views(db)
-    row = db.execute("SELECT value FROM meta WHERE key='metrics_version'").fetchone()
-    if migrate or not row or row["value"] != METRICS_VERSION:
+    version = lambda: (db.execute("SELECT value FROM meta WHERE key='metrics_version'").fetchone() or [None])[0]
+    if migrate or version() != METRICS_VERSION:
         with db:
-            for r in db.execute("SELECT cik FROM companies").fetchall():
-                build_metrics(db, r["cik"])
-            db.execute("INSERT OR REPLACE INTO meta VALUES ('metrics_version', ?)", (METRICS_VERSION,))
+            # the figures are built again once: a connection opened meanwhile (the server's other threads) waits here,
+            # then finds them done, instead of building them all again itself
+            if not db.in_transaction:
+                db.execute("BEGIN IMMEDIATE")
+            if migrate or version() != METRICS_VERSION:
+                for r in db.execute("SELECT cik FROM companies").fetchall():
+                    build_metrics(db, r["cik"])
+                db.execute("INSERT OR REPLACE INTO meta VALUES ('metrics_version', ?)", (METRICS_VERSION,))
     if "issuer_cik" not in [r[1] for r in db.execute("PRAGMA table_info(holders_5pct)")]:
         with db:   # older copies stored 13D/13Gs about other companies too: read them all again
             db.execute("ALTER TABLE holders_5pct ADD COLUMN issuer_cik INTEGER")
@@ -1066,7 +1097,8 @@ def build_metrics(db, cik):
     ifrs = uses_ifrs(db, cik)
     gaap, taxonomy = ("ifrs", "ifrs-full") if ifrs else ("us", "us-gaap")
     flow_map, inst_map = (IFRS_FLOW, IFRS_INSTANT) if ifrs else (FLOW_METRICS, INSTANT_METRICS)
-    wanted = {c for names in list(flow_map.values()) + list(inst_map.values()) for c in names} | FAMILY_TAGS | {"AmortizationOfIntangibleAssets"}
+    wanted = ({c for names in list(flow_map.values()) + list(inst_map.values()) for c in names} | FAMILY_TAGS | REDEEMABLE_TAGS
+              | {"AmortizationOfIntangibleAssets"})
 
     # A company that changed its reporting currency (Yandex in roubles became Nebius in dollars) has both on file.
     # Only the currency it reports in now is used, so years in the old one are left out instead of being mixed in.
@@ -1287,6 +1319,17 @@ def build_metrics(db, cik):
                 mi = store.get((key, "minority_interest"))
                 if mi and mi[1]:
                     store[(key, metric)] = (p, val - mi[1], dict(row, concept="equity less minority interest"), st)
+
+    # Redeemable interests, between liabilities and equity
+    for e in annual_ends | set(q_end_dates):
+        rows = [instants[c][e] for c in REDEEMABLE_TAGS if e in instants.get(c, {}) and instants[c][e]["value"] is not None]
+        val = redeemable_from_tags({r["concept"]: r["value"] for r in rows})
+        if val:
+            row = dict(max(rows, key=lambda r: r["filed"] or ""), concept="redeemable interests from tags")
+            if e in annual_ends:
+                annual[(e, "redeemable_interests")] = (-1, val, row, None)
+            if e in q_end_dates:
+                quarterly[(q_end_dates[e], "redeemable_interests")] = (-1, val, row, None)
 
     # Debt and short-term investments: every line that carries part of them, from the statement as presented when it
     # was read, otherwise from all the tags (largest of each family, families added up)
@@ -2898,7 +2941,7 @@ DETAIL_KEYS = {   # the page's name for each extra statement line -> metric
     "sti": "short_term_investments", "receivables": "receivables", "inventory": "inventory",
     "ppe": "ppe", "goodwill": "goodwill", "intangibles": "intangibles", "ltInvest": "long_term_investments",
     "ap": "accounts_payable", "deferredRev": "deferred_revenue", "stDebt": "short_term_debt",
-    "ltDebt": "long_term_debt", "liabTotal": "total_liabilities", "retained": "retained_earnings",
+    "ltDebt": "long_term_debt", "liabTotal": "total_liabilities", "redeemable": "redeemable_interests", "retained": "retained_earnings",
     "paidIn": "paid_in_capital", "aoci": "aoci", "treasury": "treasury_stock", "minority": "minority_interest",
     "accrued": "accrued_liabilities", "leaseAssets": "lease_assets", "leaseLiab": "lease_liabilities",
     "deferredTax": "deferred_tax_liabilities", "deferredRevNC": "deferred_revenue_noncurrent",

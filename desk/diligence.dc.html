@@ -1983,10 +1983,12 @@ const STMT = {
         sR('totalNCL', 'Total non-current liabilities', (g, i) => g('liabT', i) - g('curLiab', i), 1)]),
       sG('bs.d', 'Total debt', [sC('netDebt', 'Net debt (debt less cash and short-term investments)'), sI('debt', 'Total debt, excluding leases', 1)]),
       sR('liabT', 'Total liabilities', (g, i) => g('liabT', i), 1)]),
+    // stock the holder can make the company buy back, and minority holders' shares of that kind: neither debt nor equity
+    sX('redeemable', 'Redeemable interests (between liabilities and equity)'),
     sG('bs.e', "Shareholders' equity", [sX('paidIn', 'Common stock & paid-in capital'), sX('retained', 'Retained earnings'), sX('aoci', 'Accumulated other comprehensive income'),
       sR('treasuryNeg', 'Treasury stock', (g, i) => ok(g('treasury', i)) ? -g('treasury', i) : NaN),
       sR('otherEq', 'Other equity', (g, i) => anyOk(g('paidIn', i), g('retained', i)) ? g('equity', i) - Z0(g('paidIn', i)) - Z0(g('retained', i)) - Z0(g('aoci', i)) + Z0(g('treasury', i)) : NaN), sI('equity', "Total shareholders' equity", 1)]),
-    sR('nci', 'Noncontrolling and other interests', (g, i) => { const v = g('assets', i) - g('liabT', i) - g('equity', i); return ok(v) && Math.abs(v) > g('assets', i) * 0.001 ? v : NaN; }),
+    sR('nci', 'Noncontrolling and other interests', (g, i) => { const v = g('assets', i) - g('liabT', i) - Z0(g('redeemable', i)) - g('equity', i); return ok(v) && Math.abs(v) > g('assets', i) * 0.001 ? v : NaN; }),
     sR('totalLE', 'Total liabilities and equity', (g, i) => g('assets', i), 1),
     sG('bs.m', 'Other measures', [
       sR('workingCap', 'Working capital (current assets less current liabilities)', (g, i) => g('curAssets', i) - g('curLiab', i)),
@@ -4539,7 +4541,7 @@ class Component extends DCLogic {
         const core = k => isT ? TF.c[k][TF.i] : fPer === 'q' ? num(FQ2[k][yi]) : c[k][yi], perLabel = isT ? 'last twelve months to ' + TF.label : fPer === 'q' ? QL2[yi] : 'fiscal ' + Y[yi];
         const x = (isT ? TF.x : sx && sx.status === 'ok' ? (fPer === 'q' ? sx.q[QL2[yi]] : sx.a[String(Y[yi])]) : null) || {}, g = f => ok(x[f]) ? x[f] : NaN, P = v => ok(v) && v > 0;
         out.flowYears = years.slice().reverse().map(k => ({ label: k === 'ttm' ? 'TTM' : fPer === 'q' ? QL2[k] : 'FY' + String(Y[k]).slice(2), on: k === yi, pick: () => this.setState(fPer === 'q' ? { flowQ: k } : { flowYear: k }) }));
-        const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)';
+        const GOOD = 'oklch(0.72 0.15 155)', BAD = 'oklch(0.66 0.18 25)', MAIN = 'var(--color-accent)', SOFT = 'oklch(0.72 0.12 250)', RDC = 'oklch(0.74 0.12 300)';
         // a total split into named parts, with whatever is left over as "Other"; parts that overshoot are scaled to fit
         const split = (total, parts, otherLabel) => { const known = parts.filter(q => P(q[1])), sum = known.reduce((a, q) => a + q[1], 0), f = sum > total ? total / sum : 1, list = known.map(q => ({ label: q[0], v: q[1] * f, raw: q[1] })); if (total - sum > total * 0.004) list.push({ label: otherLabel, v: total - sum }); return list; };
         const N = (id, label, v, col, bold, raw) => ({ id, label, v, c: col, bold: !!bold, raw });
@@ -4573,7 +4575,10 @@ class Component extends DCLogic {
         // theirs into current and non-current, so for them the parts connect straight to the totals.
         (() => { const ta = core('assets'), ca = core('curAssets'), cl = core('curLiab'), eq0 = core('equity'), lt = g('liabTotal'), title = 'Snapshot of ' + T + '\'s balance sheet', fin = !!POS_RULES[posGroup(R.profile)].none;
           if (!P(ta) || !(ok(eq0) || ok(lt))) { out.flows.push({ title, sub: 'Balance sheet, ' + perLabel, has: false, msg: 'No balance sheet is on file for this period.' }); return; }
-          const eq = ok(eq0) ? eq0 : ta - lt, tl = ok(lt) ? lt : ta - eq, nci = ta - tl - eq, neg = eq <= 0, gap = neg ? tl - ta : 0;   // with negative equity, liabilities exceed assets by the gap
+          // redeemable stock and minority interests sit between liabilities and equity (drawn when they are more than a sliver)
+          // (a sliver is not drawn, but is still kept out of the minority interests)
+          const rdAll = P(g('redeemable')) ? g('redeemable') : 0, rd = rdAll > ta * 0.002 ? rdAll : 0;
+          const eq = ok(eq0) ? eq0 : ta - lt - rdAll, tl = ok(lt) ? lt : ta - eq - rdAll, nci = ta - tl - rdAll - eq, neg = eq <= 0, gap = neg ? tl + rd - ta : 0;   // with negative equity, what is owed exceeds assets by the gap
           if (!P(tl) || (neg && !P(gap))) { out.flows.push({ title, sub: 'Balance sheet, ' + perLabel, has: false, msg: 'The balance sheet on file for this period is incomplete.' }); return; }
           const classA = P(ca) && ca < ta, classL = P(cl) && cl < tl, nca = ta - ca, ncl = tl - cl, links = [], c0 = [], cA = [], cL = [], c5 = [];
           const pick = (total, keys, labels) => { const kept = fitParts(total, keys.map(k => [k, val(k)])); return keys.filter(k => kept.has(k)).map(k => [labels[k], val(k)]); };
@@ -4582,7 +4587,12 @@ class Component extends DCLogic {
             split(nca, fitted('nca', nca, AL), 'Not itemised').forEach((q, i) => { c0.push(N('a2' + i, q.label, q.v, GOOD, 0, q.raw)); links.push({ s: 'a2' + i, t: 'nca', v: q.v, c: GOOD }); });
             cA.push(N('ca', 'Current assets', ca, GOOD, 1), N('nca', 'Non-current assets', nca, GOOD, 1)); links.push({ s: 'ca', t: 'ta', v: ca, c: GOOD }, { s: 'nca', t: 'ta', v: nca, c: GOOD }); }
           else split(ta, pick(ta, ['cash', 'sti', 'receivables', 'ppe', 'ltInvest', 'goodwill', 'intangibles'], AL), fin ? 'Loans, securities and other assets' : 'Other assets').forEach((q, i) => { c0.push(N('a0' + i, q.label, q.v, GOOD, 0, q.raw)); links.push({ s: 'a0' + i, t: 'ta', v: q.v, c: GOOD }); });
-          links.push({ s: 'ta', t: 'tl', v: neg ? ta : tl, c: BAD }, neg ? { s: 'def', t: 'tl', v: gap, c: BAD } : { s: 'ta', t: 'eq', v: eq, c: GOOD });
+          // assets pay for the liabilities first, then the redeemable interests, then equity; a deficit makes up what they do not cover
+          const toTl = neg ? Math.min(ta, tl) : tl, toRd = neg ? Math.max(0, Math.min(rd, ta - tl)) : rd;
+          links.push({ s: 'ta', t: 'tl', v: toTl, c: BAD });
+          if (rd) links.push({ s: 'ta', t: 'rd', v: toRd, c: RDC });
+          links.push(neg ? { s: 'def', t: 'tl', v: tl - toTl, c: BAD } : { s: 'ta', t: 'eq', v: eq, c: GOOD });
+          if (neg && rd) links.push({ s: 'def', t: 'rd', v: rd - toRd, c: RDC });
           if (classL) { cL.push(N('cl', 'Current liabilities', cl, BAD, 1)); links.push({ s: 'tl', t: 'cl', v: cl, c: BAD }); if (P(ncl)) { cL.push(N('ncl', 'Non-current liabilities', ncl, BAD, 1)); links.push({ s: 'tl', t: 'ncl', v: ncl, c: BAD }); }
             split(cl, fitted('cl', cl, { ap: 'Accounts payable', taxPayable: 'Taxes payable', accrued: 'Accrued and other liabilities', stDebt: 'Short-term debt', leaseLiabCur: 'Current lease liabilities', deferredRev: 'Deferred revenue' }), 'Other current liabilities').forEach((q, i) => { c5.push(N('l1' + i, q.label, q.v, BAD, 0, q.raw)); links.push({ s: 'cl', t: 'l1' + i, v: q.v, c: BAD }); });
             if (P(ncl)) split(ncl, fitted('ncl', ncl, { ltDebt: 'Long-term debt', leaseLiab: 'Lease liabilities', deferredRevNC: 'Deferred revenue, long-term', deferredTax: 'Deferred tax', otherNCLr: 'Other non-current liabilities' }), 'Not itemised').forEach((q, i) => { c5.push(N('l2' + i, q.label, q.v, BAD, 0, q.raw)); links.push({ s: 'ncl', t: 'l2' + i, v: q.v, c: BAD }); }); }
@@ -4590,10 +4600,10 @@ class Component extends DCLogic {
           // equity is only split when every part is positive (an accumulated deficit cannot be drawn as a band)
           const re = g('retained'), pic = g('paidIn'); if (!neg && P(re) && re <= eq * 1.001) split(eq, [['Retained earnings', re], ['Paid-in capital', P(pic) && pic + re <= eq * 1.02 ? pic : NaN]], 'Other equity').forEach((q, i) => { (classL ? c5 : c5).push(N('e' + i, q.label, q.v, GOOD, 0, q.raw)); links.push({ s: 'eq', t: 'e' + i, v: q.v, c: GOOD }); });
           const showNci = !neg && nci > ta * 0.002; if (showNci) links.push({ s: 'ta', t: 'nci', v: nci, c: SOFT });
-          const mid = [N('tl', 'Total liabilities', tl, BAD, 1)].concat(neg ? [] : [N('eq', 'Shareholders\' equity', eq, GOOD, 1)]).concat(showNci ? [N('nci', 'Noncontrolling interests', nci, SOFT)] : []);
+          const mid = [N('tl', 'Total liabilities', tl, BAD, 1)].concat(rd ? [N('rd', 'Redeemable interests', rd, RDC)] : []).concat(neg ? [] : [N('eq', 'Shareholders\' equity', eq, GOOD, 1)]).concat(showNci ? [N('nci', 'Noncontrolling interests', nci, SOFT)] : []);
           // without the current / non-current step the breakdown sits one column closer, so equity's parts stay in line
           const cols = [c0, cA, [N('ta', 'Total assets', ta, MAIN, 1)].concat(neg ? [N('def', 'Shareholders\' deficit', gap, BAD, 0)] : []), mid, cL, c5].filter(x => x.length);
-          out.flows.push({ title, sub: 'Balance sheet at the end of ' + perLabel + ' · percentages are of total assets' + (neg ? ' · shareholders\' equity is negative: the company owes ' + big(gap) + ' more than it owns' : '') + (!classA ? ' · this company does not split its balance sheet into current and non-current' : ''), has: true, svg: this.flowChart(cols, links, ta, 'Balance sheet flow for ' + T) }); })();
+          out.flows.push({ title, sub: 'Balance sheet at the end of ' + perLabel + ' · percentages are of total assets' + (neg ? ' · shareholders\' equity is negative: the company owes ' + big(gap) + ' more than it owns' + (rd ? ', counting its redeemable interests' : '') : '') + (!classA ? ' · this company does not split its balance sheet into current and non-current' : ''), has: true, svg: this.flowChart(cols, links, ta, 'Balance sheet flow for ' + T) }); })();
         // cash flow: where the year's cash came from and where it went
         (() => { const cfo = core('cfo'), capex = core('capex'), cfi = g('cfi'), cff = g('cff'), acq = Z0(g('acquisitions')), div = Z0(g('dividends')), buy = Z0(g('buybacks')), iss = Z0(g('debtIssued')), rep = Z0(g('debtRepaid'));
           if (!(ok(cfo) && ok(cfi) && ok(cff))) {

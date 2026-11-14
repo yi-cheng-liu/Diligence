@@ -368,6 +368,9 @@ and filings the company facts leave out.
   reports them on the same line as its debt (Delta).
 - **Cash** for net debt, enterprise value, return on invested capital and the cash ratio includes short-term
   investments.
+- **Redeemable interests** (stock the holder can make the company buy back, and minority holders' shares of that
+  kind) are shown on their own line between liabilities and equity, as the balance sheet itself puts them. They are
+  in neither total, so shareholders' equity and the ratios built on it are unchanged (Lunar's $958M, AXT's $38M).
 - **Stock splits** are applied to every earlier share count and per-share figure.
 - **Operating income** is the company's own line. Without one it is worked out from operating figures (gross profit
   less operating expenses, or pre-tax income less non-operating items); banks, brokers and insurers get none.

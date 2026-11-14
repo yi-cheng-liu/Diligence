@@ -314,6 +314,16 @@ class Figures(unittest.TestCase):
         self.assertEqual(s.debt_from_tags(xom)[2], 9296 + 34241)
         self.assertIsNone(s.debt_from_tags({"Assets": 1}))
 
+    def test_redeemable_interests(self):
+        # Lunar: its own redeemable preferred stock and its minority holders' redeemable units, added
+        self.assertAlmostEqual(s.redeemable_from_tags({"TemporaryEquityCarryingAmountAttributableToParent": 6.6,
+                                                       "RedeemableNoncontrollingInterestEquityCarryingAmount": 951.5}), 958.1)
+        # a total given by the company is taken as it is, not added to its parts
+        self.assertEqual(s.redeemable_from_tags({s.REDEEMABLE_TOTAL: 58, "RedeemableNoncontrollingInterestEquityCarryingAmount": 58}), 58)
+        self.assertEqual(s.redeemable_from_tags({"RedeemableNoncontrollingInterestEquityCommonCarryingAmount": 3,
+                                                 "RedeemableNoncontrollingInterestEquityPreferredCarryingAmount": 4}), 7)
+        self.assertIsNone(s.redeemable_from_tags({"Liabilities": 1}))
+
     def test_short_term_investments(self):
         self.assertEqual(s.sti_from_tags({"DebtSecuritiesCurrent": 39065}), 39065)
         self.assertEqual(s.sti_from_tags({"ShortTermInvestments": 10005, "AvailableForSaleSecuritiesDebtSecuritiesCurrent": 9000}), 10005)
@@ -569,6 +579,19 @@ class Companies(unittest.TestCase):
         filed = datetime.fromisoformat(reports[0][3]).replace(tzinfo=timezone.utc)
         self.db.execute("UPDATE companies SET fetched_at=? WHERE cik=?", ((filed + timedelta(days=5)).isoformat(), cik))
         self.assertIsNone(s.report_state(self.db, cik, recent, filed + timedelta(days=6)))
+
+    def test_balance_sheets_add_up_with_redeemable_interests(self):
+        # NextEra and Nebius report redeemable minority interests between liabilities and equity in some years
+        for t in ("NEE", "NBIS"):
+            cik = self.fixtures[t][0]
+            # the years with the line, where the company also gives total liabilities (not every year's filing does)
+            years = [(y, x, self.year(t, y)) for y, x in s.desk_statements(self.db, cik)["annual"].items()
+                     if x.get("redeemable") and x.get("liabTotal") is not None]
+            years = [(y, x, v) for y, x, v in years if v.get("equity") is not None and v.get("assets")]
+            self.assertTrue(years, t)
+            for y, x, v in years:
+                told = v["equity"] + x["liabTotal"] + x["redeemable"] + (x.get("minority") or 0)
+                self.assertAlmostEqual(told, v["assets"], delta=abs(v["assets"]) * 0.005, msg=f"{t} {y}")
 
     def test_nebius_is_read_in_dollars(self):
         self.assertEqual(s.desk_statements(self.db, self.fixtures["NBIS"][0]).get("currency"), "USD")

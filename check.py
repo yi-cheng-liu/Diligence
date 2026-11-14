@@ -117,9 +117,10 @@ def main():
         looked += 1
         v, x = by[years[-1]], s.desk_statements(db, r["cik"])["annual"].get(years[-1], {})
         problems = []
-        # some companies report equity with the outside owners' share already inside it (AST SpaceMobile), others beside it
+        # some companies report equity with the outside owners' share already inside it (AST SpaceMobile), others beside
+        # it; redeemable stock and redeemable minority interests sit between liabilities and equity (Lunar, AXT)
         if v.get("equity") is not None and x.get("liabTotal") is not None and not any(
-                near(v["assets"], v["equity"] + x["liabTotal"] + extra, 0.03) for extra in (0, x.get("minority") or 0)):
+                near(v["assets"], v["equity"] + x["liabTotal"] + (x.get("redeemable") or 0) + extra, 0.03) for extra in (0, x.get("minority") or 0)):
             problems.append("assets do not equal liabilities plus equity")
         if v.get("curAssets") and v["curAssets"] > v["assets"] * 1.001:
             problems.append("current assets exceed total assets")
